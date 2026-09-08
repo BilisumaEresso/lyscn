@@ -1,0 +1,66 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-primary:      #14B8A6;
+    --color-primary-dark: #0F8077;
+    --color-primary-light:#5EDDD4;
+    --color-surface-wash: #E6FAF8;
+    --color-on-primary:   #FFFFFF;
+  }
+
+  body {
+    @apply font-sans text-ink bg-paper antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display;
+  }
+
+  /* Subtle focus ring for keyboard navigation */
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  /* Reduced-motion: disable all custom animations */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration:        0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration:       0.01ms !important;
+    }
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-ink/10 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-ink/20;
+  }
+}
+
+@layer utilities {
+  /* Leaf → Teal gradient — used sparingly (logo lockup, QR reveal) */
+  .gradient-brand {
+    background: linear-gradient(135deg, #55E6A5 0%, #14B8A6 100%);
+  }
+  .text-gradient-brand {
+    background: linear-gradient(135deg, #55E6A5 0%, #14B8A6 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}

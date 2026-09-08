@@ -1,0 +1,68 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* ── Brand theme CSS custom properties (defaults = LayoScan teal) ─────────
+     These are overridden per-restaurant by theme.js after QR resolution.      */
+  :root {
+    --color-primary:      #14B8A6;
+    --color-primary-dark: #0F8077;
+    --color-primary-light:#5EDDD4;
+    --color-surface-wash: #E6FAF8;
+    --color-on-primary:   #FFFFFF;
+  }
+
+  html {
+    background-color: #F5F8F7;
+    overscroll-behavior: none;
+  }
+
+  body {
+    @apply font-sans text-ink bg-paper antialiased;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    overscroll-behavior: none;
+  }
+
+  h1, h2, h3, h4, h5, h6 { @apply font-display; }
+
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  /* ── Reduced-motion: swap animated transitions to instant fade ─────────── */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration:   0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration:  0.01ms !important;
+    }
+  }
+}
+
+@layer utilities {
+  .gradient-brand {
+    background: linear-gradient(135deg, #55E6A5 0%, #14B8A6 100%);
+  }
+  .gradient-cover-fallback {
+    background: linear-gradient(160deg, #121A2C 0%, #14B8A6 60%, #55E6A5 100%);
+  }
+  .text-gradient-brand {
+    background: linear-gradient(135deg, #55E6A5 0%, #14B8A6 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .sticky-bottom {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 560px;
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+}
