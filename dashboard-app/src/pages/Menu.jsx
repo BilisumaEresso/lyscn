@@ -1,18 +1,20 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm, useFieldArray } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import {
   Plus, Pencil, Trash2, ChevronUp, ChevronDown,
-  X, ImageOff, Check, GripVertical,
+  X, ImageOff, Check, GripVertical, Sparkles, Search, CheckCircle2
 } from 'lucide-react';
 import api from '../lib/api';
 import { useAuthStore } from '../store/authStore';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Toggle from '../components/ui/Toggle';
+import Modal from '../components/ui/Modal';
 import EmptyState from '../components/ui/EmptyState';
 import Spinner from '../components/ui/Spinner';
+import menuRecs from '../data/menuRecommendations.json';
 
 // ── Category item ─────────────────────────────────────────────────────────────
 function CategoryItem({ cat, isSelected, onClick, onDelete, onMoveUp, onMoveDown, isFirst, isLast }) {
@@ -20,16 +22,17 @@ function CategoryItem({ cat, isSelected, onClick, onDelete, onMoveUp, onMoveDown
     <div
       onClick={onClick}
       className={`group flex items-center gap-2 px-3 py-2.5 cursor-pointer rounded-lg mx-2 mb-0.5 transition-all ${
-        isSelected ? 'bg-teal/10 text-teal' : 'hover:bg-ink/5 text-ink'
+        isSelected ? 'bg-teal/10 text-teal font-semibold' : 'hover:bg-ink/5 text-ink font-medium'
       }`}
     >
       <GripVertical size={14} className="text-ink/20 shrink-0" />
-      <span className="flex-1 text-sm font-medium truncate">{cat.name}</span>
+      <span className="flex-1 text-sm truncate">{cat.name}</span>
       <div className="hidden group-hover:flex items-center gap-0.5">
         {!isFirst && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveUp(); }}
             className="p-1 rounded hover:bg-ink/8 text-ink-muted"
+            title="Move up"
           >
             <ChevronUp size={12} />
           </button>
@@ -38,6 +41,7 @@ function CategoryItem({ cat, isSelected, onClick, onDelete, onMoveUp, onMoveDown
           <button
             onClick={(e) => { e.stopPropagation(); onMoveDown(); }}
             className="p-1 rounded hover:bg-ink/8 text-ink-muted"
+            title="Move down"
           >
             <ChevronDown size={12} />
           </button>
@@ -45,6 +49,7 @@ function CategoryItem({ cat, isSelected, onClick, onDelete, onMoveUp, onMoveDown
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(); }}
           className="p-1 rounded hover:bg-danger/10 text-ink-muted hover:text-danger"
+          title="Remove category"
         >
           <Trash2 size={12} />
         </button>
@@ -100,10 +105,86 @@ function OptionsFieldArray({ groupIndex, control, register }) {
   );
 }
 
+// ── Browse Recommended Products Modal ─────────────────────────────────────────
+function BrowseRecommendedModal({ open, onClose, categoryName, onSelect }) {
+  const [search, setSearch] = useState('');
+
+  if (!open) return null;
+
+  // Find matching category or fallback to all items
+  const catData = menuRecs.categories.find(
+    (c) => c.name.toLowerCase() === (categoryName || '').toLowerCase()
+  );
+  const items = catData ? catData.items : menuRecs.categories.flatMap((c) => c.items);
+
+  const filteredItems = items.filter((item) =>
+    item.name.toLowerCase().includes(search.toLowerCase()) ||
+    item.description.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <Modal open={open} onClose={onClose} title={`Recommended items — ${categoryName || 'Menu'}`} size="md">
+      <div className="space-y-4">
+        {/* Search input */}
+        <div className="relative">
+          <Search size={14} className="absolute left-3 top-3 text-ink-muted" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={`Search ${categoryName || 'recommended'} items…`}
+            className="w-full pl-9 pr-3 py-2 text-xs border border-ink/12 rounded-xl focus:outline-none focus:border-teal bg-ink/2"
+            autoFocus
+          />
+        </div>
+
+        {/* Item list */}
+        <div className="max-h-[360px] overflow-y-auto space-y-2 pr-1">
+          {filteredItems.length === 0 ? (
+            <div className="text-center py-8 text-ink-muted">
+              <p className="text-xs">No matching items found.</p>
+              <p className="text-[11px] text-ink/40 mt-1">Try a different search or type a custom product name directly.</p>
+            </div>
+          ) : (
+            filteredItems.map((item, idx) => (
+              <div
+                key={idx}
+                onClick={() => { onSelect(item); onClose(); }}
+                className="p-3 rounded-xl border border-ink/8 hover:border-teal/50 hover:bg-teal/5 cursor-pointer transition-all group flex items-start justify-between gap-3"
+              >
+                <div>
+                  <p className="text-xs font-bold text-ink group-hover:text-teal transition-colors">
+                    {item.name}
+                  </p>
+                  <p className="text-[11px] text-ink-muted mt-0.5 line-clamp-2">
+                    {item.description}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="px-2.5 py-1 bg-teal/10 text-teal text-[11px] font-semibold rounded-lg opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                >
+                  Use item
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 // ── Product slide-over panel ──────────────────────────────────────────────────
-function ProductPanel({ product, categoryId, restaurantId, onClose, onSaved }) {
+function ProductPanel({ product, selectedCategory, restaurantId, onClose, onSaved }) {
   const qc = useQueryClient();
   const isEditing = !!product;
+  const categoryId = selectedCategory?._id;
+  const categoryName = selectedCategory?.name ?? '';
+
+  const [browseOpen, setBrowseOpen] = useState(false);
+  const [showAutocomplete, setShowAutocomplete] = useState(false);
+  const dropdownRef = useRef(null);
 
   const { register, control, handleSubmit, watch, setValue, formState: { errors } } = useForm({
     defaultValues: product
@@ -129,6 +210,53 @@ function ProductPanel({ product, categoryId, restaurantId, onClose, onSaved }) {
   });
 
   const isAvailable = watch('isAvailable');
+  const typedName = watch('name') || '';
+
+  // Close autocomplete on click outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setShowAutocomplete(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Compute category-prioritized suggestions
+  const suggestions = (() => {
+    const query = typedName.trim().toLowerCase();
+    if (!query || query.length < 2) return { categoryItems: [], otherItems: [] };
+
+    const currentCatData = menuRecs.categories.find(
+      (c) => c.name.toLowerCase() === categoryName.toLowerCase()
+    );
+
+    const categoryItems = (currentCatData?.items ?? []).filter((item) =>
+      item.name.toLowerCase().includes(query)
+    ).sort((a, b) => {
+      const aStart = a.name.toLowerCase().startsWith(query) ? -1 : 1;
+      const bStart = b.name.toLowerCase().startsWith(query) ? -1 : 1;
+      return aStart - bStart;
+    });
+
+    const otherItems = menuRecs.categories
+      .filter((c) => c.name.toLowerCase() !== categoryName.toLowerCase())
+      .flatMap((c) => c.items)
+      .filter((item) => item.name.toLowerCase().includes(query))
+      .slice(0, 5);
+
+    return { categoryItems: categoryItems.slice(0, 6), otherItems };
+  })();
+
+  const hasSuggestions = suggestions.categoryItems.length > 0 || suggestions.otherItems.length > 0;
+
+  const handleSelectSuggestion = (item) => {
+    setValue('name', item.name, { shouldDirty: true, shouldValidate: true });
+    setValue('description', item.description, { shouldDirty: true });
+    setShowAutocomplete(false);
+    toast.success(`Autofilled "${item.name}"`);
+  };
 
   const saveMutation = useMutation({
     mutationFn: (body) =>
@@ -155,6 +283,28 @@ function ProductPanel({ product, categoryId, restaurantId, onClose, onSaved }) {
 
   const onSubmit = (data) => saveMutation.mutate({ ...data, price: Number(data.price) });
 
+  const [activeIndex, setActiveIndex] = useState(-1);
+
+  const allSuggestions = [...suggestions.categoryItems, ...suggestions.otherItems];
+
+  const handleKeyDownCombobox = (e) => {
+    if (!showAutocomplete || allSuggestions.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIndex((prev) => (prev + 1) % allSuggestions.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIndex((prev) => (prev - 1 + allSuggestions.length) % allSuggestions.length);
+    } else if (e.key === 'Enter' && activeIndex >= 0 && allSuggestions[activeIndex]) {
+      e.preventDefault();
+      handleSelectSuggestion(allSuggestions[activeIndex]);
+    } else if (e.key === 'Escape') {
+      setShowAutocomplete(false);
+      setActiveIndex(-1);
+    }
+  };
+
   return (
     <>
       {/* Backdrop */}
@@ -164,7 +314,7 @@ function ProductPanel({ product, categoryId, restaurantId, onClose, onSaved }) {
       />
       {/* Panel */}
       <div
-        className="fixed inset-y-0 right-0 w-[480px] bg-white shadow-2xl z-30 flex flex-col"
+        className="fixed inset-y-0 right-0 w-[480px] max-w-full bg-white shadow-2xl z-30 flex flex-col"
         style={{ animation: 'slide-in 200ms ease-out' }}
       >
         {/* Header */}
@@ -186,13 +336,98 @@ function ProductPanel({ product, categoryId, restaurantId, onClose, onSaved }) {
           onSubmit={handleSubmit(onSubmit)}
           className="flex-1 overflow-y-auto px-6 py-5 space-y-5"
         >
-          {/* Basic info */}
-          <Input
-            label="Product name"
-            placeholder="e.g. Grilled Chicken Burger"
-            error={errors.name?.message}
-            {...register('name', { required: 'Name is required' })}
-          />
+          {/* Product Name Field + Autocomplete Combobox */}
+          <div className="relative" ref={dropdownRef}>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-medium text-ink-muted">Product name</label>
+              <button
+                type="button"
+                onClick={() => setBrowseOpen(true)}
+                className="text-[11px] text-teal hover:text-teal/80 font-semibold flex items-center gap-1"
+              >
+                <Sparkles size={12} /> Browse recommended items
+              </button>
+            </div>
+            <Input
+              placeholder="e.g. Grilled Chicken Burger"
+              error={errors.name?.message}
+              role="combobox"
+              aria-expanded={showAutocomplete && hasSuggestions}
+              aria-autocomplete="list"
+              aria-controls="product-name-suggestions"
+              {...register('name', { required: 'Name is required' })}
+              onFocus={() => { setShowAutocomplete(true); setActiveIndex(-1); }}
+              onKeyDown={handleKeyDownCombobox}
+              onChange={(e) => {
+                register('name').onChange(e);
+                setShowAutocomplete(true);
+                setActiveIndex(-1);
+              }}
+            />
+
+            {/* Autocomplete Dropdown */}
+            {showAutocomplete && hasSuggestions && (
+              <div
+                id="product-name-suggestions"
+                role="listbox"
+                className="absolute left-0 right-0 top-full mt-1 bg-white rounded-xl shadow-xl border border-ink/10 z-40 max-h-60 overflow-y-auto py-1"
+              >
+                {suggestions.categoryItems.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-bold text-ink-muted uppercase tracking-wider px-3 py-1 bg-ink/3">
+                      From {categoryName || 'Category'}
+                    </p>
+                    {suggestions.categoryItems.map((item, idx) => {
+                      const itemFlatIndex = idx;
+                      const isActive = activeIndex === itemFlatIndex;
+                      return (
+                        <div
+                          key={idx}
+                          role="option"
+                          aria-selected={isActive}
+                          onClick={() => handleSelectSuggestion(item)}
+                          className={`px-3 py-2 cursor-pointer transition-colors ${
+                            isActive ? 'bg-teal/15 text-teal font-medium' : 'hover:bg-teal/8'
+                          }`}
+                        >
+                          <p className="text-xs font-bold text-ink">{item.name}</p>
+                          <p className="text-[11px] text-ink-muted truncate">{item.description}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {suggestions.otherItems.length > 0 && (
+                  <div className="border-t border-ink/6">
+                    <p className="text-[10px] font-bold text-ink-muted uppercase tracking-wider px-3 py-1 bg-ink/3">
+                      Other suggestions
+                    </p>
+                    {suggestions.otherItems.map((item, idx) => {
+                      const itemFlatIndex = suggestions.categoryItems.length + idx;
+                      const isActive = activeIndex === itemFlatIndex;
+                      return (
+                        <div
+                          key={idx}
+                          role="option"
+                          aria-selected={isActive}
+                          onClick={() => handleSelectSuggestion(item)}
+                          className={`px-3 py-2 cursor-pointer transition-colors ${
+                            isActive ? 'bg-teal/15 text-teal font-medium' : 'hover:bg-teal/8'
+                          }`}
+                        >
+                          <p className="text-xs font-medium text-ink">{item.name}</p>
+                          <p className="text-[11px] text-ink-muted truncate">{item.description}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Description */}
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-ink-muted">Description</label>
             <textarea
@@ -202,6 +437,8 @@ function ProductPanel({ product, categoryId, restaurantId, onClose, onSaved }) {
               {...register('description')}
             />
           </div>
+
+          {/* Price */}
           <Input
             label="Price ($)"
             type="number"
@@ -214,6 +451,8 @@ function ProductPanel({ product, categoryId, restaurantId, onClose, onSaved }) {
               min: { value: 0, message: 'Price must be 0 or more' },
             })}
           />
+
+          {/* Available toggle */}
           <div className="flex items-center justify-between py-1">
             <div>
               <p className="text-sm font-medium text-ink">Available on menu</p>
@@ -347,6 +586,18 @@ function ProductPanel({ product, categoryId, restaurantId, onClose, onSaved }) {
         </div>
       </div>
 
+      {/* Browse modal */}
+      <BrowseRecommendedModal
+        open={browseOpen}
+        onClose={() => setBrowseOpen(false)}
+        categoryName={categoryName}
+        onSelect={(item) => {
+          setValue('name', item.name, { shouldDirty: true, shouldValidate: true });
+          setValue('description', item.description, { shouldDirty: true });
+          toast.success(`Selected "${item.name}"`);
+        }}
+      />
+
       <style>{`
         @keyframes slide-in {
           from { transform: translateX(100%); }
@@ -354,6 +605,218 @@ function ProductPanel({ product, categoryId, restaurantId, onClose, onSaved }) {
         }
       `}</style>
     </>
+  );
+}
+
+// ── Add Category Modal with Recommended Picker ─────────────────────────────────
+function AddCategoryModal({ open, onClose, existingCategories, onCategoryAdded }) {
+  const qc = useQueryClient();
+  const [mode, setMode] = useState('recommended'); // 'recommended' or 'custom'
+  const [search, setSearch] = useState('');
+  const [selectedRecs, setSelectedRecs] = useState([]);
+  const [customName, setCustomName] = useState('');
+  const [isAdding, setIsAdding] = useState(false);
+
+  if (!open) return null;
+
+  const existingNamesLower = existingCategories.map((c) => c.name.toLowerCase());
+
+  const filteredCategories = menuRecs.categories.filter((c) =>
+    c.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const toggleSelectRec = (name) => {
+    setSelectedRecs((prev) =>
+      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]
+    );
+  };
+
+  const handleAddRecommended = async () => {
+    if (selectedRecs.length === 0) return;
+    try {
+      setIsAdding(true);
+      let addedCount = 0;
+
+      for (let i = 0; i < selectedRecs.length; i++) {
+        const catName = selectedRecs[i];
+        const nextOrder = existingCategories.length + i + 1;
+        const res = await api.post('/categories', { name: catName, sortOrder: nextOrder });
+        if (i === 0 && onCategoryAdded && res.data?.category) {
+          onCategoryAdded(res.data.category);
+        }
+        addedCount += 1;
+      }
+
+      qc.invalidateQueries({ queryKey: ['categories'] });
+      toast.success(`Added ${addedCount} categor${addedCount === 1 ? 'y' : 'ies'}`);
+      setSelectedRecs([]);
+      setSearch('');
+      onClose();
+    } catch (err) {
+      toast.error('Failed to add categories');
+    } finally {
+      setIsAdding(false);
+    }
+  };
+
+  const handleAddCustom = async (e) => {
+    e.preventDefault();
+    if (!customName.trim()) return;
+    try {
+      setIsAdding(true);
+      const res = await api.post('/categories', { name: customName.trim() });
+      qc.invalidateQueries({ queryKey: ['categories'] });
+      toast.success(`Added category "${customName.trim()}"`);
+      if (onCategoryAdded && res.data?.category) {
+        onCategoryAdded(res.data.category);
+      }
+      setCustomName('');
+      onClose();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to add category');
+    } finally {
+      setIsAdding(false);
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title="Add category" size="md">
+      <div className="space-y-4">
+        {/* Mode Toggle Tabs */}
+        <div className="flex p-0.5 bg-ink/6 rounded-xl border border-ink/8">
+          <button
+            type="button"
+            onClick={() => setMode('recommended')}
+            className={`flex-1 py-1.5 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+              mode === 'recommended' ? 'bg-white text-ink shadow-xs' : 'text-ink-muted hover:text-ink'
+            }`}
+          >
+            <Sparkles size={13} className={mode === 'recommended' ? 'text-teal' : ''} />
+            Choose from recommended
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('custom')}
+            className={`flex-1 py-1.5 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+              mode === 'custom' ? 'bg-white text-ink shadow-xs' : 'text-ink-muted hover:text-ink'
+            }`}
+          >
+            <Plus size={13} />
+            Custom category
+          </button>
+        </div>
+
+        {mode === 'recommended' ? (
+          /* Recommended Picker Mode */
+          <div className="space-y-3">
+            {/* Search */}
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-3 text-ink-muted" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search recommended categories…"
+                className="w-full pl-9 pr-3 py-2 text-xs border border-ink/12 rounded-xl focus:outline-none focus:border-teal bg-ink/2"
+              />
+            </div>
+
+            {/* Category chips grid */}
+            <div className="max-h-[300px] overflow-y-auto grid grid-cols-2 gap-2 p-1">
+              {filteredCategories.length === 0 ? (
+                <div className="col-span-2 text-center py-6 text-ink-muted">
+                  <p className="text-xs">No matching categories found.</p>
+                  <button
+                    type="button"
+                    onClick={() => { setMode('custom'); setCustomName(search); }}
+                    className="text-xs text-teal font-semibold mt-1 hover:underline"
+                  >
+                    Create custom category "{search}"
+                  </button>
+                </div>
+              ) : (
+                filteredCategories.map((cat) => {
+                  const isExisting = existingNamesLower.includes(cat.name.toLowerCase());
+                  const isSelected = selectedRecs.includes(cat.name);
+
+                  if (isExisting) {
+                    return (
+                      <div
+                        key={cat.name}
+                        className="px-3 py-2 rounded-xl border border-ink/8 bg-ink/3 text-ink/40 text-xs font-medium flex items-center justify-between cursor-not-allowed select-none"
+                      >
+                        <span>{cat.name}</span>
+                        <span className="text-[10px] text-ink/40 flex items-center gap-0.5">
+                          <CheckCircle2 size={11} /> Added
+                        </span>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={cat.name}
+                      onClick={() => toggleSelectRec(cat.name)}
+                      className={`px-3 py-2 rounded-xl border text-xs font-medium flex items-center justify-between cursor-pointer transition-all ${
+                        isSelected
+                          ? 'border-teal bg-teal/10 text-teal shadow-2xs'
+                          : 'border-ink/10 bg-white hover:border-ink/20 text-ink'
+                      }`}
+                    >
+                      <span className="truncate">{cat.name}</span>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => {}}
+                        className="accent-teal rounded"
+                      />
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Action Bar */}
+            <div className="flex items-center justify-between pt-2 border-t border-ink/8">
+              <span className="text-xs text-ink-muted">
+                {selectedRecs.length} selected
+              </span>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={onClose}>
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleAddRecommended}
+                  disabled={selectedRecs.length === 0 || isAdding}
+                >
+                  {isAdding ? 'Adding…' : `Add selected (${selectedRecs.length})`}
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* Custom Category Mode */
+          <form onSubmit={handleAddCustom} className="space-y-4 pt-1">
+            <Input
+              label="Category name"
+              placeholder="e.g. Daily Chef Specials"
+              value={customName}
+              onChange={(e) => setCustomName(e.target.value)}
+              autoFocus
+            />
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-ink/8">
+              <Button type="button" variant="outline" size="sm" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button type="submit" size="sm" disabled={!customName.trim() || isAdding}>
+                {isAdding ? 'Creating…' : 'Create category'}
+              </Button>
+            </div>
+          </form>
+        )}
+      </div>
+    </Modal>
   );
 }
 
@@ -430,8 +893,7 @@ function ProductCard({ product, onEdit }) {
 export default function Menu() {
   const [selectedCat, setSelectedCat] = useState(null);
   const [panelProduct, setPanelProduct] = useState(undefined); // undefined=closed, null=new
-  const [newCatName, setNewCatName] = useState('');
-  const [addingCat, setAddingCat] = useState(false);
+  const [addCategoryOpen, setAddCategoryOpen] = useState(false);
   const qc = useQueryClient();
   const { restaurant } = useAuthStore();
 
@@ -450,19 +912,6 @@ export default function Menu() {
     enabled: !!selectedCat,
   });
   const products = prodData?.products ?? [];
-
-  // Mutations
-  const addCatMutation = useMutation({
-    mutationFn: (name) => api.post('/categories', { name }).then((r) => r.data),
-    onSuccess: (d) => {
-      qc.invalidateQueries({ queryKey: ['categories'] });
-      setNewCatName('');
-      setAddingCat(false);
-      setSelectedCat(d.category);
-      toast.success('Category added');
-    },
-    onError: (err) => toast.error(err.response?.data?.message || 'Failed to add category'),
-  });
 
   const deleteCatMutation = useMutation({
     mutationFn: (id) => api.delete(`/categories/${id}`),
@@ -539,42 +988,14 @@ export default function Menu() {
           )}
         </div>
 
-        {/* Add category */}
+        {/* Add category button */}
         <div className="px-3 py-3 border-t border-ink/8">
-          {addingCat ? (
-            <div className="flex items-center gap-1.5">
-              <input
-                autoFocus
-                value={newCatName}
-                onChange={(e) => setNewCatName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && newCatName.trim()) addCatMutation.mutate(newCatName.trim());
-                  if (e.key === 'Escape') { setAddingCat(false); setNewCatName(''); }
-                }}
-                placeholder="Category name…"
-                className="flex-1 px-2.5 py-1.5 text-xs border border-ink/12 rounded-lg focus:outline-none focus:border-teal"
-              />
-              <button
-                onClick={() => newCatName.trim() && addCatMutation.mutate(newCatName.trim())}
-                className="p-1.5 bg-teal text-white rounded-lg hover:bg-teal/90"
-              >
-                <Check size={13} />
-              </button>
-              <button
-                onClick={() => { setAddingCat(false); setNewCatName(''); }}
-                className="p-1.5 text-ink-muted rounded-lg hover:bg-ink/8"
-              >
-                <X size={13} />
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setAddingCat(true)}
-              className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-ink-muted hover:text-teal rounded-lg hover:bg-teal/6 transition-colors"
-            >
-              <Plus size={13} /> Add category
-            </button>
-          )}
+          <button
+            onClick={() => setAddCategoryOpen(true)}
+            className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-teal hover:bg-teal/8 border border-teal/30 rounded-lg transition-colors shadow-2xs"
+          >
+            <Plus size={13} /> Add category
+          </button>
         </div>
       </div>
 
@@ -631,17 +1052,25 @@ export default function Menu() {
       {isPanelOpen && (
         <ProductPanel
           product={panelProduct ?? null}
-          categoryId={selectedCat?._id}
+          selectedCategory={selectedCat}
           restaurantId={restaurant?._id}
           onClose={() => setPanelProduct(undefined)}
           onSaved={() => setPanelProduct(undefined)}
         />
       )}
+
+      {/* ── Add Category Modal with Recommended Picker ────────────────── */}
+      <AddCategoryModal
+        open={addCategoryOpen}
+        onClose={() => setAddCategoryOpen(false)}
+        existingCategories={categories}
+        onCategoryAdded={(newCat) => setSelectedCat(newCat)}
+      />
     </div>
   );
 }
 
-// Tiny inline icon wrappers to avoid import issues
+// Tiny inline icon wrapper
 function UtensilsCrossedIcon() {
   return (
     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" className="mx-auto">

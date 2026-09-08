@@ -72,6 +72,7 @@ export default function Settings() {
       contactAddress: restaurant.contactInfo?.address ?? '',
       instagram:      restaurant.socialLinks?.instagram  ?? '',
       facebook:       restaurant.socialLinks?.facebook   ?? '',
+      tiktok:         restaurant.socialLinks?.tiktok     ?? '',
       website:        restaurant.socialLinks?.website    ?? '',
     });
   }, [restaurant, reset]);
@@ -101,6 +102,7 @@ export default function Settings() {
       socialLinks: {
         instagram: form.instagram,
         facebook:  form.facebook,
+        tiktok:    form.tiktok,
         website:   form.website,
       },
     });
@@ -285,6 +287,11 @@ export default function Settings() {
               label="Facebook"
               placeholder="https://facebook.com/yourrestaurant"
               {...register('facebook')}
+            />
+            <Input
+              label="TikTok"
+              placeholder="https://tiktok.com/@yourrestaurant"
+              {...register('tiktok')}
             />
             <Input
               label="Website"

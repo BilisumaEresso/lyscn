@@ -1,7 +1,8 @@
-import { NavLink, useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, UtensilsCrossed, QrCode,
-  ClipboardList, Settings, LogOut,
+  ClipboardList, Settings, LogOut, X
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import logo from '../../assets/logo.png';
@@ -14,19 +15,37 @@ const NAV_ITEMS = [
   { to: '/settings',icon: Settings,        label: 'Settings' },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen, onClose }) {
   const { user, restaurant, logout } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Close mobile drawer on route change
+  useEffect(() => {
+    if (onClose) onClose();
+  }, [location.pathname]);
+
+  // Handle ESC key to close mobile drawer
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isOpen && onClose) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   const handleLogout = () => {
+    if (onClose) onClose();
     logout();
     navigate('/login');
   };
 
-  return (
-    <aside className="w-60 shrink-0 bg-ink flex flex-col h-screen sticky top-0">
+  const navContent = (
+    <div className="flex flex-col h-full bg-ink text-white">
       {/* ── Logo lockup ─────────────────────────────────────────────── */}
-      <div className="px-5 py-4 border-b border-white/8">
+      <div className="px-5 py-4 border-b border-white/8 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg gradient-brand flex items-center justify-center shrink-0 shadow-sm">
             <img src={logo} alt="" className="w-8 h-8 rounded-lg object-cover" />
@@ -35,6 +54,17 @@ export default function Sidebar() {
             LayoScan
           </span>
         </div>
+        {/* Mobile Close Button */}
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1 rounded-lg text-white/60 hover:text-white hover:bg-white/10 lg:hidden transition-colors"
+            aria-label="Close navigation drawer"
+          >
+            <X size={18} />
+          </button>
+        )}
       </div>
 
       {/* ── Restaurant badge ────────────────────────────────────────── */}
@@ -54,6 +84,7 @@ export default function Sidebar() {
             key={to}
             to={to}
             end={end}
+            onClick={() => { if (onClose) onClose(); }}
             style={({ isActive }) =>
               isActive
                 ? {
@@ -85,7 +116,7 @@ export default function Sidebar() {
       </nav>
 
       {/* ── User + logout ────────────────────────────────────────────── */}
-      <div className="px-2.5 py-3 border-t border-white/8">
+      <div className="px-2.5 py-3 border-t border-white/8 mt-auto">
         <div className="flex items-center gap-3 px-3 py-2 mb-1">
           <div
             className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
@@ -115,6 +146,34 @@ export default function Sidebar() {
           Sign out
         </button>
       </div>
-    </aside>
+    </div>
+  );
+
+  return (
+    <>
+      {/* Desktop Persistent Sidebar (>= 1024px) */}
+      <aside className="hidden lg:flex w-60 shrink-0 bg-ink flex-col h-screen sticky top-0 border-r border-white/5">
+        {navContent}
+      </aside>
+
+      {/* Mobile/Tablet Drawer Backdrop & Sliding Drawer (< 1024px) */}
+      {isOpen && (
+        <>
+          <div
+            className="fixed inset-0 bg-ink/75 backdrop-blur-xs z-40 lg:hidden animate-fade-in"
+            onClick={onClose}
+            aria-hidden="true"
+          />
+          <aside
+            role="dialog"
+            aria-modal="true"
+            aria-label="Navigation drawer"
+            className="fixed inset-y-0 left-0 z-50 w-64 bg-ink flex flex-col h-full shadow-2xl lg:hidden transform transition-transform duration-200 ease-out"
+          >
+            {navContent}
+          </aside>
+        </>
+      )}
+    </>
   );
 }

@@ -1,0 +1,279 @@
+{
+  "categories": [
+    {
+      "name": "Breakfast",
+      "items": [
+        { "name": "Scrambled Eggs", "description": "Soft scrambled eggs served with toasted sourdough and butter." },
+        { "name": "Pancakes with Syrup", "description": "Stack of fluffy golden pancakes topped with maple syrup and fresh berries." },
+        { "name": "Avocado Toast", "description": "Smashed avocado on toasted artisan bread topped with poached egg and chili flakes." },
+        { "name": "Full Breakfast Plate", "description": "Fried eggs, crispy bacon, pork sausages, grilled tomatoes, and baked beans." },
+        { "name": "Eggs Benedict", "description": "Poached eggs and smoked ham on toasted English muffins with hollandaise sauce." },
+        { "name": "French Toast", "description": "Thick-cut brioche French toast served with cinnamon sugar and maple syrup." },
+        { "name": "Omelette Supreme", "description": "Three-egg omelette stuffed with ham, cheddar cheese, mushrooms, and bell peppers." },
+        { "name": "Granola & Yogurt Bowl", "description": "Greek yogurt topped with house-made granola, honey, and seasonal fresh fruits." },
+        { "name": "Breakfast Burrito", "description": "Warm tortilla stuffed with scrambled eggs, cheese, beans, and salsa." },
+        { "name": "Croissant & Preserve", "description": "Warm buttery croissant served with strawberry jam and whipped butter." }
+      ]
+    },
+    {
+      "name": "Starters & Appetizers",
+      "items": [
+        { "name": "Garlic Bread with Cheese", "description": "Toasted baguette brushed with garlic butter and melted mozzarella." },
+        { "name": "Crispy Mozzarella Sticks", "description": "Golden breaded mozzarella sticks served with warm marinara dipping sauce." },
+        { "name": "Buffalo Chicken Wings", "description": "Crispy wings tossed in spicy buffalo sauce with celery and ranch dip." },
+        { "name": "Loaded Potato Skins", "description": "Crispy potato shells stuffed with melted cheddar, bacon crumbles, and sour cream." },
+        { "name": "Nachos Supreme", "description": "Tortilla chips loaded with melted cheese, jalapenos, guacamole, and salsa." },
+        { "name": "Calamari Fritti", "description": "Lightly battered squid rings served with garlic aioli and lemon wedges." },
+        { "name": "Bruschetta Classica", "description": "Toasted Italian bread topped with diced tomatoes, garlic, fresh basil, and olive oil." },
+        { "name": "Chicken Tenders", "description": "Crispy golden chicken breast strips served with honey mustard sauce." },
+        { "name": "Spring Rolls", "description": "Crispy vegetable spring rolls served with sweet chili dipping sauce." }
+      ]
+    },
+    {
+      "name": "Salads",
+      "items": [
+        { "name": "Classic Caesar Salad", "description": "Crisp romaine lettuce, garlic croutons, and parmesan tossed in Caesar dressing." },
+        { "name": "Greek Salad", "description": "Cucumbers, ripe tomatoes, red onion, Kalamata olives, and feta cheese with oregano." },
+        { "name": "Caprese Salad", "description": "Sliced fresh mozzarella, ripe tomatoes, and sweet basil drizzled with balsamic glaze." },
+        { "name": "Cobbs Salad", "description": "Grilled chicken, avocado, hard-boiled egg, bacon, and blue cheese on mixed greens." },
+        { "name": "Quinoa & Avocado Salad", "description": "Fluffy quinoa, avocado, cherry tomatoes, and cucumber with lemon vinaigrette." },
+        { "name": "Chicken Salad Bowl", "description": "Grilled chicken breast, mixed greens, sweet corn, and cherry tomatoes." },
+        { "name": "Asian Sesame Salad", "description": "Shredded cabbage, carrots, edamame, and crispy wontons with sesame dressing." },
+        { "name": "Mediterranean Tuna Salad", "description": "Flaked tuna, white beans, red onion, and parsley tossed in olive oil and lemon." }
+      ]
+    },
+    {
+      "name": "Soups",
+      "items": [
+        { "name": "Tomato Basil Bisque", "description": "Rich heirloom tomato soup infused with fresh basil and cream." },
+        { "name": "French Onion Soup", "description": "Caramelized onion broth topped with a crusty baguette slice and melted Gruyere." },
+        { "name": "Cream of Mushroom", "description": "Velvety wild mushroom soup served with garlic croutons." },
+        { "name": "Chicken Noodle Soup", "description": "Comforting chicken broth with tender chicken, egg noodles, and vegetables." },
+        { "name": "Minestrone Soup", "description": "Hearty Italian vegetable soup with beans and ditalini pasta." },
+        { "name": "Clam Chowder", "description": "Creamy New England chowder packed with tender clams and diced potatoes." },
+        { "name": "Pumpkin Soup", "description": "Smooth roasted pumpkin soup drizzled with cream and toasted pumpkin seeds." },
+        { "name": "Lentil Soup", "description": "Wholesome brown lentil soup seasoned with cumin, garlic, and olive oil." }
+      ]
+    },
+    {
+      "name": "Sandwiches",
+      "items": [
+        { "name": "Club Sandwich", "description": "Triple-decker sandwich with turkey breast, bacon, lettuce, tomato, and mayo." },
+        { "name": "Philly Cheesesteak", "description": "Thinly sliced beef with sautéed onions and melted cheese on a hoagie roll." },
+        { "name": "BLT Sandwich", "description": "Crispy bacon, fresh lettuce, and ripe tomatoes on toasted white bread." },
+        { "name": "Grilled Cheese Sandwich", "description": "Melted cheddar and Swiss cheese toasted to perfection on sourdough." },
+        { "name": "Chicken Pesto Panini", "description": "Grilled chicken, mozzarella, tomato, and basil pesto pressed on ciabatta." },
+        { "name": "Tuna Melt", "description": "House tuna salad and melted cheddar cheese on grilled rye bread." },
+        { "name": "Pulled Pork Sandwich", "description": "Slow-roasted barbecue pulled pork topped with coleslaw on a brioche bun." },
+        { "name": "Veggie Delight Sandwich", "description": "Hummus, cucumber, roasted red peppers, spinach, and feta on whole grain." }
+      ]
+    },
+    {
+      "name": "Burgers",
+      "items": [
+        { "name": "Classic Beef Burger", "description": "Juicy beef patty with lettuce, tomato, onion, and house burger sauce." },
+        { "name": "Cheeseburger", "description": "Flame-grilled beef patty topped with melted American cheddar cheese." },
+        { "name": "Bacon Deluxe Burger", "description": "Beef patty, smoked bacon, cheddar, crispy onion rings, and BBQ sauce." },
+        { "name": "Mushroom Swiss Burger", "description": "Beef patty topped with sautéed wild mushrooms and melted Swiss cheese." },
+        { "name": "Crispy Chicken Burger", "description": "Golden fried chicken breast, coleslaw, pickles, and spicy mayo on brioche." },
+        { "name": "BBQ Smokehouse Burger", "description": "Double beef patty, smoked bacon, cheddar cheese, and smoky BBQ glaze." },
+        { "name": "Beyond Plant Burger", "description": "Plant-based patty with avocado, lettuce, tomato, and vegan mayo." },
+        { "name": "Spicy Jalapeno Burger", "description": "Beef patty, pickled jalapenos, pepper jack cheese, and spicy chipotle aioli." }
+      ]
+    },
+    {
+      "name": "Pizza",
+      "items": [
+        { "name": "Margherita Pizza", "description": "Classic San Marzano tomato sauce, fresh mozzarella, and aromatic basil leaves." },
+        { "name": "Pepperoni Pizza", "description": "Crispy pepperoni slices over rich tomato sauce and melted mozzarella." },
+        { "name": "Quattro Formaggi", "description": "Blend of mozzarella, gorgonzola, parmesan, and fontina cheese." },
+        { "name": "Hawaiian Pizza", "description": "Savory ham and sweet pineapple chunks on tomato mozzarella base." },
+        { "name": "BBQ Chicken Pizza", "description": "Grilled chicken, red onions, cilantro, mozzarella, and tangy BBQ sauce." },
+        { "name": "Vegetarian Supreme", "description": "Bell peppers, mushrooms, red onion, black olives, and fresh spinach." },
+        { "name": "Meat Lover's Pizza", "description": "Pepperoni, Italian sausage, ham, ground beef, and crispy bacon." },
+        { "name": "Prosciutto e Rucola", "description": "Prosciutto di Parma, fresh baby arugula, and shaved parmesan flakes." }
+      ]
+    },
+    {
+      "name": "Pasta",
+      "items": [
+        { "name": "Spaghetti Carbonara", "description": "Spaghetti tossed with crispy guanciale, egg yolks, pecorino, and black pepper." },
+        { "name": "Penne Arrabbiata", "description": "Penne pasta in a spicy garlic and crushed red chili tomato sauce." },
+        { "name": "Fettuccine Alfredo", "description": "Fettuccine ribbon pasta folded into rich butter and parmesan cream sauce." },
+        { "name": "Spaghetti Bolognese", "description": "Traditional slow-cooked beef and pork ragu over al dente spaghetti." },
+        { "name": "Lasagna Bolognese", "description": "Layered pasta with rich meat sauce, creamy béchamel, and melted mozzarella." },
+        { "name": "Pesto Genovese Pasta", "description": "Penne tossed in fragrant basil pesto, pine nuts, and shaved parmesan." },
+        { "name": "Seafood Linguine", "description": "Linguine with shrimp, mussels, and calamari in white wine garlic sauce." },
+        { "name": "Ravioli Ricotta e Spinaci", "description": "Handmade pasta pillows filled with ricotta and spinach in sage butter sauce." }
+      ]
+    },
+    {
+      "name": "Main Courses",
+      "items": [
+        { "name": "Roast Chicken", "description": "Half herb-roasted chicken served with pan gravy and roasted vegetables." },
+        { "name": "Beef Stroganoff", "description": "Tender beef strips in rich sour cream and mushroom sauce over egg noodles." },
+        { "name": "Chicken Parmigiana", "description": "Breaded chicken breast topped with marinara and melted mozzarella with spaghetti." },
+        { "name": "Chicken Curry", "description": "Tender chicken cooked in aromatic coconut curry sauce served with basmati rice." },
+        { "name": "Slow-Cooked Lamb Shank", "description": "Braising lamb shank in rosemary red wine jus over creamy mashed potatoes." },
+        { "name": "Pork Chops", "description": "Pan-seared pork chops topped with caramelized apple glaze and green beans." },
+        { "name": "Beef Chili Con Carne", "description": "Hearty minced beef chili with kidney beans served with steamed rice and sour cream." },
+        { "name": "Shepherd's Pie", "description": "Minced lamb cooked with vegetables, topped with baked mashed potato crust." }
+      ]
+    },
+    {
+      "name": "Grills & BBQ",
+      "items": [
+        { "name": "Ribeye Steak", "description": "Prime 10oz grilled ribeye steak served with garlic herb butter." },
+        { "name": "Filet Mignon", "description": "Tender 8oz beef tenderloin steak grilled to your liking with peppercorn sauce." },
+        { "name": "BBQ Pork Ribs", "description": "Full rack of slow-smoked pork ribs brushed with sticky BBQ sauce." },
+        { "name": "Grilled Lamb Chops", "description": "Marinated lamb chops grilled over open flame with mint chimichurri." },
+        { "name": "Mixed Grill Platter", "description": "Assortment of steak, chicken skewer, sausage, and pork chop." },
+        { "name": "Grilled Chicken Skewers", "description": "Charbroiled chicken breast skewers marinated in lemon, garlic, and herbs." },
+        { "name": "BBQ Beef Brisket", "description": "Slow-smoked beef brisket slices served with pickles and house BBQ glaze." },
+        { "name": "Grilled Salmon Steak", "description": "Charbroiled salmon fillet with dill butter and grilled asparagus." }
+      ]
+    },
+    {
+      "name": "Seafood",
+      "items": [
+        { "name": "Fish and Chips", "description": "Beer-battered cod fillet served with golden fries, tartar sauce, and peas." },
+        { "name": "Grilled Sea Bass", "description": "Pan-seared sea bass fillet with lemon butter caper sauce and roasted potatoes." },
+        { "name": "Garlic Butter Shrimp", "description": "Jumbo shrimp sautéed in white wine garlic butter sauce served with bread." },
+        { "name": "Pan-Seared Salmon", "description": "Crispy skin salmon fillet over asparagus and lemon herb risotto." },
+        { "name": "Seafood Paella", "description": "Saffron rice cooked with shrimp, mussels, squid, and bell peppers." },
+        { "name": "Seared Sea Scallops", "description": "Pan-seared jumbo scallops served over cauliflower purée." },
+        { "name": "Crab Cakes", "description": "Pan-fried lump crab meat patties served with spicy remoulade." },
+        { "name": "Lobster Tail", "description": "Broiled lobster tail served with drawn butter and lemon wedges." }
+      ]
+    },
+    {
+      "name": "Vegetarian & Vegan",
+      "items": [
+        { "name": "Chickpea Buddha Bowl", "description": "Spiced chickpeas, roasted sweet potato, quinoa, avocado, and tahini dressing." },
+        { "name": "Vegetable Stir-Fry", "description": "Fresh garden vegetables tossed in ginger soy glaze served with jasmine rice." },
+        { "name": "Eggplant Parmigiana", "description": "Baked eggplant slices layered with marinara, mozzarella, and fresh basil." },
+        { "name": "Vegan Mushroom Risotto", "description": "Arborio rice cooked with wild mushrooms, garlic, and nutritional yeast." },
+        { "name": "Tofu & Veggie Curry", "description": "Crispy tofu cubes and seasonal vegetables in mild coconut curry." },
+        { "name": "Stuffed Bell Peppers", "description": "Roasted peppers filled with black beans, corn, rice, and melted vegan cheese." },
+        { "name": "Spinach & Feta Pie", "description": "Flaky phyllo pastry stuffed with spinach, herbs, and crumbly feta cheese." },
+        { "name": "Falafel Wrap", "description": "Crispy falafel balls, hummus, lettuce, and tahini wrapped in warm flatbread." }
+      ]
+    },
+    {
+      "name": "Sides",
+      "items": [
+        { "name": "French Fries", "description": "Crispy golden potato fries seasoned with sea salt." },
+        { "name": "Sweet Potato Fries", "description": "Crispy sweet potato fries served with garlic aioli." },
+        { "name": "Onion Rings", "description": "Thick-cut battered onion rings fried crisp." },
+        { "name": "Mashed Potatoes", "description": "Creamy Yukon gold mashed potatoes with butter and cream." },
+        { "name": "Steamed Rice", "description": "Fluffy long-grain jasmine or basmati rice." },
+        { "name": "Side Garden Salad", "description": "Mixed greens, cherry tomatoes, and cucumber with house vinaigrette." },
+        { "name": "Grilled Vegetables", "description": "Seasoned zucchini, bell peppers, eggplant, and red onion." },
+        { "name": "Macaroni and Cheese", "description": "Elbow pasta baked in a rich three-cheese sauce." },
+        { "name": "Coleslaw", "description": "Creamy shredded cabbage and carrot salad." }
+      ]
+    },
+    {
+      "name": "Desserts",
+      "items": [
+        { "name": "Classic Tiramisu", "description": "Espresso-soaked ladyfingers layered with mascarpone cream and cocoa powder." },
+        { "name": "New York Cheesecake", "description": "Rich creamy cheesecake on a graham cracker crust with berry compote." },
+        { "name": "Chocolate Lava Cake", "description": "Warm chocolate cake with a molten chocolate center served with vanilla ice cream." },
+        { "name": "Apple Pie", "description": "Warm baked apple pie with cinnamon served with a scoop of vanilla ice cream." },
+        { "name": "Crème Brûlée", "description": "Classic rich vanilla custard topped with a caramelized sugar crust." },
+        { "name": "Chocolate Brownie", "description": "Fudgy chocolate brownie studded with walnuts served warm with fudge sauce." },
+        { "name": "Churros with Chocolate", "description": "Golden fried churros dusted in cinnamon sugar with warm chocolate dip." },
+        { "name": "Ice Cream Sundae", "description": "Three scoops of ice cream topped with chocolate syrup, whipped cream, and cherry." }
+      ]
+    },
+    {
+      "name": "Kids Menu",
+      "items": [
+        { "name": "Mini Cheeseburger", "description": "Kid-sized beef patty with cheddar cheese served with fries." },
+        { "name": "Chicken Nuggets", "description": "Crispy chicken nuggets served with french fries and ketchup." },
+        { "name": "Mac & Cheese", "description": "Creamy cheesy macaroni pasta portion." },
+        { "name": "Spaghetti Bolognese (Kids)", "description": "Child-sized portion of spaghetti with mild meat sauce." },
+        { "name": "Fish Fingers", "description": "Crispy breaded fish strips served with fries and tartar dip." },
+        { "name": "Mini Margherita Pizza", "description": "Small cheese and tomato pizza." },
+        { "name": "Grilled Cheese Sandwich (Kids)", "description": "Melted cheese sandwich cut into triangles with fries." },
+        { "name": "Hot Dog", "description": "Classic pork hotdog in a soft bun served with fries." }
+      ]
+    },
+    {
+      "name": "Coffee & Hot Drinks",
+      "items": [
+        { "name": "Espresso", "description": "Single or double shot of rich, concentrated coffee." },
+        { "name": "Cappuccino", "description": "Espresso topped with equal parts steamed milk and velvety milk foam." },
+        { "name": "Caffè Latte", "description": "Smooth espresso blended with steamed milk and a light layer of foam." },
+        { "name": "Americano", "description": "Espresso diluted with hot water for a rich black coffee taste." },
+        { "name": "Flat White", "description": "Double espresso topped with silky micro-foamed milk." },
+        { "name": "Caffè Mocha", "description": "Espresso mixed with rich chocolate syrup and steamed milk." },
+        { "name": "Hot Chocolate", "description": "Rich cocoa steamed with milk and topped with marshmallows." },
+        { "name": "Chai Tea Latte", "description": "Spiced black tea concentrate steamed with milk and cinnamon." },
+        { "name": "Herbal Tea Selection", "description": "Choice of Chamomile, Peppermint, Earl Grey, or English Breakfast." }
+      ]
+    },
+    {
+      "name": "Cold Drinks & Juices",
+      "items": [
+        { "name": "Fresh Orange Juice", "description": "100% freshly squeezed orange juice." },
+        { "name": "Fresh Watermelon Juice", "description": "Chilled pure watermelon juice." },
+        { "name": "Fresh Lemonade", "description": "House-made lemonade with fresh lemons, mint, and ice." },
+        { "name": "Iced Coffee", "description": "Chilled espresso poured over ice with choice of milk." },
+        { "name": "Iced Tea", "description": "Brewed black tea served over ice with lemon slices." },
+        { "name": "Sparkling Water", "description": "Chilled bottle of natural sparkling mineral water." },
+        { "name": "Still Mineral Water", "description": "Chilled natural spring water." },
+        { "name": "Soft Drinks", "description": "Choice of Coca-Cola, Diet Coke, Sprite, or Fanta." }
+      ]
+    },
+    {
+      "name": "Smoothies & Shakes",
+      "items": [
+        { "name": "Strawberry Banana Smoothie", "description": "Fresh strawberries, banana, yogurt, and honey blended smooth." },
+        { "name": "Mango Passion Fruit Smoothie", "description": "Tropical blend of ripe mango, passion fruit, and apple juice." },
+        { "name": "Green Detox Smoothie", "description": "Spinach, green apple, cucumber, ginger, and coconut water." },
+        { "name": "Classic Chocolate Milkshake", "description": "Rich chocolate ice cream blended with milk and topped with whipped cream." },
+        { "name": "Vanilla Bean Milkshake", "description": "Creamy vanilla bean ice cream shake." },
+        { "name": "Oreo Cookie Shake", "description": "Crushed Oreo cookies blended with vanilla ice cream and milk." },
+        { "name": "Peanut Butter Protein Shake", "description": "Peanut butter, banana, protein powder, and almond milk." },
+        { "name": "Berry Blast Smoothie", "description": "Blueberries, raspberries, strawberries, and Greek yogurt." }
+      ]
+    },
+    {
+      "name": "Alcoholic Beverages",
+      "items": [
+        { "name": "Draft Lager Beer", "description": "Chilled pint of crisp golden lager beer." },
+        { "name": "Craft IPA", "description": "Hoppy India Pale Ale with citrus notes." },
+        { "name": "House Red Wine", "description": "Glass of full-bodied Cabernet Sauvignon." },
+        { "name": "House White Wine", "description": "Glass of crisp, chilled Pinot Grigio." },
+        { "name": "Prosecco Sparkler", "description": "Chilled glass of Italian sparkling wine." },
+        { "name": "Classic Mojito", "description": "White rum, fresh lime, mint leaves, sugar, and soda water." },
+        { "name": "Margarita", "description": "Tequila, triple sec, and fresh lime juice with a salted rim." },
+        { "name": "Espresso Martini", "description": "Vodka, fresh espresso, coffee liqueur, and sugar syrup." },
+        { "name": "Aperol Spritz", "description": "Aperol, prosecco, and soda water garnished with an orange slice." }
+      ]
+    },
+    {
+      "name": "Specials & Chef's Picks",
+      "items": [
+        { "name": "Chef's Special Tasting Menu", "description": "Three-course curated meal highlighted by the chef's daily selection." },
+        { "name": "Daily Soup & Sandwich Combo", "description": "Choice of daily soup paired with half sandwich of your choice." },
+        { "name": "Catch of the Day", "description": "Freshly caught fish prepared daily with seasonal accompaniments." },
+        { "name": "Signature House Cocktail", "description": "Custom mixologist cocktail creation of the week." },
+        { "name": "Chef's Pasta Special", "description": "Handmade pasta feature with seasonal local ingredients." },
+        { "name": "Weekly Roast Feature", "description": "Specialty roast meat served with traditional trimmings every Sunday." },
+        { "name": "Dessert Sampler Platter", "description": "Trio of mini desserts selected by our pastry chef." }
+      ]
+    },
+    {
+      "name": "Local & Traditional Dishes",
+      "items": [
+        { "name": "Local Specialty Dish", "description": "Add your own regional dish here" },
+        { "name": "Traditional House Stew", "description": "Add your authentic local stew recipe here" },
+        { "name": "Regional Breakfast Favorite", "description": "Add your local morning traditional dish here" },
+        { "name": "Heritage Recipe", "description": "Add your family or regional specialty recipe here" },
+        { "name": "Street Food Classic", "description": "Add popular local street food favorite here" }
+      ]
+    }
+  ]
+}

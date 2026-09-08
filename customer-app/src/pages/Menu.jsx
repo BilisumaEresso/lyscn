@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { ShoppingCart, Plus, Minus, Trash2, ImageOff } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Trash2, ImageOff, Info } from 'lucide-react';
 import clsx from 'clsx';
 import api from '../lib/api';
 import { applyBrandColor } from '../lib/theme';
@@ -428,7 +428,7 @@ export default function Menu() {
   return (
     <div className="min-h-screen bg-paper max-w-[560px] mx-auto relative">
       {/* ── Header / Cover ─────────────────────────────────────────────── */}
-      <div className="relative h-52 overflow-hidden">
+      <div className="relative h-56 overflow-hidden">
         {restaurant?.coverUrl ? (
           <img
             src={restaurant.coverUrl}
@@ -439,23 +439,40 @@ export default function Menu() {
         ) : (
           <div className="w-full h-full gradient-cover-fallback" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-ink/70 via-ink/20 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-ink/85 via-ink/40 to-transparent" />
+
+        {/* Top-right "About" Link Button */}
+        <button
+          onClick={() => navigate('/about')}
+          className="absolute top-4 right-4 z-10 px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-md text-white text-xs font-semibold hover:bg-white/30 transition-all flex items-center gap-1.5 shadow-sm border border-white/20"
+        >
+          <Info size={13} />
+          <span>About</span>
+        </button>
+
         <div className="absolute bottom-0 left-0 right-0 px-5 pb-4 flex items-end gap-3">
           {restaurant?.logoUrl && (
             <img
               src={restaurant.logoUrl}
               alt={`${restaurant.name} logo`}
-              className="w-10 h-10 rounded-xl border-2 border-white/30 shadow object-cover shrink-0"
+              className="w-12 h-12 rounded-2xl border-2 border-white/30 shadow-md object-cover shrink-0"
               loading="eager"
             />
           )}
-          <div>
-            <h1 className="font-display font-bold text-white text-xl leading-tight">
-              {restaurant?.name}
-            </h1>
-            <p className="text-white/60 text-xs mt-0.5">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-2">
+              <h1 className="font-display font-bold text-white text-xl leading-tight truncate">
+                {restaurant?.name}
+              </h1>
+            </div>
+            <p className="text-white/70 text-xs font-medium mt-0.5">
               {branch?.name} · {table?.label}
             </p>
+            {restaurant?.description && (
+              <p className="text-white/80 text-xs mt-1 leading-snug line-clamp-2">
+                {restaurant.description}
+              </p>
+            )}
           </div>
         </div>
       </div>

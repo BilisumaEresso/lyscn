@@ -24,6 +24,7 @@ const restaurantSchema = new mongoose.Schema(
     socialLinks: {
       instagram: { type: String },
       facebook:  { type: String },
+      tiktok:    { type: String },
       website:   { type: String },
     },
     contactInfo: {

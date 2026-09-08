@@ -8,8 +8,10 @@ import ErrorBoundary from './components/ErrorBoundary';
 // ── Code-split pages (loaded on demand) ──────────────────────────────────────
 const Resolve       = lazy(() => import('./pages/Resolve'));
 const Menu          = lazy(() => import('./pages/Menu'));
+const About         = lazy(() => import('./pages/About'));
 const Checkout      = lazy(() => import('./pages/Checkout'));
 const OrderTracking = lazy(() => import('./pages/OrderTracking'));
+const Landing       = lazy(() => import('./pages/Landing'));
 const NoSession     = lazy(() => import('./pages/NoSession'));
 const NotFound      = lazy(() => import('./pages/NotFound'));
 
@@ -79,6 +81,9 @@ export default function App() {
         <BrowserRouter>
           <Suspense fallback={<PageSkeleton />}>
             <Routes>
+              {/* Landing entry point */}
+              <Route path="/" element={<Landing />} />
+
               {/* QR entry point */}
               <Route path="/t/:qrToken" element={<Resolve />} />
 
@@ -86,6 +91,10 @@ export default function App() {
               <Route
                 path="/menu"
                 element={<SessionRoute><Menu /></SessionRoute>}
+              />
+              <Route
+                path="/about"
+                element={<SessionRoute><About /></SessionRoute>}
               />
               <Route
                 path="/checkout"
@@ -102,8 +111,8 @@ export default function App() {
                 }
               />
 
-              {/* 404 / direct access without QR */}
-              <Route path="*" element={<NotFound />} />
+              {/* Catch-all */}
+              <Route path="*" element={<Landing />} />
             </Routes>
           </Suspense>
         </BrowserRouter>
