@@ -9,6 +9,7 @@ const tableRoutes      = require('./routes/tableRoutes');
 const categoryRoutes   = require('./routes/categoryRoutes');
 const productRoutes    = require('./routes/productRoutes');
 const orderRoutes      = require('./routes/orderRoutes');
+const assistanceRoutes = require('./routes/assistanceRoutes');
 const publicRoutes     = require('./routes/publicRoutes');
 
 // ── Error handling middleware ─────────────────────────────────────────────────
@@ -33,6 +34,7 @@ app.use('/api/tables',      tableRoutes);
 app.use('/api/categories',  categoryRoutes);
 app.use('/api/products',    productRoutes);
 app.use('/api/orders',      orderRoutes);
+app.use('/api/assistance',  assistanceRoutes);
 app.use('/api/public',      publicRoutes);
 
 // ── Catch-all & error handler (must be last) ──────────────────────────────────

@@ -2,6 +2,11 @@ const crypto = require('crypto');
 const Table = require('../models/Table');
 const Branch = require('../models/Branch');
 
+const emitTableUpdated = (req, table) => {
+  const io = req.app.get('io');
+  if (io && table) io.to(`restaurant:${table.restaurantId}`).emit('table:updated', table);
+};
+
 // ── GET /api/tables?branchId= ─────────────────────────────────────────────────
 const listTables = async (req, res, next) => {
   try {
@@ -177,6 +182,80 @@ const bulkDeactivate = async (req, res, next) => {
   }
 };
 
+// ── PATCH /api/tables/:id/release ───────────────────────────────────────────────
+const releaseTable = async (req, res, next) => {
+  try {
+    const table = await Table.findOneAndUpdate(
+      { _id: req.params.id, restaurantId: req.tenantId },
+      {
+        status: 'available',
+        occupiedSince: null,
+        activeSessionToken: null,
+        sessionExpiresAt: null,
+        sessionLocationVerified: null,
+      },
+      { new: true }
+    );
+
+    if (!table) {
+      return res.status(404).json({ success: false, message: 'Table not found.' });
+    }
+
+    emitTableUpdated(req, table);
+    return res.json({ success: true, table });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ── PATCH /api/tables/bulk/release ──────────────────────────────────────────────
+const bulkRelease = async (req, res, next) => {
+  try {
+    const { ids } = req.body;
+    const uniqueIds = Array.isArray(ids) ? [...new Set(ids)] : [];
+
+    if (uniqueIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'An array of table ids is required.',
+      });
+    }
+
+    const count = await Table.countDocuments({
+      _id: { $in: uniqueIds },
+      restaurantId: req.tenantId,
+    });
+
+    if (count !== uniqueIds.length) {
+      return res.status(403).json({
+        success: false,
+        message: 'One or more tables do not belong to your restaurant or were not found.',
+      });
+    }
+
+    await Table.updateMany(
+      { _id: { $in: uniqueIds }, restaurantId: req.tenantId },
+      {
+        status: 'available',
+        occupiedSince: null,
+        activeSessionToken: null,
+        sessionExpiresAt: null,
+        sessionLocationVerified: null,
+      }
+    );
+
+    const updatedTables = await Table.find({
+      _id: { $in: uniqueIds },
+      restaurantId: req.tenantId,
+    });
+    updatedTables.forEach((table) => emitTableUpdated(req, table));
+
+    return res.json({ success: true, tables: updatedTables });
+  } catch (err) {
+    return next(err);
+  }
+};
+
 // ── PATCH /api/tables/:id ─────────────────────────────────────────────────────
 const updateTable = async (req, res, next) => {
   try {
@@ -249,8 +328,9 @@ module.exports = {
   createBulkTables,
   bulkRegenerateQR,
   bulkDeactivate,
+  releaseTable,
+  bulkRelease,
   updateTable,
   deleteTable,
   regenerateQR,
 };
-

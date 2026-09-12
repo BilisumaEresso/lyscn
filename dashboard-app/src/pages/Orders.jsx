@@ -2,10 +2,11 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import toast from 'react-hot-toast';
+import Currency, { formatBirr } from '../components/ui/Currency';
 import {
   DollarSign, Clock, RefreshCw, Wifi, WifiOff,
   CheckCircle2, CreditCard, ChevronDown, ChevronUp,
-  LayoutGrid, ListFilter, AlertTriangle, User, MessageSquare
+  LayoutGrid, ListFilter, AlertTriangle, User, MessageSquare, Star, MapPin
 } from 'lucide-react';
 import clsx from 'clsx';
 import api from '../lib/api';
@@ -102,6 +103,15 @@ const STATUS_CONFIG = {
   },
 };
 
+function RatingBadge({ rating }) {
+  if (!rating) return null;
+  return (
+    <span className="text-xs px-2 py-0.5 rounded-full border border-amber-200 bg-amber-50 text-amber-700 font-semibold flex items-center gap-1">
+      <Star size={11} fill="currentColor" /> {rating}/5
+    </span>
+  );
+}
+
 // ── Redesigned Order Card Component ──────────────────────────────────────────
 function OrderCard({ order, highlighted, isShaking, now, index }) {
   const qc = useQueryClient();
@@ -188,6 +198,11 @@ function OrderCard({ order, highlighted, isShaking, now, index }) {
                 <span className="font-display font-bold text-ink text-base tracking-tight truncate">
                   {order.tableId?.label ?? 'Takeaway'}
                 </span>
+                {order.tableId?.sessionLocationVerified === false && (
+                  <span title="Location unverified for this order" className="text-ink-muted">
+                    <MapPin size={12} />
+                  </span>
+                )}
                 {order.guestName && (
                   <span className="text-xs text-ink-muted flex items-center gap-1 truncate">
                     <User size={10} /> {order.guestName}
@@ -215,30 +230,31 @@ function OrderCard({ order, highlighted, isShaking, now, index }) {
 
             {/* Total + Payment Status Pill */}
             <div className="flex items-center justify-between pt-1">
-              <span className="font-display font-bold text-ink text-sm">
-                ${order.totalAmount.toFixed(2)}
-              </span>
+              <Currency value={order.totalAmount} className="font-display font-bold text-ink text-sm" />
 
               {/* Payment Pill */}
-              <div
-                className={clsx(
-                  'text-xs px-2.5 py-0.5 rounded-full border font-medium flex items-center gap-1 transition-colors',
-                  order.paymentStatus === 'paid'
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                    : 'bg-slate-100 text-slate-600 border-slate-200'
-                )}
-              >
-                {order.paymentStatus === 'paid' ? (
-                  <>
-                    <CheckCircle2 size={11} className="text-emerald-600" />
-                    <span>Paid</span>
-                  </>
-                ) : (
-                  <>
-                    <CreditCard size={11} className="text-slate-500" />
-                    <span>Unpaid</span>
-                  </>
-                )}
+              <div className="flex items-center gap-1.5">
+                {order.status === 'served' && <RatingBadge rating={order.rating} />}
+                <div
+                  className={clsx(
+                    'text-xs px-2.5 py-0.5 rounded-full border font-medium flex items-center gap-1 transition-colors',
+                    order.paymentStatus === 'paid'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : 'bg-slate-100 text-slate-600 border-slate-200'
+                  )}
+                >
+                  {order.paymentStatus === 'paid' ? (
+                    <>
+                      <CheckCircle2 size={11} className="text-emerald-600" />
+                      <span>Paid</span>
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard size={11} className="text-slate-500" />
+                      <span>Unpaid</span>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -266,14 +282,14 @@ function OrderCard({ order, highlighted, isShaking, now, index }) {
                           {item.selectedModifiers.map((m, mIdx) => (
                             <p key={mIdx}>
                               • {m.groupName}: {m.optionName}{' '}
-                              {m.priceDelta > 0 ? `(+$${m.priceDelta.toFixed(2)})` : ''}
+                              {m.priceDelta > 0 ? `(+${formatBirr(m.priceDelta)})` : ''}
                             </p>
                           ))}
                         </div>
                       )}
                     </div>
                     <span className="font-medium text-ink shrink-0">
-                      ${(item.subtotal || item.unitPrice * item.qty).toFixed(2)}
+                      <Currency value={item.subtotal || item.unitPrice * item.qty} />
                     </span>
                   </div>
                 ))}
@@ -439,11 +455,112 @@ function mergeOrder(currentData, updatedOrder) {
   return { ...currentData, orders: [updatedOrder, ...currentData.orders] };
 }
 
+// ── Order Row Details used by list view (expandable) ─────────────────────────
+function OrderRowDetails({ order, now, isExpanded, onToggle }) {
+  const qc = useQueryClient();
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
+
+  const cancelMutation = useMutation({
+    mutationFn: () => api.patch(`/orders/${order._id}/status`, { status: 'cancelled' }).then((r) => r.data),
+    onSuccess: () => {
+      setConfirmingCancel(false);
+      qc.setQueryData(['orders-kanban'], (old) => mergeOrder(old, { ...order, status: 'cancelled' }));
+      toast.success(`Order cancelled — ${order.tableId?.label ?? 'Table'}`);
+    },
+    onError: () => toast.error('Cancel failed'),
+  });
+
+  const payMutation = useMutation({
+    mutationFn: (paymentMethod) => api.patch(`/orders/${order._id}/payment`, { paymentMethod }).then((r) => r.data),
+    onSuccess: (data) => {
+      qc.setQueryData(['orders-kanban'], (old) => mergeOrder(old, data.order));
+      toast.success('Marked as paid');
+    },
+    onError: () => toast.error('Payment update failed'),
+  });
+
+  return (
+    <div className="mt-3">
+      {isExpanded && (
+        <div className="pl-0 pr-0 py-3 border-t border-ink/8 bg-paper/60 text-xs space-y-2.5 animate-fade-in">
+          <div className="space-y-1.5">
+            <p className="font-semibold text-ink uppercase tracking-wider text-[10px] text-ink-muted">
+              Order Items ({order.items.length})
+            </p>
+            {order.items.map((item, i) => (
+              <div key={i} className="flex justify-between items-start text-ink">
+                <div>
+                  <span className="font-medium text-ink">{item.qty}× {item.name}</span>
+                  {item.selectedModifiers?.length > 0 && (
+                    <div className="text-[11px] text-ink-muted pl-2 space-y-0.5">
+                      {item.selectedModifiers.map((m, mIdx) => (
+                        <p key={mIdx}>• {m.groupName}: {m.optionName} {m.priceDelta > 0 ? `(+${formatBirr(m.priceDelta)})` : ''}</p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <Currency value={item.subtotal || item.unitPrice * item.qty} className="font-medium text-ink shrink-0" />
+              </div>
+            ))}
+          </div>
+
+          {order.notes && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-2 text-amber-800 text-[11px] flex items-start gap-1.5">
+              <MessageSquare size={12} className="shrink-0 mt-0.5" />
+              <span>{order.notes}</span>
+            </div>
+          )}
+
+          {/* Payment actions */}
+          {order.paymentStatus === 'unpaid' && order.status !== 'cancelled' && (
+            <div className="flex gap-2 mt-2">
+              <button onClick={(e) => { e.stopPropagation(); payMutation.mutate('cash'); }} disabled={payMutation.isPending} className="flex-1 py-1 rounded-md border border-ink/12 text-[12px] font-medium text-ink-muted hover:bg-ink/5 transition-colors flex items-center justify-center gap-1">
+                <DollarSign size={12} /> Cash
+              </button>
+              <button onClick={(e) => { e.stopPropagation(); payMutation.mutate('pos'); }} disabled={payMutation.isPending} className="flex-1 py-1 rounded-md border border-ink/12 text-[12px] font-medium text-ink-muted hover:bg-ink/5 transition-colors flex items-center justify-center gap-1">
+                <DollarSign size={12} /> POS
+              </button>
+            </div>
+          )}
+
+          {/* Cancel action */}
+          {order.status !== 'served' && order.status !== 'cancelled' && (
+            confirmingCancel ? (
+              <div className="flex gap-1.5 pt-2">
+                <button type="button" onClick={(e) => { e.stopPropagation(); cancelMutation.mutate(); }} disabled={cancelMutation.isPending} className="flex-1 py-1 rounded-md bg-danger/10 text-danger text-[11px] font-semibold">{cancelMutation.isPending ? 'Cancelling…' : 'Confirm cancel'}</button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); setConfirmingCancel(false); }} className="px-2.5 py-1 rounded-md bg-ink/6 text-[11px] text-ink-muted">Keep</button>
+              </div>
+            ) : (
+              <button type="button" onClick={(e) => { e.stopPropagation(); setConfirmingCancel(true); }} className="text-[11px] text-ink/40 hover:text-danger transition-colors py-0.5 text-center font-medium">Cancel order</button>
+            )
+          )}
+
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Orders Page ─────────────────────────────────────────────────────────
 export default function Orders() {
   const qc = useQueryClient();
-  const [viewMode, setViewMode] = useState('board'); // 'board' or 'list'
+  // Default to list view everywhere; Board remains available on wide screens (>=1024px)
+  const [viewMode, setViewMode] = useState('list'); // 'board' or 'list'
   const [showCancelled, setShowCancelled] = useState(false);
+  const [activeFilter, setActiveFilter] = useState('all'); // chip filter: 'all' or status
+  const [expandedSections, setExpandedSections] = useState(() => ({
+    placed: true,
+    accepted: true,
+    preparing: true,
+    ready: true,
+    served: false, // served collapsed by default
+  }));
+  const [expandedOrders, setExpandedOrders] = useState({});
+  const listContainerRef = useRef(null);
+
+  const toggleOrderExpanded = (orderId) => {
+    setExpandedOrders((s) => ({ ...s, [orderId]: !s[orderId] }));
+  };
   const [highlightedId, setHighlightedId] = useState(null);
   const [shakingId, setShakingId] = useState(null);
   const [socketConnected, setSocketConnected] = useState(false);
@@ -560,7 +677,6 @@ export default function Orders() {
       socket.off('reconnect',     onReconnect);
       socket.off('order:created', onOrderCreated);
       socket.off('order:updated', onOrderUpdated);
-      socket.disconnect();
       clearTimeout(highlightTimer.current);
     };
   }, [qc, highlight]);
@@ -569,6 +685,39 @@ export default function Orders() {
   const listOrders = [...orders].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
+
+  // Refs for status sections to support scrolling from chips
+  const sectionRefs = {
+    placed: useRef(null),
+    accepted: useRef(null),
+    preparing: useRef(null),
+    ready: useRef(null),
+    served: useRef(null),
+  };
+
+  // Ensure we don't keep board view active on small screens
+  useEffect(() => {
+    function handleResize() {
+      if (window.innerWidth < 1024 && viewMode === 'board') setViewMode('list');
+    }
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [viewMode]);
+
+  const scrollToSection = (status) => {
+    if (!sectionRefs[status] || !sectionRefs[status].current) return;
+    // Scroll parent container (the list wrapper) so the section is visible
+    sectionRefs[status].current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Highlight briefly
+    const el = sectionRefs[status].current;
+    el.classList.add('ring-2', 'ring-teal');
+    setTimeout(() => el.classList.remove('ring-2', 'ring-teal'), 900);
+  };
+
+  const toggleSection = (status) => {
+    setExpandedSections((s) => ({ ...s, [status]: !s[status] }));
+  };
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-paper">
@@ -593,8 +742,8 @@ export default function Orders() {
 
         {/* Header Controls: View Density + Filters + Refresh */}
         <div className="flex items-center gap-3">
-          {/* Board vs List Density Toggle */}
-          <div className="flex bg-ink/5 p-0.5 rounded-xl border border-ink/8">
+          {/* Board vs List toggle — only visible on wide screens (>=1024px). Default is List. */}
+          <div className="hidden lg:flex bg-ink/5 p-0.5 rounded-xl border border-ink/8">
             <button
               onClick={() => setViewMode('board')}
               className={clsx(
@@ -670,60 +819,127 @@ export default function Orders() {
             </div>
           </DragDropContext>
         ) : (
-          /* DENSE LIST VIEW SORTED BY ELAPSED TIME */
-          <div className="max-w-4xl mx-auto px-6 py-6 overflow-y-auto h-full space-y-3">
-            {listOrders.length === 0 ? (
-              <p className="text-center text-ink-muted text-sm py-12">No orders recorded yet.</p>
-            ) : (
-              listOrders.map((order) => {
-                const config = STATUS_CONFIG[order.status] || STATUS_CONFIG.placed;
-                const elapsedMins = getElapsedMinutes(order.createdAt, now);
+          /* LIST VIEW: Mobile-first grouped sections */
+          <div ref={listContainerRef} className="max-w-4xl mx-auto px-4 md:px-6 py-4 overflow-y-auto h-full space-y-6 pb-32">
+            {/* Filter Chips Row (horizontally scrollable on small screens) */}
+            <div className="flex gap-2 overflow-x-auto no-scrollbar py-2">
+              {['all', ...STATUS_FLOW].filter(s => s !== 'cancelled').map((s) => (
+                <button
+                  key={s}
+                  onClick={() => {
+                    const key = s === 'all' ? 'all' : s;
+                    setActiveFilter(key);
+                    if (key !== 'all') {
+                      // If targeting served, ensure the section is expanded so users see content
+                      if (key === 'served') setExpandedSections((p) => ({ ...p, served: true }));
+                      scrollToSection(key);
+                    }
+                  }}
+                  className={clsx('text-xs px-3 py-1.5 rounded-full whitespace-nowrap font-medium flex items-center gap-2',
+                    activeFilter === (s === 'all' ? 'all' : s)
+                      ? 'bg-white text-ink shadow-xs'
+                      : 'bg-ink/4 text-ink-muted hover:bg-ink/6')}
+                >
+                  <span className="capitalize">{s === 'all' ? 'All' : STATUS_CONFIG[s]?.label}</span>
+                  {s !== 'all' && (
+                    <span className="text-[11px] px-2 py-0.5 rounded-full border font-semibold text-ink-muted">
+                      {(grouped[s] || []).length}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
 
-                return (
-                  <div
-                    key={order._id}
-                    className="bg-white rounded-xl border border-ink/10 p-4 shadow-xs flex items-center justify-between gap-4"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div
-                        className="w-2 h-10 rounded-full shrink-0"
-                        style={{ backgroundColor: config.accentColor }}
-                      />
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-display font-bold text-ink text-base">
-                            {order.tableId?.label ?? 'Table'}
-                          </span>
-                          <span className={clsx('text-xs px-2 py-0.5 rounded-full border font-semibold', config.badgeStyle)}>
-                            {config.label}
-                          </span>
-                        </div>
-                        <p className="text-xs text-ink-muted truncate mt-0.5">
-                          {order.items.map((i) => `${i.qty}× ${i.name}`).join(', ')}
-                        </p>
-                      </div>
+            {/* Sections */}
+            {['placed', 'accepted', 'preparing', 'ready', 'served'].map((status) => {
+              if (!grouped[status] || grouped[status].length === 0) return null;
+              if (activeFilter !== 'all' && activeFilter !== status) return null;
+              const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.placed;
+              const isExpanded = expandedSections[status];
+
+              return (
+                <section key={status} ref={sectionRefs[status]} className="space-y-3" aria-labelledby={`section-${status}`}>
+                  <header id={`section-${status}`} className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="w-3 h-3 rounded-full" style={{ backgroundColor: cfg.accentColor }} />
+                      <h2 className="font-display font-semibold text-sm text-ink">
+                        {cfg.label}
+                      </h2>
+                      <span className="text-xs text-ink-muted">· {(grouped[status] || []).length}</span>
                     </div>
-
-                    <div className="flex items-center gap-4 shrink-0">
-                      <span className="font-display font-bold text-ink text-sm">
-                        ${order.totalAmount.toFixed(2)}
-                      </span>
-                      <span className="text-xs text-ink-muted font-medium flex items-center gap-1">
-                        <Clock size={11} /> {timeAgo(order.createdAt, now)}
-                      </span>
-                      {NEXT_STATUS[order.status] && (
+                    <div className="flex items-center gap-2">
+                      {status === 'served' ? (
                         <button
-                          onClick={() => updateStatusMutation.mutate({ id: order._id, status: NEXT_STATUS[order.status] })}
-                          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white shadow-xs"
-                          style={{ backgroundColor: config.accentColor }}
+                          onClick={() => toggleSection(status)}
+                          className="text-xs text-ink-muted px-2 py-1 rounded-full border"
                         >
-                          Advance →
+                          {isExpanded ? 'Collapse' : 'Expand'}
                         </button>
-                      )}
+                      ) : null}
                     </div>
-                  </div>
-                );
-              })
+                  </header>
+
+                  {isExpanded && (
+                    <div className="space-y-2">
+                      {(grouped[status] || []).map((order, idx) => (
+                        <div key={order._id} className={clsx('animate-fade-in')}>
+                          {/* Render order row (non-draggable) */}
+                          <div onClick={() => toggleOrderExpanded(order._id)} className={clsx('bg-white rounded-xl border border-ink/10 p-4 shadow-sm overflow-hidden cursor-pointer', order._id === highlightedId && 'ring-2 ring-teal')}>
+                            {/* Reuse structure from OrderCard header/body */}
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-start gap-3 min-w-0">
+                                <div className="w-2 rounded-full shrink-0" style={{ backgroundColor: cfg.accentColor, height: '48px' }} />
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-display font-bold text-ink text-base truncate">
+                                      {order.tableId?.label ?? 'Table'}
+                                    </span>
+                                    <span className={clsx('text-xs px-2 py-0.5 rounded-full border font-semibold', cfg.badgeStyle)}>
+                                      {cfg.label}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-ink-muted truncate mt-1">
+                                    {order.items.slice(0,2).map(i=>`${i.qty}× ${i.name}`).join(', ')}{order.items.length>2?` +${order.items.length-2} more`:''}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-3 shrink-0">
+                                <span className="font-display font-bold text-ink text-sm">
+                                  <Currency value={order.totalAmount} />
+                                </span>
+                                <span className="text-xs text-ink-muted font-medium flex items-center gap-1">
+                                  <Clock size={11} /> {timeAgo(order.createdAt, now)}
+                                </span>
+                                {NEXT_STATUS[order.status] && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); updateStatusMutation.mutate({ id: order._id, status: NEXT_STATUS[order.status] }); }}
+                                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white shadow-xs"
+                                    style={{ backgroundColor: cfg.accentColor }}
+                                  >
+                                    {NEXT_LABEL[order.status]}
+                                  </button>
+                                )}
+                                {order.status === 'served' && <RatingBadge rating={order.rating} />}
+                              </div>
+                            </div>
+
+                            {/* Expand in place details (clicking row toggles) */}
+                            {/* Keep same behavior: reveal item list, modifiers, notes, payment actions */}
+                            {/* For brevity reuse a simple toggle local to this render */}
+                            <OrderRowDetails order={order} now={now} isExpanded={!!expandedOrders[order._id]} onToggle={() => toggleOrderExpanded(order._id)} />
+
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              );
+            })}
+
+            {(!Object.values(grouped).flat().length) && (
+              <p className="text-center text-ink-muted text-sm py-12">No orders recorded yet.</p>
             )}
           </div>
         )}

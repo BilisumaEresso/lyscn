@@ -7,6 +7,7 @@ const jwt = require('jsonwebtoken');
  * Room architecture:
  *   restaurant:<restaurantId>  — joined automatically for authenticated staff
  *   order:<orderId>            — joined on-demand via `join:order` event (customer + staff)
+ *   restaurant:<restaurantId>  — assistance and order events for staff
  */
 function initSockets(io) {
   // ── Auth middleware ───────────────────────────────────────────────────────────

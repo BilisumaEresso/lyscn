@@ -69,7 +69,7 @@ async function seed() {
     restaurantId: restaurant._id,
     name:         'Main Branch',
     address:      '123 Main Street, Demo City, DC 00001',
-    currency:     'USD',
+    currency:     'ETB',
     timezone:     'America/New_York',
   });
   console.log(`[Seed] 🏪   Branch → ${branch.name}  (id: ${branch._id})\n`);

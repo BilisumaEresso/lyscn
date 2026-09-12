@@ -6,6 +6,8 @@ const {
   createBulkTables,
   bulkRegenerateQR,
   bulkDeactivate,
+  bulkRelease,
+  releaseTable,
   updateTable,
   deleteTable,
   regenerateQR,
@@ -20,8 +22,10 @@ router.post('/',     restrictTo('owner', 'manager'), createTable);
 router.post('/bulk', restrictTo('owner', 'manager'), createBulkTables);
 router.patch('/bulk/regenerate-qr', restrictTo('owner', 'manager'), bulkRegenerateQR);
 router.patch('/bulk/deactivate',    restrictTo('owner', 'manager'), bulkDeactivate);
+router.patch('/bulk/release',       restrictTo('owner', 'manager'), bulkRelease);
 router.patch('/:id', restrictTo('owner', 'manager'), updateTable);
 router.delete('/:id', restrictTo('owner', 'manager'), deleteTable);
 router.post('/:id/regenerate-qr', restrictTo('owner', 'manager'), regenerateQR);
+router.patch('/:id/release', restrictTo('owner', 'manager'), releaseTable);
 
 module.exports = router;

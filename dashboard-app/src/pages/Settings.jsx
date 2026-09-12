@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
-import { Settings as SettingsIcon, Upload, Palette, Image as ImageIcon } from 'lucide-react';
+import { Settings as SettingsIcon, Upload, Palette, Image as ImageIcon, MapPin } from 'lucide-react';
 import api from '../lib/api';
 import { useAuthStore } from '../store/authStore';
 import Input from '../components/ui/Input';
@@ -21,6 +21,7 @@ function SectionHeader({ title, description }) {
 export default function Settings() {
   const { setRestaurant } = useAuthStore();
   const qc = useQueryClient();
+  const [locationSaving, setLocationSaving] = useState(false);
 
   // Fetch latest restaurant data
   const { data, isLoading } = useQuery({
@@ -29,6 +30,11 @@ export default function Settings() {
   });
 
   const restaurant = data?.restaurant;
+  const { data: branchData } = useQuery({
+    queryKey: ['branches'],
+    queryFn: () => api.get('/branches').then((r) => r.data),
+  });
+  const branch = branchData?.branches?.[0];
 
   const {
     register,
@@ -112,6 +118,52 @@ export default function Settings() {
     setValue('brandColor', colorHex, { shouldDirty: true, shouldValidate: true });
   };
 
+  const verifyBranchLocation = () => {
+    if (!branch?._id || !navigator.geolocation) {
+      toast.error('Location services are not available in this browser.');
+      return;
+    }
+    setLocationSaving(true);
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        try {
+          await api.patch(`/branches/${branch._id}/location`, {
+            lat: coords.latitude,
+            lng: coords.longitude,
+            radiusMeters: branch.location?.radiusMeters || 150,
+            locationStrictMode: branch.locationStrictMode || false,
+          });
+          qc.invalidateQueries({ queryKey: ['branches'] });
+          toast.success('Cafe location verified and saved.');
+        } catch (err) {
+          toast.error(err.response?.data?.message || 'Could not save cafe location.');
+        } finally {
+          setLocationSaving(false);
+        }
+      },
+      () => {
+        setLocationSaving(false);
+        toast.error('Could not read your current location.');
+      },
+      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 0 }
+    );
+  };
+
+  const toggleStrictLocation = async (event) => {
+    if (!branch?._id || !branch.location) return;
+    try {
+      await api.patch(`/branches/${branch._id}/location`, {
+        lat: branch.location.lat,
+        lng: branch.location.lng,
+        radiusMeters: branch.location.radiusMeters,
+        locationStrictMode: event.target.checked,
+      });
+      qc.invalidateQueries({ queryKey: ['branches'] });
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not update location setting.');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -121,7 +173,7 @@ export default function Settings() {
   }
 
   return (
-    <div className="max-w-[760px] mx-auto px-8 py-8">
+    <div className="max-w-[760px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       {/* Header */}
       <div className="flex items-center gap-3 mb-8">
         <div className="w-10 h-10 rounded-xl bg-ink/6 flex items-center justify-center">
@@ -162,7 +214,7 @@ export default function Settings() {
               <label className="text-xs font-medium text-ink-muted flex items-center gap-1.5">
                 <Palette size={12} /> Brand color
               </label>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <input
                   type="color"
                   value={brandColor}
@@ -251,7 +303,7 @@ export default function Settings() {
             title="Contact information"
             description="Shown to customers on the menu footer and order status pages."
           />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Phone"
               type="tel"
@@ -264,10 +316,10 @@ export default function Settings() {
               placeholder="hello@restaurant.com"
               {...register('contactEmail')}
             />
-            <div className="col-span-2">
+            <div className="sm:col-span-2">
               <Input
-                label="Address"
-                placeholder="123 Main St, City, Country"
+                label={<span className="inline-flex items-center gap-1"><MapPin size={12} /> Cafe location</span>}
+                placeholder="Bole, Addis Ababa"
                 {...register('contactAddress')}
               />
             </div>
@@ -298,6 +350,43 @@ export default function Settings() {
               placeholder="https://yourrestaurant.com"
               {...register('website')}
             />
+          </div>
+        </section>
+
+        <section>
+          <SectionHeader
+            title="Order location verification"
+            description="Optionally verify that customers are near this branch when they scan a table QR code."
+          />
+          <div className="rounded-2xl border border-ink/8 bg-ink/2 p-4 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-ink">
+                  {branch?.location ? 'Cafe location configured' : 'Cafe location not configured'}
+                </p>
+                <p className="text-xs text-ink-muted mt-1">
+                  Stand inside the cafe and use your current location to configure the ordering radius.
+                </p>
+              </div>
+              <Button type="button" variant="outline" onClick={verifyBranchLocation} disabled={locationSaving || !branch}>
+                <MapPin size={14} /> {locationSaving ? 'Checking…' : 'Use my current location'}
+              </Button>
+            </div>
+            <label className={`flex items-start gap-3 ${branch?.location ? 'cursor-pointer' : 'opacity-50'}`}>
+              <input
+                type="checkbox"
+                checked={Boolean(branch?.locationStrictMode)}
+                onChange={toggleStrictLocation}
+                disabled={!branch?.location}
+                className="mt-1 accent-teal"
+              />
+              <span>
+                <span className="block text-sm font-medium text-ink">Require customers to be nearby to order</span>
+                <span className="block text-xs text-ink-muted mt-0.5">
+                  Strict mode blocks ordering when a customer&apos;s location cannot be verified within the cafe radius.
+                </span>
+              </span>
+            </label>
           </div>
         </section>
 

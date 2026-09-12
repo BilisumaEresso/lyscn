@@ -4,13 +4,15 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import {
   Plus, Pencil, Trash2, ChevronUp, ChevronDown,
-  X, ImageOff, Check, GripVertical, Sparkles, Search, CheckCircle2
+  X, ImageOff, Check, GripVertical, Sparkles, Search, CheckCircle2,
+  SlidersHorizontal, PackageOpen, Eye, EyeOff, ArrowLeft
 } from 'lucide-react';
 import api from '../lib/api';
 import { useAuthStore } from '../store/authStore';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Toggle from '../components/ui/Toggle';
+import Currency from '../components/ui/Currency';
 import Modal from '../components/ui/Modal';
 import EmptyState from '../components/ui/EmptyState';
 import Spinner from '../components/ui/Spinner';
@@ -21,17 +23,18 @@ function CategoryItem({ cat, isSelected, onClick, onDelete, onMoveUp, onMoveDown
   return (
     <div
       onClick={onClick}
-      className={`group flex items-center gap-2 px-3 py-2.5 cursor-pointer rounded-lg mx-2 mb-0.5 transition-all ${
-        isSelected ? 'bg-teal/10 text-teal font-semibold' : 'hover:bg-ink/5 text-ink font-medium'
+      className={`group flex items-center gap-2 px-3 py-3 min-h-14 cursor-pointer rounded-xl mx-2 mb-1 transition-all border ${
+        isSelected ? 'border-teal/20 bg-teal/10 text-teal font-semibold' : 'border-transparent hover:bg-ink/5 text-ink font-medium'
       }`}
     >
       <GripVertical size={14} className="text-ink/20 shrink-0" />
-      <span className="flex-1 text-sm truncate">{cat.name}</span>
-      <div className="hidden group-hover:flex items-center gap-0.5">
+      <span className="flex-1 min-w-0 text-sm truncate">{cat.name}</span>
+      <span className="text-[11px] text-ink-muted tabular-nums">{cat.productCount ?? cat.productsCount ?? ''}</span>
+      <div className="flex items-center gap-0.5">
         {!isFirst && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveUp(); }}
-            className="p-1 rounded hover:bg-ink/8 text-ink-muted"
+            className="min-h-10 min-w-10 p-2 rounded-lg hover:bg-ink/8 text-ink-muted flex items-center justify-center"
             title="Move up"
           >
             <ChevronUp size={12} />
@@ -40,7 +43,7 @@ function CategoryItem({ cat, isSelected, onClick, onDelete, onMoveUp, onMoveDown
         {!isLast && (
           <button
             onClick={(e) => { e.stopPropagation(); onMoveDown(); }}
-            className="p-1 rounded hover:bg-ink/8 text-ink-muted"
+            className="min-h-10 min-w-10 p-2 rounded-lg hover:bg-ink/8 text-ink-muted flex items-center justify-center"
             title="Move down"
           >
             <ChevronDown size={12} />
@@ -48,7 +51,7 @@ function CategoryItem({ cat, isSelected, onClick, onDelete, onMoveUp, onMoveDown
         )}
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(); }}
-          className="p-1 rounded hover:bg-danger/10 text-ink-muted hover:text-danger"
+          className="min-h-10 min-w-10 p-2 rounded-lg hover:bg-danger/10 text-ink-muted hover:text-danger flex items-center justify-center"
           title="Remove category"
         >
           <Trash2 size={12} />
@@ -75,7 +78,7 @@ function OptionsFieldArray({ groupIndex, control, register }) {
             className="flex-1 px-2.5 py-1.5 text-xs border border-ink/12 rounded-lg focus:outline-none focus:border-teal focus:ring-1 focus:ring-teal/15"
           />
           <div className="flex items-center">
-            <span className="text-xs text-ink-muted px-1">+$</span>
+            <span className="text-xs text-ink-muted px-1">+Br</span>
             <input
               type="number"
               step="0.01"
@@ -314,7 +317,7 @@ function ProductPanel({ product, selectedCategory, restaurantId, onClose, onSave
       />
       {/* Panel */}
       <div
-        className="fixed inset-y-0 right-0 w-[480px] max-w-full bg-white shadow-2xl z-30 flex flex-col"
+        className="fixed inset-x-0 bottom-0 top-auto h-[92dvh] max-w-full rounded-t-3xl bg-white shadow-2xl z-50 flex flex-col lg:inset-y-0 lg:inset-x-auto lg:right-0 lg:top-0 lg:bottom-auto lg:h-screen lg:max-h-screen lg:w-[480px] lg:rounded-none"
         style={{ animation: 'slide-in 200ms ease-out' }}
       >
         {/* Header */}
@@ -334,7 +337,7 @@ function ProductPanel({ product, selectedCategory, restaurantId, onClose, onSave
         <form
           id="product-form"
           onSubmit={handleSubmit(onSubmit)}
-          className="flex-1 overflow-y-auto px-6 py-5 space-y-5"
+          className="min-h-0 flex-1 overflow-y-auto px-6 py-5 space-y-5"
         >
           {/* Product Name Field + Autocomplete Combobox */}
           <div className="relative" ref={dropdownRef}>
@@ -440,7 +443,7 @@ function ProductPanel({ product, selectedCategory, restaurantId, onClose, onSave
 
           {/* Price */}
           <Input
-            label="Price ($)"
+            label="Price (Br)"
             type="number"
             step="0.01"
             min="0"
@@ -514,7 +517,7 @@ function ProductPanel({ product, selectedCategory, restaurantId, onClose, onSave
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 mb-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
                     <label className="flex items-center gap-1.5 text-xs text-ink-muted cursor-pointer">
                       <input
                         type="checkbox"
@@ -556,7 +559,7 @@ function ProductPanel({ product, selectedCategory, restaurantId, onClose, onSave
         </form>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-ink/8">
+        <div className="shrink-0 flex items-center justify-between gap-3 px-6 py-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] border-t border-ink/8 bg-white">
           {isEditing ? (
             <Button
               type="button"
@@ -832,11 +835,11 @@ function ProductCard({ product, onEdit }) {
   });
 
   return (
-    <div className="border border-ink/8 rounded-xl bg-white overflow-hidden hover:border-ink/16 transition-colors group">
+    <article className="border border-ink/8 rounded-2xl bg-white overflow-hidden hover:border-ink/16 transition-colors group shadow-xs">
       {/* Image area */}
       <div
         onClick={() => onEdit(product)}
-        className="h-36 bg-ink/4 flex items-center justify-center cursor-pointer relative"
+        className="h-40 sm:h-36 bg-ink/4 flex items-center justify-center cursor-pointer relative"
       >
         {product.imageUrl ? (
           <img
@@ -855,7 +858,7 @@ function ProductCard({ product, onEdit }) {
       </div>
 
       {/* Info */}
-      <div className="px-3 py-3">
+      <div className="px-4 py-4">
         <div className="flex items-start justify-between gap-2 mb-2">
           <p
             className="text-sm font-semibold text-ink leading-tight cursor-pointer hover:text-teal transition-colors"
@@ -864,7 +867,7 @@ function ProductCard({ product, onEdit }) {
             {product.name}
           </p>
           <span className="text-sm font-bold text-ink shrink-0">
-            ${product.price.toFixed(2)}
+            <Currency value={product.price} />
           </span>
         </div>
         {product.modifierGroups?.length > 0 && (
@@ -872,28 +875,38 @@ function ProductCard({ product, onEdit }) {
             {product.modifierGroups.length} modifier group{product.modifierGroups.length !== 1 ? 's' : ''}
           </p>
         )}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3 pt-2 border-t border-ink/6">
           <span
-            className={`text-xs font-medium ${product.isAvailable ? 'text-emerald-700' : 'text-ink-muted'}`}
+            className={`inline-flex items-center gap-1.5 text-xs font-semibold ${product.isAvailable ? 'text-emerald-700' : 'text-ink-muted'}`}
           >
+            {product.isAvailable ? <Eye size={13} /> : <EyeOff size={13} />}
             {product.isAvailable ? 'Available' : 'Hidden'}
           </span>
-          <Toggle
-            checked={product.isAvailable}
-            onChange={(val) => toggleMutation.mutate(val)}
-            id={`toggle-${product._id}`}
-          />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onEdit(product)}
+              aria-label={`Edit ${product.name}`}
+              className="min-h-10 min-w-10 rounded-lg text-ink-muted hover:bg-ink/6 flex items-center justify-center"
+            >
+              <Pencil size={15} />
+            </button>
+            <Toggle checked={product.isAvailable} onChange={(val) => toggleMutation.mutate(val)} id={`toggle-${product._id}`} />
+          </div>
         </div>
       </div>
-    </div>
+    </article>
   );
 }
 
 // ── Main Menu page ────────────────────────────────────────────────────────────
 export default function Menu() {
   const [selectedCat, setSelectedCat] = useState(null);
+  const [mobileCategoryList, setMobileCategoryList] = useState(true);
   const [panelProduct, setPanelProduct] = useState(undefined); // undefined=closed, null=new
   const [addCategoryOpen, setAddCategoryOpen] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
+  const [productFilter, setProductFilter] = useState('all');
   const qc = useQueryClient();
   const { restaurant } = useAuthStore();
 
@@ -912,6 +925,17 @@ export default function Menu() {
     enabled: !!selectedCat,
   });
   const products = prodData?.products ?? [];
+  const visibleProducts = products.filter((product) => {
+    const query = productSearch.trim().toLowerCase();
+    const matchesSearch = !query
+      || product.name.toLowerCase().includes(query)
+      || (product.description || '').toLowerCase().includes(query);
+    const matchesFilter = productFilter === 'all'
+      || (productFilter === 'available' && product.isAvailable)
+      || (productFilter === 'hidden' && !product.isAvailable)
+      || (productFilter === 'modifiers' && product.modifierGroups?.length > 0);
+    return matchesSearch && matchesFilter;
+  });
 
   const deleteCatMutation = useMutation({
     mutationFn: (id) => api.delete(`/categories/${id}`),
@@ -951,19 +975,24 @@ export default function Menu() {
   const isPanelOpen = panelProduct !== undefined;
 
   return (
-    <div className="flex h-full" style={{ height: 'calc(100vh - 0px)' }}>
-      {/* ── Left: Categories ─────────────────────────────────────────── */}
-      <div className="w-64 shrink-0 border-r border-ink/8 flex flex-col bg-white">
-        <div className="px-4 py-4 border-b border-ink/8">
-          <h2 className="font-display font-semibold text-base text-ink">Menu</h2>
-          <p className="text-xs text-ink-muted mt-0.5">Select a category</p>
+    <div className="flex flex-col lg:flex-row h-full bg-paper" style={{ height: 'calc(100vh - 0px)' }}>
+      {/* ── Left: Categories (full width on mobile, fixed width on md+) ───────────────── */}
+      <div className={`w-full lg:w-64 shrink-0 border-r border-ink/8 flex-col bg-white ${mobileCategoryList ? 'flex' : 'hidden'} lg:flex`}>
+        <div className="px-4 py-5 border-b border-ink/8">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h1 className="font-display font-semibold text-xl text-ink">Menu</h1>
+              <p className="text-xs text-ink-muted mt-1">{categories.length} categor{categories.length === 1 ? 'y' : 'ies'} · Organize your offerings</p>
+            </div>
+            <PackageOpen size={22} className="text-teal/70 mt-1" />
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto py-2">
           {catsLoading ? (
             <div className="flex justify-center py-6"><Spinner size="sm" /></div>
           ) : categories.length === 0 ? (
-            <div className="px-4 py-6 text-center">
+            <div className="px-4 py-10 text-center">
               <p className="text-xs text-ink-muted">No categories yet.</p>
               <p className="text-xs text-ink/40 mt-0.5">Add your first one below.</p>
             </div>
@@ -973,7 +1002,10 @@ export default function Menu() {
                 key={cat._id}
                 cat={cat}
                 isSelected={selectedCat?._id === cat._id}
-                onClick={() => setSelectedCat(cat)}
+                onClick={() => {
+                  setSelectedCat(cat);
+                  setMobileCategoryList(false);
+                }}
                 onDelete={() => {
                   if (confirm(`Remove category "${cat.name}"?`)) {
                     deleteCatMutation.mutate(cat._id);
@@ -1000,7 +1032,7 @@ export default function Menu() {
       </div>
 
       {/* ── Right: Products ───────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto">
+      <div className={`flex-1 overflow-y-auto ${mobileCategoryList ? 'hidden' : 'block'} lg:block`}>
         {!selectedCat ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
@@ -1012,17 +1044,56 @@ export default function Menu() {
             </div>
           </div>
         ) : (
-          <div className="px-8 py-6 max-w-[1000px]">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="font-display font-semibold text-xl text-ink">{selectedCat.name}</h2>
+          <div className="px-4 sm:px-6 lg:px-8 py-5 lg:py-7 max-w-[1200px]">
+            <div className="flex items-start justify-between gap-4 mb-5">
+              <div className="min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setMobileCategoryList(true)}
+                  className="lg:hidden mb-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-teal"
+                >
+                  <ArrowLeft size={16} /> Categories
+                </button>
+                <h2 className="font-display font-semibold text-2xl text-ink truncate">{selectedCat.name}</h2>
                 <p className="text-sm text-ink-muted mt-0.5">
-                  {products.length} product{products.length !== 1 ? 's' : ''}
+                  {visibleProducts.length} of {products.length} product{products.length !== 1 ? 's' : ''}
                 </p>
               </div>
-              <Button onClick={() => setPanelProduct(null)}>
+              <Button className="hidden lg:inline-flex shrink-0" onClick={() => setPanelProduct(null)}>
                 <Plus size={15} /> Add product
               </Button>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2 mb-5">
+              <div className="relative flex-1">
+                <Search size={16} className="absolute left-3 top-3 text-ink-muted" />
+                <input
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  placeholder="Search products…"
+                  aria-label="Search products"
+                  className="w-full min-h-11 pl-9 pr-3 rounded-xl border border-ink/10 bg-white text-sm focus:outline-none focus:border-teal focus:ring-2 focus:ring-teal/10"
+                />
+              </div>
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                {[
+                  ['all', 'All'],
+                  ['available', 'Available'],
+                  ['hidden', 'Hidden'],
+                  ['modifiers', 'Modifiers'],
+                ].map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setProductFilter(value)}
+                    className={`min-h-11 px-3 rounded-xl text-xs font-semibold whitespace-nowrap border transition-colors ${
+                      productFilter === value ? 'border-teal bg-teal/10 text-teal' : 'border-ink/10 bg-white text-ink-muted'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {prodsLoading ? (
@@ -1037,9 +1108,15 @@ export default function Menu() {
                 action={() => setPanelProduct(null)}
                 actionLabel="Add first product"
               />
+            ) : visibleProducts.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-ink/12 bg-white py-14 px-5 text-center">
+                <SlidersHorizontal size={28} className="mx-auto text-ink/25" />
+                <p className="text-sm font-semibold text-ink mt-3">No matching products</p>
+                <p className="text-xs text-ink-muted mt-1">Try a different search or filter.</p>
+              </div>
             ) : (
-              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {products.map((p) => (
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                {visibleProducts.map((p) => (
                   <ProductCard key={p._id} product={p} onEdit={setPanelProduct} />
                 ))}
               </div>
@@ -1064,8 +1141,43 @@ export default function Menu() {
         open={addCategoryOpen}
         onClose={() => setAddCategoryOpen(false)}
         existingCategories={categories}
-        onCategoryAdded={(newCat) => setSelectedCat(newCat)}
+        onCategoryAdded={(newCat) => {
+          setSelectedCat(newCat);
+          setMobileCategoryList(false);
+        }}
       />
+
+      {/* FAB: primary add action on mobile/tablet (placed above bottom tab bar) */}
+      {mobileCategoryList && <button
+        type="button"
+        onClick={() => setAddCategoryOpen(true)}
+        aria-label="Add category"
+        className="lg:hidden fixed right-4 z-50 rounded-full flex items-center justify-center shadow-lg text-white"
+        style={{
+          width: '56px',
+          height: '56px',
+          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 84px)',
+          background: 'var(--color-primary)'
+        }}
+      >
+        <Plus size={20} />
+      </button>}
+      {!mobileCategoryList && (
+        <button
+          type="button"
+          onClick={() => setPanelProduct(null)}
+          aria-label={`Add product to ${selectedCat?.name || 'category'}`}
+          className="lg:hidden fixed right-4 z-50 rounded-full flex items-center justify-center shadow-lg text-white"
+          style={{
+            width: '56px',
+            height: '56px',
+            bottom: 'calc(env(safe-area-inset-bottom, 0px) + 84px)',
+            background: 'var(--color-primary)'
+          }}
+        >
+          <Plus size={20} />
+        </button>
+      )}
     </div>
   );
 }

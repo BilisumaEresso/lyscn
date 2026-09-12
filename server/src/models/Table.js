@@ -18,6 +18,16 @@ const tableSchema = new mongoose.Schema(
     label:    { type: String, required: true, trim: true },
     qrToken:  { type: String, unique: true, index: true },
     isActive: { type: Boolean, default: true },
+    status: {
+      type: String,
+      enum: ['available', 'occupied'],
+      default: 'available',
+      index: true,
+    },
+    occupiedSince: { type: Date, default: null },
+    activeSessionToken: { type: String, default: null, index: true },
+    sessionExpiresAt: { type: Date, default: null },
+    sessionLocationVerified: { type: Boolean, default: null },
   },
   { timestamps: true }
 );

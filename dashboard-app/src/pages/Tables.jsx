@@ -3,9 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
   Plus, Download, RefreshCw, QrCode, ChevronDown, ChevronUp, Archive,
-  Trash2, Edit2, Check, X, Layers, AlertTriangle
+  Trash2, Edit2, Check, X, Layers, AlertTriangle, MoreVertical, Clock3,
+  Sparkles, ListChecks, RotateCcw, Search, SlidersHorizontal, Users, CircleCheck, CircleDot, MapPin
 } from 'lucide-react';
 import api from '../lib/api';
+import socket from '../lib/socket';
 import { useAuthStore } from '../store/authStore';
 import { generateThemeFromColor } from '../lib/theme';
 import { createStyledQR, downloadTableCard, downloadAllTablesZip } from '../lib/qrCardComposer';
@@ -370,6 +372,7 @@ function AddTableModal({ open, onClose, branches, allTables, defaultMode = 'sing
       onClose={onClose}
       title={mode === 'single' ? 'Add Single Table' : 'Bulk Add Tables'}
       size={mode === 'bulk' && hasGeneratedPreview ? 'lg' : 'md'}
+      mobileSheet
     >
       {/* Mode Tabs */}
       <div className="flex border-b border-ink/8 mb-5">
@@ -571,8 +574,46 @@ function AddTableModal({ open, onClose, branches, allTables, defaultMode = 'sing
   );
 }
 
-// ── Table row with inline label edit ──────────────────────────────────────────
-function TableRow({ table, isSelected, onToggleSelect, onViewQR }) {
+function formatElapsed(date, now) {
+  if (!date) return null;
+  const minutes = Math.max(0, Math.floor((now - new Date(date).getTime()) / 60000));
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  if (hours < 24) return `${hours}h ${remainder}m`;
+  return `${Math.floor(hours / 24)}d ${hours % 24}h`;
+}
+
+function TableActionSheet({ table, open, onClose, onViewQR, onRelease, onEdit, onRegenerate, onDeactivate, canRelease }) {
+  if (!table || !open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      <button type="button" aria-label="Close table actions" className="absolute inset-0 bg-ink/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full sm:max-w-sm bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl p-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] sm:pb-4">
+        <div className="flex items-center justify-between px-2 pb-3 border-b border-ink/8">
+          <div>
+            <p className="font-display font-bold text-ink">{table.label}</p>
+            <p className="text-xs text-ink-muted mt-0.5">Table actions</p>
+          </div>
+          <button type="button" onClick={onClose} aria-label={`Close actions for ${table.label}`} className="min-h-11 min-w-11 p-2 rounded-xl text-ink-muted hover:bg-ink/5"><X size={18} /></button>
+        </div>
+        <div className="grid grid-cols-2 gap-2 pt-3">
+          <button type="button" onClick={onViewQR} className="action-sheet-button"><QrCode size={17} /> View QR code</button>
+          <button type="button" onClick={onEdit} className="action-sheet-button"><Edit2 size={17} /> Edit label</button>
+          <button type="button" onClick={onRegenerate} className="action-sheet-button"><RefreshCw size={17} /> Regenerate QR</button>
+          {canRelease && (
+            <button type="button" onClick={onRelease} aria-label={`Release ${table.label}`} className="action-sheet-button text-teal"><RotateCcw size={17} /> Release table</button>
+          )}
+          <button type="button" onClick={onDeactivate} className="action-sheet-button text-danger"><Trash2 size={17} /> Deactivate</button>
+        </div>
+      </div>
+      <style>{`.action-sheet-button{display:flex;align-items:center;gap:.55rem;border:1px solid rgba(18,26,44,.08);border-radius:.85rem;padding:.8rem .75rem;font-size:.8rem;font-weight:600;color:#121A2C;background:#fff;transition:background .15s}.action-sheet-button:hover{background:#f5f8f7}`}</style>
+    </div>
+  );
+}
+
+// ── Mobile-first table card with inline label edit ────────────────────────────
+function TableRow({ table, isSelected, onToggleSelect, onViewQR, onOpenActions, needsAttention, readyToClear, onRelease, selectionMode, now }) {
   const qc = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
   const [editLabel, setEditLabel] = useState(table.label);
@@ -618,6 +659,18 @@ function TableRow({ table, isSelected, onToggleSelect, onViewQR }) {
     onError: () => toast.error('Failed to regenerate QR code'),
   });
 
+  const status = table.status || 'available';
+  const statusLabel = status === 'occupied' ? 'Occupied' : 'Available';
+  const occupiedMinutes = table.occupiedSince ? Math.max(0, Math.floor((now - new Date(table.occupiedSince).getTime()) / 60000)) : 0;
+  const statusClass = status === 'occupied' && occupiedMinutes >= 90
+      ? 'bg-danger/10 text-danger border-danger/25'
+      : status === 'occupied' && occupiedMinutes >= 45
+      ? 'bg-amber/10 text-amber border-amber/25'
+      : status === 'occupied'
+      ? 'bg-teal/10 text-teal border-teal/20'
+      : 'bg-emerald-50 text-emerald-700 border-emerald-200';
+  const elapsed = formatElapsed(table.occupiedSince, now);
+
   const handleSaveLabel = () => {
     const trimmed = editLabel.trim();
     if (!trimmed) {
@@ -641,30 +694,41 @@ function TableRow({ table, isSelected, onToggleSelect, onViewQR }) {
   };
 
   return (
-    <div className={`flex items-center gap-3 px-4 py-3 border-b border-ink/4 last:border-0 transition-colors ${
-      isSelected ? 'bg-teal/5' : 'hover:bg-ink/1.5'
+    <div className={`relative p-4 sm:p-5 border border-ink/8 rounded-2xl bg-white shadow-sm transition-all ${
+      isSelected ? 'bg-teal/5' : 'hover:bg-ink/[.015]'
     }`}>
-      {/* Row Checkbox */}
-      <input
-        type="checkbox"
-        checked={isSelected}
-        onChange={() => onToggleSelect(table._id)}
-        aria-label={`Select ${table.label}`}
-        className="w-4 h-4 rounded border-ink/20 text-teal focus:ring-teal cursor-pointer shrink-0"
-      />
-
-      {/* QR Thumbnail icon button */}
-      <button
-        type="button"
-        onClick={() => onViewQR(table)}
-        className="w-8 h-8 rounded-lg bg-mint/40 hover:bg-mint/80 flex items-center justify-center shrink-0 transition-colors"
-        title="Click to view QR print card"
-      >
-        <QrCode size={15} className="text-teal" />
-      </button>
-
-      {/* Editable Label / QR Token */}
-      <div className="flex-1 min-w-0">
+      <div className="flex items-start gap-3">
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={() => onToggleSelect(table._id)}
+          aria-label={`Select ${table.label}`}
+          className={`w-5 h-5 mt-1 rounded border-ink/20 text-teal focus:ring-teal cursor-pointer shrink-0 ${selectionMode ? '' : 'hidden'}`}
+        />
+        <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-bold ${statusClass}`}>
+              <span className="w-1.5 h-1.5 rounded-full bg-current" /> {statusLabel}{elapsed ? ` · ${elapsed}` : ''}
+            </span>
+            {needsAttention && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber bg-amber/10 px-2 py-1 rounded-full">
+                <AlertTriangle size={11} /> Needs attention
+              </span>
+            )}
+            {table.sessionLocationVerified === false && (
+              <span
+                title="Location unverified for this table session"
+                className="inline-flex items-center gap-1 text-[10px] font-semibold text-ink-muted bg-ink/5 px-2 py-1 rounded-full"
+              >
+                <MapPin size={11} /> Location unverified
+              </span>
+            )}
+          </div>
+          <button type="button" onClick={() => onOpenActions(table)} className="min-h-11 min-w-11 -mr-2 -mt-2 p-2 rounded-xl text-ink-muted hover:text-ink hover:bg-ink/5" aria-label={`Actions for ${table.label}`}>
+            <MoreVertical size={18} />
+          </button>
+        </div>
         {isEditing ? (
           <div className="flex items-center gap-1 max-w-xs">
             <input
@@ -692,7 +756,7 @@ function TableRow({ table, isSelected, onToggleSelect, onViewQR }) {
             </button>
           </div>
         ) : (
-          <div className="flex items-center gap-2 group">
+          <div className="flex items-start gap-2 group">
             <p
               onClick={() => setIsEditing(true)}
               className="text-sm font-semibold text-ink cursor-pointer hover:text-teal transition-colors flex items-center gap-1.5"
@@ -703,83 +767,52 @@ function TableRow({ table, isSelected, onToggleSelect, onViewQR }) {
             </p>
           </div>
         )}
-        <p className="text-xs text-ink-muted font-mono mt-0.5">{table.qrToken}</p>
-      </div>
-
-      {/* Actions */}
-      <div className="flex items-center gap-3">
-        <span className={`text-xs font-medium ${table.isActive ? 'text-emerald-700' : 'text-ink-muted'}`}>
-          {table.isActive ? 'Active' : 'Inactive'}
-        </span>
-
-        <Toggle
-          checked={table.isActive}
-          onChange={(val) => updateMutation.mutate({ isActive: val })}
-          id={`table-toggle-${table._id}`}
-        />
-
-        <Button variant="outline" size="sm" onClick={() => onViewQR(table)}>
-          <QrCode size={13} /> View QR
-        </Button>
-
-        {/* Per-row inline confirmation for Regenerate */}
-        {confirmRegen ? (
-          <div className="flex items-center gap-1">
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={() => regenMutation.mutate()}
-              disabled={regenMutation.isPending}
-            >
-              Confirm
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setConfirmRegen(false)}>
-              Cancel
-            </Button>
+        {readyToClear && table.status === 'occupied' && (
+          <div className="mt-3 rounded-xl border border-amber/25 bg-amber/10 px-3 py-2.5 flex items-center gap-2">
+            <Sparkles size={16} className="text-amber shrink-0" />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-amber">Ready to clear</p>
+              <p className="text-[11px] text-amber/80">All orders served &amp; paid</p>
+            </div>
+            <button type="button" onClick={() => onRelease(table._id)} aria-label={`Mark ${table.label} available`} className="min-h-11 px-2 text-xs font-bold text-amber hover:underline whitespace-nowrap">
+              Mark available
+            </button>
           </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setConfirmRegen(true)}
-            className="p-1.5 text-ink-muted hover:text-amber rounded-lg hover:bg-amber/10 transition-colors"
-            title="Regenerate QR"
-          >
-            <RefreshCw size={14} />
-          </button>
         )}
-
-        {/* Per-row inline confirmation for Deactivate */}
-        {confirmDeactivate ? (
-          <div className="flex items-center gap-1">
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={() => deactivateMutation.mutate()}
-              disabled={deactivateMutation.isPending}
-            >
-              Deactivate
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setConfirmDeactivate(false)}>
-              Cancel
-            </Button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setConfirmDeactivate(true)}
-            className="p-1.5 text-ink-muted hover:text-danger rounded-lg hover:bg-danger/10 transition-colors"
-            title="Deactivate table"
-          >
-            <Trash2 size={14} />
+        <div className="flex items-center justify-between gap-3 mt-3">
+          <p className="text-xs text-ink-muted font-mono truncate">{table.qrToken}</p>
+          <button type="button" onClick={() => onViewQR(table)} className="min-h-11 min-w-11 rounded-xl bg-mint/40 hover:bg-mint/80 flex items-center justify-center shrink-0 transition-colors" aria-label={`View QR code for ${table.label}`}>
+            <QrCode size={17} className="text-teal" />
+          </button>
+        </div>
+        {!table.isActive && <span className="inline-block text-xs font-semibold text-ink-muted mt-2">Inactive</span>}
+        {status === 'occupied' && (
+          <button type="button" onClick={() => onRelease(table._id)} className="w-full min-h-11 mt-3 rounded-xl border border-teal/25 text-teal text-sm font-semibold hover:bg-teal/5" aria-label={`Release ${table.label}`}>
+            Release table
           </button>
         )}
       </div>
+      </div>
+      {confirmRegen && (
+        <div className="flex items-center gap-2 mt-3 p-2 rounded-lg bg-amber/10">
+          <span className="text-xs text-amber flex-1">Invalidate the current QR code?</span>
+          <Button variant="danger" size="sm" onClick={() => regenMutation.mutate()} disabled={regenMutation.isPending}>Confirm</Button>
+          <Button variant="ghost" size="sm" onClick={() => setConfirmRegen(false)}>Cancel</Button>
+        </div>
+      )}
+      {confirmDeactivate && (
+        <div className="flex items-center gap-2 mt-3 p-2 rounded-lg bg-danger/10">
+          <span className="text-xs text-danger flex-1">Deactivate this table?</span>
+          <Button variant="danger" size="sm" onClick={() => deactivateMutation.mutate()} disabled={deactivateMutation.isPending}>Deactivate</Button>
+          <Button variant="ghost" size="sm" onClick={() => setConfirmDeactivate(false)}>Cancel</Button>
+        </div>
+      )}
     </div>
   );
 }
 
 // ── Branch group with select-all ──────────────────────────────────────────────
-function BranchGroup({ branch, tables, selectedIds, onToggleSelect, onToggleSelectBranch, onViewQR, onAddClick }) {
+function BranchGroup({ branch, tables, selectedIds, onToggleSelect, onToggleSelectBranch, onViewQR, onOpenActions, onAddClick, attentionIds, readyToClearIds, onRelease, selectionMode, now }) {
   const [collapsed, setCollapsed] = useState(false);
 
   const branchTableIds = tables.map((t) => t._id);
@@ -788,14 +821,14 @@ function BranchGroup({ branch, tables, selectedIds, onToggleSelect, onToggleSele
   return (
     <div className="border border-ink/8 rounded-xl bg-white overflow-hidden mb-4 shadow-sm">
       {/* Branch header */}
-      <div className="w-full flex items-center justify-between px-4 py-3 bg-ink/2 border-b border-ink/4">
+      <div className="w-full flex items-center justify-between px-4 py-3.5 bg-ink/2 border-b border-ink/4">
         <div className="flex items-center gap-3">
           <input
             type="checkbox"
             checked={isAllSelected}
             onChange={() => onToggleSelectBranch(branchTableIds)}
             aria-label={`Select all tables in ${branch.name}`}
-            className="w-4 h-4 rounded border-ink/20 text-teal focus:ring-teal cursor-pointer"
+            className={`w-5 h-5 rounded border-ink/20 text-teal focus:ring-teal cursor-pointer ${selectionMode ? '' : 'hidden'}`}
             title="Select all tables in branch"
           />
           <button
@@ -807,6 +840,13 @@ function BranchGroup({ branch, tables, selectedIds, onToggleSelect, onToggleSele
             <span className="text-xs text-ink-muted bg-ink/6 px-2 py-0.5 rounded-full">
               {tables.length} table{tables.length !== 1 ? 's' : ''}
             </span>
+            <span className="hidden sm:inline text-[11px] text-emerald-700">{tables.filter((table) => table.status !== 'occupied').length} available</span>
+            <span className="hidden sm:inline text-[11px] text-teal">{tables.filter((table) => table.status === 'occupied').length} occupied</span>
+            {tables.some((table) => attentionIds.has(String(table._id))) && (
+               <span className="text-[10px] font-semibold text-amber bg-amber/10 px-2 py-0.5 rounded-full flex items-center gap-1">
+                 <AlertTriangle size={11} /> Attention
+               </span>
+            )}
           </button>
         </div>
 
@@ -836,15 +876,24 @@ function BranchGroup({ branch, tables, selectedIds, onToggleSelect, onToggleSele
               </div>
             </div>
           ) : (
-            tables.map((t) => (
+            <div className="grid grid-cols-1 min-[400px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 p-3">
+            {tables.map((t) => (
               <TableRow
                 key={t._id}
                 table={t}
                 isSelected={selectedIds.has(t._id)}
                 onToggleSelect={onToggleSelect}
                 onViewQR={onViewQR}
+                onOpenActions={onOpenActions}
+                needsAttention={attentionIds.has(String(t._id))}
+                readyToClear={readyToClearIds.has(String(t._id))}
+                onRelease={onRelease}
+                selectionMode={selectionMode}
+                now={now}
               />
             ))
+            }
+            </div>
           )}
         </>
       )}
@@ -857,14 +906,27 @@ export default function Tables() {
   const qc = useQueryClient();
   const [addModalState, setAddModalState] = useState({ open: false, mode: 'single', branchId: '' });
   const [qrModalTable, setQrModalTable] = useState(null);
+  const [actionTable, setActionTable] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
+  const [selectionMode, setSelectionMode] = useState(false);
   const [isZipping, setIsZipping] = useState(false);
+  const [now, setNow] = useState(Date.now());
+  const [readyToClearIds, setReadyToClearIds] = useState(new Set());
+  const [branchFilter, setBranchFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [search, setSearch] = useState('');
 
   // Bulk Confirmation Modals
   const [bulkConfirmRegen, setBulkConfirmRegen] = useState(false);
   const [bulkConfirmDeactivate, setBulkConfirmDeactivate] = useState(false);
 
-  const { restaurant } = useAuthStore();
+  const { restaurant, user } = useAuthStore();
+  const canRelease = user?.role === 'owner' || user?.role === 'manager';
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const { data: branchData, isLoading: branchLoading } = useQuery({
     queryKey: ['branches'],
@@ -875,16 +937,85 @@ export default function Tables() {
     queryKey: ['tables'],
     queryFn: () => api.get('/tables').then((r) => r.data),
   });
+  const { data: assistanceData } = useQuery({
+    queryKey: ['assistance'],
+    queryFn: () => api.get('/assistance').then((r) => r.data),
+    refetchInterval: 15_000,
+  });
+
+  useEffect(() => {
+    socket.connect();
+    const onTableUpdated = (updatedTable) => {
+      if (updatedTable?.status === 'available') {
+        setReadyToClearIds((current) => {
+          const next = new Set(current);
+          next.delete(String(updatedTable._id));
+          return next;
+        });
+      }
+      qc.setQueryData(['tables'], (old) => {
+        if (!old?.tables || !updatedTable?._id) return old;
+        return {
+          ...old,
+          tables: old.tables.map((table) =>
+            String(table._id) === String(updatedTable._id) ? { ...table, ...updatedTable } : table
+          ),
+        };
+      });
+    };
+    const onReadyToClear = ({ tableId }) => {
+      if (!tableId) return;
+      setReadyToClearIds((current) => new Set(current).add(String(tableId)));
+    };
+    const onOrderUpdated = (order) => {
+      const tableId = order?.tableId?._id || order?.tableId;
+      if (tableId) {
+        setReadyToClearIds((current) => {
+          const next = new Set(current);
+          next.delete(String(tableId));
+          return next;
+        });
+      }
+      qc.invalidateQueries({ queryKey: ['tables'] });
+    };
+    socket.on('table:updated', onTableUpdated);
+    socket.on('table:readyToClear', onReadyToClear);
+    socket.on('order:updated', onOrderUpdated);
+    socket.on('order:created', onOrderUpdated);
+    return () => {
+      socket.off('table:updated', onTableUpdated);
+      socket.off('table:readyToClear', onReadyToClear);
+      socket.off('order:updated', onOrderUpdated);
+      socket.off('order:created', onOrderUpdated);
+    };
+  }, [qc]);
 
   const branches = branchData?.branches ?? [];
-  const tables   = tableData?.tables   ?? [];
+  const tables = tableData?.tables ?? [];
+  const attentionIds = new Set(
+    (assistanceData?.assistance ?? [])
+      .filter((request) => request.status === 'pending' || request.status === 'acknowledged')
+      .map((request) => String(request.tableId?._id || request.tableId))
+  );
+  const normalizedSearch = search.trim().toLowerCase();
+  const filteredTables = tables.filter((table) => {
+    const matchesBranch = branchFilter === 'all' || String(table.branchId) === String(branchFilter);
+    const matchesStatus = statusFilter === 'all'
+      || (statusFilter === 'attention' ? attentionIds.has(String(table._id)) : (table.status || 'available') === statusFilter);
+    const matchesSearch = !normalizedSearch || table.label.toLowerCase().includes(normalizedSearch);
+    return matchesBranch && matchesStatus && matchesSearch;
+  });
   const isLoading = branchLoading || tableLoading;
 
   // Group tables by branch
   const grouped = branches.map((b) => ({
     branch: b,
-    tables: tables.filter((t) => String(t.branchId) === String(b._id)),
-  }));
+    tables: filteredTables.filter((t) => String(t.branchId) === String(b._id)),
+  })).filter(({ tables: branchTables }) => branchTables.length > 0 || branchFilter === 'all');
+
+  const occupiedCount = tables.filter((table) => table.status === 'occupied').length;
+  const availableCount = tables.length - occupiedCount;
+  const attentionCount = attentionIds.size;
 
   // Selection handlers
   const handleToggleSelect = (id) => {
@@ -909,6 +1040,43 @@ export default function Tables() {
     });
   };
 
+  const closeActionSheet = () => setActionTable(null);
+
+  const releaseMutation = useMutation({
+    mutationFn: (id) => api.patch(`/tables/${id}/release`).then((r) => r.data),
+    onSuccess: (_, releasedId) => {
+      qc.invalidateQueries({ queryKey: ['tables'] });
+      setReadyToClearIds((current) => {
+        const next = new Set(current);
+        next.delete(String(releasedId));
+        return next;
+      });
+      closeActionSheet();
+      toast.success('Table released');
+    },
+    onError: (err) => toast.error(err.response?.data?.message || 'Failed to release table'),
+  });
+
+  const actionRegenMutation = useMutation({
+    mutationFn: (id) => api.post(`/tables/${id}/regenerate-qr`).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tables'] });
+      closeActionSheet();
+      toast.success('QR code regenerated');
+    },
+    onError: () => toast.error('Failed to regenerate QR code'),
+  });
+
+  const actionDeactivateMutation = useMutation({
+    mutationFn: (id) => api.delete(`/tables/${id}`).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tables'] });
+      closeActionSheet();
+      toast.success('Table deactivated');
+    },
+    onError: () => toast.error('Failed to deactivate table'),
+  });
+
   // Bulk actions
   const bulkRegenMutation = useMutation({
     mutationFn: () =>
@@ -932,6 +1100,23 @@ export default function Tables() {
       setBulkConfirmDeactivate(false);
     },
     onError: (err) => toast.error(err.response?.data?.message || 'Failed to deactivate selected tables'),
+  });
+
+  const bulkReleaseMutation = useMutation({
+    mutationFn: () =>
+      api.patch('/tables/bulk/release', { ids: Array.from(selectedIds) }).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tables'] });
+      toast.success(`Released ${selectedIds.size} tables.`);
+      setSelectedIds(new Set());
+      setSelectionMode(false);
+      setReadyToClearIds((current) => {
+        const next = new Set(current);
+        selectedIds.forEach((id) => next.delete(String(id)));
+        return next;
+      });
+    },
+    onError: (err) => toast.error(err.response?.data?.message || 'Failed to release selected tables'),
   });
 
   const handleDownloadSelectedZip = async () => {
@@ -984,23 +1169,34 @@ export default function Tables() {
   };
 
   return (
-    <div className="max-w-[1200px] mx-auto px-8 py-8 relative pb-24">
+    <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-7 relative pb-32">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="font-display font-bold text-2xl text-ink">Tables &amp; QR codes</h1>
-          <p className="text-sm text-ink-muted mt-1">
-            Each table has a unique QR code customers scan to order.
-          </p>
+          <div className="flex items-center gap-3">
+            <h1 className="font-display font-bold text-2xl sm:text-3xl text-ink">Tables</h1>
+            {tables.length > 0 && (
+              <span className="text-xs font-bold text-ink-muted bg-ink/5 rounded-full px-2.5 py-1">{tables.length} total</span>
+            )}
+          </div>
+          <p className="text-sm text-ink-muted mt-1">Live floor status and QR codes</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {tables.length > 0 && (
+            <Button
+              variant="outline"
+              onClick={() => setSelectionMode((value) => !value)}
+            >
+              <ListChecks size={15} /> {selectionMode ? 'Done selecting' : 'Select'}
+            </Button>
+          )}
           {tables.length > 0 && (
             <Button
               variant="outline"
               onClick={handleDownloadAllZip}
               disabled={isZipping}
             >
-              <Archive size={15} /> {isZipping ? 'Exporting ZIP…' : 'Download all cards (.zip)'}
+              <Archive size={15} /> <span className="hidden sm:inline">{isZipping ? 'Exporting ZIP…' : 'Download all cards'}</span><span className="sm:hidden">Export</span>
             </Button>
           )}
           <Button variant="outline" onClick={() => openAddModal('bulk')}>
@@ -1010,6 +1206,73 @@ export default function Tables() {
             <Plus size={15} /> Add table
           </Button>
         </div>
+      </div>
+
+      {/* Floor summary: tap a metric to filter the cards. */}
+      <div className="flex gap-3 overflow-x-auto pb-1 mb-5 snap-x">
+        {[
+          ['all', 'Total tables', tables.length, Users, 'bg-ink/5 text-ink'],
+          ['available', 'Available', availableCount, CircleCheck, 'bg-emerald-50 text-emerald-700'],
+          ['occupied', 'Occupied', occupiedCount, CircleDot, 'bg-teal/10 text-teal'],
+        ].map(([value, label, count, Icon, tone]) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setStatusFilter(value)}
+            className={`min-w-[132px] snap-start rounded-2xl border px-4 py-3 text-left transition-colors ${
+              statusFilter === value ? 'border-teal ring-2 ring-teal/15' : 'border-ink/8'
+            } ${tone}`}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[11px] font-semibold uppercase tracking-wide opacity-70">{label}</span>
+              <Icon size={16} />
+            </div>
+            <span className="block text-2xl font-display font-bold mt-1">{count}</span>
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => setStatusFilter('attention')}
+          className={`min-w-[132px] snap-start rounded-2xl border px-4 py-3 text-left transition-colors ${
+            statusFilter === 'attention' ? 'border-amber ring-2 ring-amber/15' : 'border-ink/8'
+          } bg-amber/10 text-amber`}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-[11px] font-semibold uppercase tracking-wide opacity-70">Attention</span>
+            <AlertTriangle size={16} />
+          </div>
+          <span className="block text-2xl font-display font-bold mt-1">{attentionCount}</span>
+        </button>
+      </div>
+
+      {/* Filters remain touch-friendly and scroll horizontally on phones. */}
+      <div className="flex flex-col sm:flex-row gap-2 mb-6">
+        <label className="relative flex-1 min-w-0">
+          <Search size={16} className="absolute left-3 top-3 text-ink-muted" />
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search table label"
+            aria-label="Search tables"
+            className="w-full min-h-11 rounded-xl border border-ink/10 bg-white pl-9 pr-3 text-sm focus:outline-none focus:border-teal"
+          />
+        </label>
+        <label className="relative">
+          <span className="sr-only">Filter by branch</span>
+          <select value={branchFilter} onChange={(event) => setBranchFilter(event.target.value)} className="w-full sm:w-48 min-h-11 rounded-xl border border-ink/10 bg-white px-3 text-sm">
+            <option value="all">All branches</option>
+            {branches.map((branch) => <option key={branch._id} value={branch._id}>{branch.name}</option>)}
+          </select>
+        </label>
+        <label className="relative">
+          <SlidersHorizontal size={15} className="absolute left-3 top-3 text-ink-muted pointer-events-none" />
+          <span className="sr-only">Filter by status</span>
+          <select value={statusFilter === 'attention' ? 'all' : statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-full sm:w-40 min-h-11 rounded-xl border border-ink/10 bg-white pl-9 pr-3 text-sm">
+            <option value="all">All statuses</option>
+            <option value="available">Available</option>
+            <option value="occupied">Occupied</option>
+          </select>
+        </label>
       </div>
 
       {isLoading ? (
@@ -1028,19 +1291,35 @@ export default function Tables() {
         <div className="border border-amber/30 bg-amber/5 rounded-xl p-5 text-sm text-amber">
           No branches configured. Go to Settings to add a branch first.
         </div>
+      ) : filteredTables.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-ink/15 bg-white px-5 py-12 text-center">
+          <Search size={24} className="mx-auto text-ink-muted" />
+          <p className="text-sm font-semibold text-ink mt-3">No tables match these filters</p>
+          <button type="button" onClick={() => { setSearch(''); setBranchFilter('all'); setStatusFilter('all'); }} className="mt-3 min-h-11 px-4 rounded-xl text-sm font-semibold text-teal hover:bg-teal/5">
+            Clear filters
+          </button>
+        </div>
       ) : (
-        grouped.map(({ branch, tables: bTables }) => (
-          <BranchGroup
-            key={branch._id}
-            branch={branch}
-            tables={bTables}
-            selectedIds={selectedIds}
-            onToggleSelect={handleToggleSelect}
-            onToggleSelectBranch={handleToggleSelectBranch}
-            onViewQR={setQrModalTable}
-            onAddClick={openAddModal}
-          />
-        ))
+        <>
+          {grouped.map(({ branch, tables: bTables }) => (
+            <BranchGroup
+              key={branch._id}
+              branch={branch}
+              tables={bTables}
+              selectedIds={selectedIds}
+              onToggleSelect={handleToggleSelect}
+              onToggleSelectBranch={handleToggleSelectBranch}
+              onViewQR={setQrModalTable}
+              onOpenActions={setActionTable}
+              onAddClick={openAddModal}
+              attentionIds={attentionIds}
+              readyToClearIds={readyToClearIds}
+              onRelease={(id) => releaseMutation.mutate(id)}
+              selectionMode={selectionMode}
+              now={now}
+            />
+          ))}
+        </>
       )}
 
       {/* Add Table Modal (Single / Bulk) */}
@@ -1053,6 +1332,22 @@ export default function Tables() {
         initialBranchId={addModalState.branchId}
       />
 
+      {/* FAB: primary add action on mobile/tablet (placed above bottom tab bar) */}
+      <button
+        type="button"
+        onClick={() => openAddModal('single')}
+        aria-label="Add table"
+        className="lg:hidden fixed right-4 z-50 rounded-full flex items-center justify-center shadow-lg text-white"
+        style={{
+          width: '56px',
+          height: '56px',
+          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 84px)',
+          background: 'var(--color-primary)'
+        }}
+      >
+        <Plus size={20} />
+      </button>
+
       {/* QR Code Modal */}
       <QRModal
         table={qrModalTable}
@@ -1060,14 +1355,48 @@ export default function Tables() {
         onClose={() => setQrModalTable(null)}
       />
 
+      <TableActionSheet
+        table={actionTable}
+        open={!!actionTable}
+        onClose={closeActionSheet}
+        onViewQR={() => {
+          setQrModalTable(actionTable);
+          closeActionSheet();
+        }}
+        onEdit={() => {
+          const nextLabel = window.prompt('Table label', actionTable?.label || '');
+          if (nextLabel && nextLabel.trim() && nextLabel.trim() !== actionTable?.label) {
+            api.patch(`/tables/${actionTable._id}`, { label: nextLabel.trim() })
+              .then(() => {
+                qc.invalidateQueries({ queryKey: ['tables'] });
+                toast.success('Table updated');
+              })
+              .catch(() => toast.error('Failed to update table'));
+          }
+          closeActionSheet();
+        }}
+        onRelease={() => releaseMutation.mutate(actionTable._id)}
+        onRegenerate={() => {
+          if (window.confirm('Regenerate this QR code? Previously printed codes will stop working.')) {
+            actionRegenMutation.mutate(actionTable._id);
+          }
+        }}
+        onDeactivate={() => {
+          if (window.confirm('Deactivate this table? Customers will no longer be able to order from it.')) {
+            actionDeactivateMutation.mutate(actionTable._id);
+          }
+        }}
+        canRelease={canRelease && actionTable?.status !== 'available'}
+      />
+
       {/* Bulk Action Bar */}
       {selectedIds.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-ink text-white rounded-2xl px-6 py-3.5 shadow-2xl flex items-center gap-4 animate-in fade-in slide-in-from-bottom-4 duration-200">
+        <div className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+5.5rem)] lg:bottom-4 left-3 right-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-40 bg-ink text-white rounded-2xl px-3 sm:px-6 py-3.5 shadow-2xl flex flex-wrap items-center justify-center gap-2 sm:gap-4 animate-in fade-in slide-in-from-bottom-4 duration-200">
           <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-white/15">
             {selectedIds.size} selected
           </span>
 
-          <div className="h-4 w-px bg-white/20" />
+          <div className="hidden sm:block h-4 w-px bg-white/20" />
 
           <div className="flex items-center gap-2">
             <Button
@@ -1078,6 +1407,18 @@ export default function Tables() {
             >
               <RefreshCw size={13} /> Regenerate QR
             </Button>
+
+            {canRelease && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-white/20 text-white hover:bg-white/10"
+                onClick={() => bulkReleaseMutation.mutate()}
+                disabled={bulkReleaseMutation.isPending}
+              >
+                <RotateCcw size={13} /> {bulkReleaseMutation.isPending ? 'Releasing…' : 'Release'}
+              </Button>
+            )}
 
             <Button
               variant="danger"
@@ -1100,7 +1441,7 @@ export default function Tables() {
 
           <button
             type="button"
-            onClick={() => setSelectedIds(new Set())}
+            onClick={() => { setSelectedIds(new Set()); setSelectionMode(false); }}
             className="p-1 hover:bg-white/15 rounded-lg transition-colors text-white/70 hover:text-white ml-1"
             title="Clear selection"
           >

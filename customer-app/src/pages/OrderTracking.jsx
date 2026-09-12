@@ -1,13 +1,15 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef } from 'react';
-import { CheckCircle2, Circle, Clock } from 'lucide-react';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { useEffect, useRef, useState } from 'react';
+import { CheckCircle2, Circle, Clock, Star } from 'lucide-react';
 import clsx from 'clsx';
 import api from '../lib/api';
 import socket from '../lib/socket';
 import { applyBrandColor } from '../lib/theme';
 import { useSessionStore } from '../store/sessionStore';
 import logo from '../assets/logo.png';
+import AssistanceButton from '../components/AssistanceButton';
+import toast from 'react-hot-toast';
 
 const STEPS = [
   { key: 'placed',    label: 'Order placed',    desc: 'We received your order' },
@@ -84,6 +86,9 @@ export default function OrderTracking() {
   const qc          = useQueryClient();
   const joined      = useRef(false);
   const session     = useSessionStore();
+  const [feedbackRating, setFeedbackRating] = useState(0);
+  const [feedbackText, setFeedbackText] = useState('');
+  const [feedbackDismissed, setFeedbackDismissed] = useState(false);
 
   // Re-apply brand color on refresh
   useEffect(() => {
@@ -110,6 +115,23 @@ export default function OrderTracking() {
   const paymentStatus = data?.paymentStatus ?? 'unpaid';
   const currentIndex  = STATUS_INDEX[status] ?? 0;
   const isCancelled   = status === 'cancelled';
+  const feedbackSubmitted = Number(data?.rating) > 0;
+
+  const feedbackMutation = useMutation({
+    mutationFn: () => api.patch(`/orders/public/${orderId}/feedback`, {
+      rating: feedbackRating,
+      feedback: feedbackText.trim() || null,
+    }).then((r) => r.data),
+    onSuccess: (result) => {
+      qc.setQueryData(['order-status', orderId], (old) => ({
+        ...old,
+        rating: result.rating,
+        feedback: result.feedback,
+      }));
+      toast.success('Thanks for your feedback!');
+    },
+    onError: (err) => toast.error(err.response?.data?.message || 'Could not save feedback.'),
+  });
 
   // Socket: join order room + listen for instant updates
   useEffect(() => {
@@ -135,6 +157,8 @@ export default function OrderTracking() {
         success:       true,
         status:        updatedOrder.status,
         paymentStatus: updatedOrder.paymentStatus,
+        rating:        updatedOrder.rating,
+        feedback:      updatedOrder.feedback,
       });
     };
 
@@ -171,6 +195,11 @@ export default function OrderTracking() {
             ? 'This order was cancelled. Please ask a staff member.'
             : "We'll update this as your order progresses."}
         </p>
+
+        <div className="mt-3 flex items-center justify-between">
+          <AssistanceButton />
+          {status === 'served' && <span className="text-xs text-ink-muted">How was your visit?</span>}
+        </div>
 
         {!isCancelled && (
           <div
@@ -229,7 +258,75 @@ export default function OrderTracking() {
         )}
       </div>
 
-      {/* Actions */}
+      {/* Feedback prompt */}
+      {status === 'served' && !feedbackSubmitted && !feedbackDismissed && (
+        <div className="mx-4 mb-4 rounded-2xl border border-ink/8 bg-white px-4 py-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="font-display font-semibold text-base text-ink">How was your order?</p>
+            <button
+              type="button"
+              onClick={() => setFeedbackDismissed(true)}
+              className="text-xs text-ink-muted hover:text-ink"
+            >
+              No thanks
+            </button>
+          </div>
+          <div className="flex gap-1.5 mt-3" role="radiogroup" aria-label={`Order rating${feedbackRating ? `, ${feedbackRating} of 5 selected` : ''}`}>
+            {[1, 2, 3, 4, 5].map((value) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setFeedbackRating(value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    setFeedbackRating(Math.min(5, value + 1));
+                  } else if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
+                    event.preventDefault();
+                    setFeedbackRating(Math.max(1, value - 1));
+                  } else if (event.key === ' ' || event.key === 'Enter') {
+                    event.preventDefault();
+                    setFeedbackRating(value);
+                  }
+                }}
+                aria-label={`${value} star${value !== 1 ? 's' : ''}`}
+                aria-checked={feedbackRating === value}
+                role="radio"
+                className="min-h-11 min-w-11 p-2 rounded-lg"
+              >
+                <Star
+                  size={26}
+                  fill={value <= feedbackRating ? 'var(--color-primary)' : 'transparent'}
+                  style={{ color: value <= feedbackRating ? 'var(--color-primary)' : 'rgba(18,26,44,0.25)' }}
+                />
+              </button>
+            ))}
+          </div>
+          <textarea
+            value={feedbackText}
+            onChange={(e) => setFeedbackText(e.target.value)}
+            maxLength={1000}
+            rows={2}
+            placeholder="Tell us more (optional)"
+            className="w-full mt-3 px-3 py-2.5 rounded-xl border border-ink/12 bg-paper text-sm resize-none focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={() => feedbackMutation.mutate()}
+            disabled={!feedbackRating || feedbackMutation.isPending}
+            className="w-full mt-3 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-40"
+            style={{ background: 'var(--color-primary)', color: 'var(--color-on-primary)' }}
+          >
+            {feedbackMutation.isPending ? 'Sending…' : 'Send feedback'}
+          </button>
+        </div>
+      )}
+      {status === 'served' && feedbackSubmitted && (
+        <div className="mx-4 mb-4 rounded-2xl bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-700">
+          Thanks for rating your order {data.rating}/5!
+        </div>
+      )}
+
       <div className="px-4 pb-4 space-y-3">
         <button
           onClick={() => navigate('/menu')}

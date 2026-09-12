@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, UtensilsCrossed, QrCode,
-  ClipboardList, Settings, LogOut, X
+  ClipboardList, Settings, LogOut, X, MapPin
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import logo from '../../assets/logo.png';
@@ -71,9 +71,14 @@ export default function Sidebar({ isOpen, onClose }) {
       {restaurant && (
         <div className="px-5 py-3 border-b border-white/8">
           <p className="text-white/35 text-[10px] font-medium uppercase tracking-wider mb-0.5">
-            Restaurant
+            Cafe
           </p>
           <p className="text-white/80 text-sm font-medium truncate">{restaurant.name}</p>
+          {restaurant.contactInfo?.address && (
+            <p className="text-white/45 text-[11px] mt-1 truncate flex items-center gap-1">
+              <MapPin size={11} /> {restaurant.contactInfo.address}
+            </p>
+          )}
         </div>
       )}
 

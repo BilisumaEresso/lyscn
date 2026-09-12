@@ -6,6 +6,7 @@ const {
   getOrderStatus,
   updateOrderStatus,
   updateOrderPayment,
+  submitOrderFeedback,
 } = require('../controllers/orderController');
 const { protect }               = require('../middleware/auth');
 const { resolveTenantFromAuth } = require('../middleware/tenantResolver');
@@ -14,6 +15,7 @@ const { resolveTenantFromAuth } = require('../middleware/tenantResolver');
 // Registered BEFORE router.use(protect) to skip the auth guard
 router.post('/public',           placeOrder);
 router.get('/public/:id/status', getOrderStatus);
+router.patch('/public/:id/feedback', submitOrderFeedback);
 
 // ── Protected routes (staff only) ────────────────────────────────────────────
 router.use(protect, resolveTenantFromAuth);

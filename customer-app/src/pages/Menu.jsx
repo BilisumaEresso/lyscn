@@ -2,13 +2,15 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { ShoppingCart, Plus, Minus, Trash2, ImageOff, Info } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Trash2, ImageOff, Info, MapPin } from 'lucide-react';
 import clsx from 'clsx';
 import api from '../lib/api';
 import { applyBrandColor } from '../lib/theme';
 import { useSessionStore } from '../store/sessionStore';
 import { useCartStore, cartItemCount, cartSubtotal } from '../store/cartStore';
 import logo from '../assets/logo.png';
+import AssistanceButton from '../components/AssistanceButton';
+import Currency, { formatBirr } from '../components/Currency';
 
 // ── "Powered by LayoScan" mark ────────────────────────────────────────────────
 function PoweredBy() {
@@ -130,7 +132,7 @@ function ProductSheet({ product, onClose }) {
                 {product.name}
               </h2>
               <span className="font-display font-bold text-xl text-ink shrink-0">
-                ${product.price.toFixed(2)}
+                <Currency value={product.price} />
               </span>
             </div>
             {product.description && (
@@ -200,7 +202,7 @@ function ProductSheet({ product, onClose }) {
                             </span>
                           </div>
                           {opt.priceDelta !== 0 && (
-                            <span className="text-sm text-ink-muted">+${opt.priceDelta.toFixed(2)}</span>
+                            <span className="text-sm text-ink-muted">+<Currency value={opt.priceDelta} /></span>
                           )}
                         </button>
                       );
@@ -249,7 +251,7 @@ function ProductSheet({ product, onClose }) {
             } : { background: 'rgba(18,26,44,0.15)', color: '#5B6B7A' }}
           >
             {allRequiredMet
-              ? `Add to order · $${total.toFixed(2)}`
+              ? `Add to order · ${formatBirr(total)}`
               : 'Make your selections'}
           </button>
         </div>
@@ -281,7 +283,7 @@ function ProductCard({ product, onOpen }) {
       onClick={() => onOpen(product)}
       role="button"
       tabIndex={0}
-      aria-label={`View ${product.name}, $${product.price.toFixed(2)}`}
+      aria-label={`View ${product.name}, ${formatBirr(product.price)}`}
       onKeyDown={(e) => e.key === 'Enter' && onOpen(product)}
       className="bg-white rounded-2xl overflow-hidden border border-ink/6 cursor-pointer active:scale-[0.98] transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
       style={{ '--tw-outline-color': 'var(--color-primary)' }}
@@ -320,7 +322,7 @@ function ProductCard({ product, onOpen }) {
           {product.name}
         </p>
         <p className="font-display font-bold text-ink text-base">
-          ${product.price.toFixed(2)}
+          <Currency value={product.price} />
         </p>
         {hasRequired && (
           <p className="text-xs text-ink-muted mt-1">Tap to customise</p>
@@ -339,7 +341,7 @@ function CartBar({ itemCount, subtotal, onTap }) {
     >
       <button
         onClick={onTap}
-        aria-label={`View cart — ${itemCount} items, $${subtotal.toFixed(2)}`}
+        aria-label={`View cart — ${itemCount} items, ${formatBirr(subtotal)}`}
         className="w-full rounded-2xl px-5 py-4 flex items-center justify-between shadow-xl active:scale-[0.98] transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
         style={{
           background:   'var(--color-primary)',
@@ -355,7 +357,7 @@ function CartBar({ itemCount, subtotal, onTap }) {
           </span>
         </div>
         <span className="font-display font-bold text-base" style={{ color: 'var(--color-on-primary)' }}>
-          ${subtotal.toFixed(2)} →
+          <Currency value={subtotal} /> →
         </span>
       </button>
     </div>
@@ -441,14 +443,17 @@ export default function Menu() {
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-ink/85 via-ink/40 to-transparent" />
 
-        {/* Top-right "About" Link Button */}
-        <button
-          onClick={() => navigate('/about')}
-          className="absolute top-4 right-4 z-10 px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-md text-white text-xs font-semibold hover:bg-white/30 transition-all flex items-center gap-1.5 shadow-sm border border-white/20"
-        >
-          <Info size={13} />
-          <span>About</span>
-        </button>
+        {/* Top-right customer actions */}
+        <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+          <AssistanceButton dark />
+          <button
+            onClick={() => navigate('/about')}
+            className="px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-md text-white text-xs font-semibold hover:bg-white/30 transition-all flex items-center gap-1.5 shadow-sm border border-white/20"
+          >
+            <Info size={13} />
+            <span>About</span>
+          </button>
+        </div>
 
         <div className="absolute bottom-0 left-0 right-0 px-5 pb-4 flex items-end gap-3">
           {restaurant?.logoUrl && (
@@ -468,6 +473,11 @@ export default function Menu() {
             <p className="text-white/70 text-xs font-medium mt-0.5">
               {branch?.name} · {table?.label}
             </p>
+            {(restaurant?.contactInfo?.address || branch?.address) && (
+              <p className="text-white/65 text-xs mt-1 flex items-center gap-1 truncate">
+                <MapPin size={11} /> {restaurant?.contactInfo?.address || branch.address}
+              </p>
+            )}
             {restaurant?.description && (
               <p className="text-white/80 text-xs mt-1 leading-snug line-clamp-2">
                 {restaurant.description}

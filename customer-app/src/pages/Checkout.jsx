@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
+import Currency from '../components/Currency';
 import { Minus, Plus, Trash2, ChevronLeft } from 'lucide-react';
 import clsx from 'clsx';
 import api from '../lib/api';
@@ -20,7 +21,7 @@ export default function Checkout() {
 
   const [guestName, setGuestName] = useState('');
 
-  const { restaurant, branch, table, sessionId } = session;
+  const { restaurant, branch, table, sessionId, sessionToken } = session;
 
   // Re-apply brand color on refresh
   useEffect(() => {
@@ -40,6 +41,12 @@ export default function Checkout() {
       navigate(`/order/${data.order._id}`, { replace: true });
     },
     onError: (err) => {
+      if (err.response?.status === 401 || err.response?.data?.message?.includes('session has expired')) {
+        toast.error('Your session has ended — please scan the QR code again to continue ordering.');
+        useSessionStore.getState().clearSession();
+        navigate('/');
+        return;
+      }
       toast.error(err.response?.data?.message || 'Failed to place order — please try again.');
     },
   });
@@ -59,6 +66,7 @@ export default function Checkout() {
       branchId:     branch._id,
       tableId:      table._id,
       sessionId,
+      sessionToken,
       guestName:    guestName.trim() || null,
       items:        orderItems,
     });
@@ -122,7 +130,7 @@ export default function Checkout() {
                     {item.selectedModifiers.map((m) => m.optionName).join(', ')}
                   </p>
                 )}
-                <p className="text-xs text-ink-muted mt-1">${item.unitPrice.toFixed(2)} each</p>
+                <p className="text-xs text-ink-muted mt-1"><Currency value={item.unitPrice} /> each</p>
               </div>
 
               {/* Qty stepper */}
@@ -149,14 +157,14 @@ export default function Checkout() {
               </div>
 
               <span className="font-bold text-ink text-sm shrink-0 min-w-[52px] text-right">
-                ${(item.unitPrice * item.qty).toFixed(2)}
+                <Currency value={item.unitPrice * item.qty} />
               </span>
             </div>
           ))}
 
           <div className="flex items-center justify-between px-4 py-3 bg-ink/2">
             <span className="text-sm font-medium text-ink-muted">Subtotal (display only)</span>
-            <span className="font-display font-bold text-ink text-base">${subtotal.toFixed(2)}</span>
+            <Currency value={subtotal} className="font-display font-bold text-ink text-base" />
           </div>
           <p className="px-4 pb-3 text-[11px] text-ink/40">
             Final total confirmed by server after placing order.

@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
-import { ShoppingBag, Clock, DollarSign, AlertCircle } from 'lucide-react';
+import { ShoppingBag, Clock, DollarSign, AlertCircle, MapPin } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import api from '../lib/api';
 import { useAuthStore } from '../store/authStore';
 import Badge from '../components/ui/Badge';
 import Spinner from '../components/ui/Spinner';
+import Currency from '../components/ui/Currency';
 
 function StatCard({ icon: Icon, label, value, sub, accent = false }) {
   return (
@@ -68,6 +69,11 @@ export default function Dashboard() {
         <p className="text-sm text-ink-muted mt-1">
           {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
         </p>
+        {restaurant?.contactInfo?.address && (
+          <p className="text-xs text-ink-muted mt-2 flex items-center gap-1">
+            <MapPin size={13} /> {restaurant.contactInfo.address}
+          </p>
+        )}
       </div>
 
       {isLoading ? (
@@ -89,7 +95,7 @@ export default function Dashboard() {
             <StatCard
               icon={DollarSign}
               label="Revenue today"
-              value={`$${todayRevenue.toFixed(2)}`}
+              value={<Currency value={todayRevenue} />}
               sub="paid orders only"
             />
             <StatCard
@@ -148,7 +154,7 @@ export default function Dashboard() {
                           {order.items.length} item{order.items.length !== 1 ? 's' : ''}
                         </td>
                         <td className="px-4 py-3 font-medium text-ink">
-                          ${order.totalAmount.toFixed(2)}
+                          <Currency value={order.totalAmount} />
                         </td>
                         <td className="px-4 py-3">
                           <Badge status={order.status} label={capitalize(order.status)} />

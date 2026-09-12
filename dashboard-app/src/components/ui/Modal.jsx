@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
-export default function Modal({ open, onClose, title, children, size = 'md' }) {
+export default function Modal({ open, onClose, title, children, size = 'md', mobileSheet = false }) {
   // Close on Escape
   useEffect(() => {
     if (!open) return;
@@ -24,7 +24,11 @@ export default function Modal({ open, onClose, title, children, size = 'md' }) {
       />
       {/* Panel */}
       <div
-        className={`relative w-full ${widths[size]} bg-white rounded-2xl shadow-xl flex flex-col max-h-[90vh]`}
+        className={`relative w-full ${widths[size]} bg-white shadow-xl flex flex-col max-h-[90vh] ${
+          mobileSheet
+            ? 'rounded-t-3xl sm:rounded-2xl fixed bottom-0 sm:static max-h-[92dvh] sm:max-h-[90vh]'
+            : 'rounded-2xl'
+        }`}
         style={{ animation: 'modal-in 150ms ease-out' }}
       >
         {/* Header */}
@@ -32,7 +36,8 @@ export default function Modal({ open, onClose, title, children, size = 'md' }) {
           <h2 className="font-display font-semibold text-lg text-ink">{title}</h2>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-ink-muted hover:text-ink hover:bg-ink/6 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal"
+            aria-label={`Close ${title}`}
+            className="min-h-11 min-w-11 p-2 rounded-lg text-ink-muted hover:text-ink hover:bg-ink/6 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal"
           >
             <X size={18} />
           </button>

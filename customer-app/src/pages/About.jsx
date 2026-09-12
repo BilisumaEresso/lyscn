@@ -274,7 +274,7 @@ export default function About() {
                     <MapPin size={16} />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[11px] text-ink-muted font-medium">Address</p>
+                    <p className="text-[11px] text-ink-muted font-medium">Cafe location</p>
                     <p className="text-xs font-semibold text-ink leading-relaxed">
                       {address}
                     </p>

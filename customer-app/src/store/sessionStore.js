@@ -22,18 +22,18 @@ export const useSessionStore = create(
        * Called by the /t/:qrToken page after a successful table resolution.
        * Generates a new sessionId only if the qrToken has changed (new visit).
        */
-      setSession: ({ qrToken, restaurant, branch, table }) => {
+      setSession: ({ qrToken, restaurant, branch, table, sessionToken }) => {
         const existing = get();
         const sessionId =
           existing.qrToken === qrToken && existing.sessionId
             ? existing.sessionId   // same visit — reuse existing session
             : uuidv4();            // new token / first visit — fresh session
 
-        set({ qrToken, sessionId, restaurant, branch, table });
+        set({ qrToken, sessionId, sessionToken, restaurant, branch, table });
       },
 
       clearSession: () =>
-        set({ qrToken: null, sessionId: null, restaurant: null, branch: null, table: null }),
+        set({ qrToken: null, sessionId: null, sessionToken: null, restaurant: null, branch: null, table: null }),
     }),
     { name: 'layoscan-session' }
   )

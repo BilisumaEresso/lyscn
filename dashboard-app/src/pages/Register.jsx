@@ -38,7 +38,7 @@ export default function Register() {
       try {
         await api.post('/branches', {
           name: 'Main Branch',
-          currency: 'USD',
+          currency: 'ETB',
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
         });
       } catch (_) {

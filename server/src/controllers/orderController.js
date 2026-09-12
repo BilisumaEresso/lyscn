@@ -4,17 +4,40 @@ const Table   = require('../models/Table');
 
 const VALID_STATUSES = ['placed', 'accepted', 'preparing', 'ready', 'served', 'cancelled'];
 
+// A table can be released manually, but once every non-cancelled order has
+// been served and paid it is useful to surface a clear-table suggestion.
+const suggestTableReadyToClear = async (req, tableId, restaurantId) => {
+  const [activeOrder, currentOrder] = await Promise.all([
+    Order.exists({
+      tableId,
+      restaurantId,
+      status: { $nin: ['served', 'cancelled'] },
+    }),
+    Order.exists({
+      tableId,
+      restaurantId,
+      status: 'served',
+      paymentStatus: 'paid',
+    }),
+  ]);
+
+  if (activeOrder || !currentOrder) return;
+
+  const io = req.app.get('io');
+  if (io) io.to(`restaurant:${restaurantId}`).emit('table:readyToClear', { tableId });
+};
+
 // ── POST /api/orders/public ───────────────────────────────────────────────────
 // Customer-facing: places a new order.
 // Prices are ALWAYS computed server-side — client totals are ignored.
 const placeOrder = async (req, res, next) => {
   try {
-    const { tableId, restaurantId, branchId, sessionId, guestName, items } = req.body;
+    const { tableId, restaurantId, branchId, sessionId, sessionToken, guestName, items } = req.body;
 
-    if (!tableId || !restaurantId || !branchId || !sessionId || !Array.isArray(items) || items.length === 0) {
+    if (!tableId || !restaurantId || !branchId || !sessionId || !sessionToken || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'tableId, restaurantId, branchId, sessionId, and at least one item are required.',
+        message: 'tableId, restaurantId, branchId, sessionId, sessionToken, and at least one item are required.',
       });
     }
 
@@ -24,6 +47,15 @@ const placeOrder = async (req, res, next) => {
       return res.status(404).json({
         success: false,
         message: 'Table not found or inactive. Please re-scan the QR code.',
+      });
+    }
+    if (
+      table.activeSessionToken !== sessionToken
+      || (table.sessionExpiresAt && table.sessionExpiresAt <= new Date())
+    ) {
+      return res.status(401).json({
+        success: false,
+        message: 'Your session has expired — please scan the QR code again.',
       });
     }
 
@@ -95,12 +127,17 @@ const placeOrder = async (req, res, next) => {
       totalAmount,
     });
 
+    if (table.sessionExpiresAt) {
+      table.sessionExpiresAt = null;
+      await table.save();
+    }
+
     // ── Realtime: broadcast to restaurant staff room ──────────────────────────
     const io = req.app.get('io');
     if (io) {
       // Populate tableId for the event payload so the kanban card can show the label
       const populated = await Order.findById(order._id)
-        .populate('tableId', 'label')
+        .populate('tableId', 'label sessionLocationVerified')
         .populate('branchId', 'name');
       io.to(`restaurant:${order.restaurantId}`).emit('order:created', populated);
     }
@@ -141,7 +178,7 @@ const listOrders = async (req, res, next) => {
 // ── GET /api/orders/public/:id/status — PUBLIC (customer polling) ─────────────
 const getOrderStatus = async (req, res, next) => {
   try {
-    const order = await Order.findById(req.params.id).select('status paymentStatus');
+    const order = await Order.findById(req.params.id).select('status paymentStatus rating feedback');
 
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found.' });
@@ -151,6 +188,61 @@ const getOrderStatus = async (req, res, next) => {
       success: true,
       status:        order.status,
       paymentStatus: order.paymentStatus,
+      rating:        order.rating,
+      feedback:      order.feedback,
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// PATCH /api/orders/public/:id/feedback — customer feedback after service
+const submitOrderFeedback = async (req, res, next) => {
+  try {
+    const { rating, feedback } = req.body;
+    const numericRating = Number(rating);
+
+    if (!Number.isInteger(numericRating) || numericRating < 1 || numericRating > 5) {
+      return res.status(400).json({ success: false, message: 'rating must be an integer from 1 to 5.' });
+    }
+
+    const existingOrder = await Order.findOne({ _id: req.params.id }).select('status rating feedback');
+    if (!existingOrder) {
+      return res.status(404).json({ success: false, message: 'Order not found.' });
+    }
+    if (existingOrder.rating != null) {
+      return res.json({
+        success: true,
+        rating: existingOrder.rating,
+        feedback: existingOrder.feedback,
+        alreadySubmitted: true,
+      });
+    }
+    if (existingOrder.status !== 'served') {
+      return res.status(400).json({ success: false, message: 'Feedback is available after the order is served.' });
+    }
+
+    const order = await Order.findOneAndUpdate(
+      { _id: req.params.id, status: 'served', rating: null },
+      { rating: numericRating, feedback: feedback ? String(feedback).trim() : null },
+      { new: true, runValidators: true }
+    );
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Served order not found.' });
+    }
+
+    const populatedOrder = await Order.findById(order._id)
+      .populate('tableId', 'label')
+      .populate('branchId', 'name');
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`restaurant:${order.restaurantId}`).emit('order:updated', populatedOrder);
+      io.to(`order:${order._id}`).emit('order:updated', populatedOrder);
+    }
+    return res.json({
+      success: true,
+      rating: order.rating,
+      feedback: order.feedback,
     });
   } catch (err) {
     return next(err);
@@ -186,6 +278,11 @@ const updateOrderStatus = async (req, res, next) => {
     if (io) {
       io.to(`restaurant:${order.restaurantId}`).emit('order:updated', order);
       io.to(`order:${order._id}`).emit('order:updated', order);
+    }
+
+    if (order.status === 'served' && order.paymentStatus === 'paid') {
+      suggestTableReadyToClear(req, order.tableId?._id || order.tableId, order.restaurantId)
+        .catch((err) => console.error('Unable to evaluate table clear suggestion:', err));
     }
 
     return res.json({ success: true, order });
@@ -226,6 +323,11 @@ const updateOrderPayment = async (req, res, next) => {
       io.to(`order:${order._id}`).emit('order:updated', order);
     }
 
+    if (order.status === 'served' && order.paymentStatus === 'paid') {
+      suggestTableReadyToClear(req, order.tableId?._id || order.tableId, order.restaurantId)
+        .catch((err) => console.error('Unable to evaluate table clear suggestion:', err));
+    }
+
     return res.json({ success: true, order });
   } catch (err) {
     return next(err);
@@ -238,4 +340,5 @@ module.exports = {
   getOrderStatus,
   updateOrderStatus,
   updateOrderPayment,
+  submitOrderFeedback,
 };

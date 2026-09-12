@@ -13,7 +13,7 @@ const listBranches = async (req, res, next) => {
 // ── POST /api/branches ────────────────────────────────────────────────────────
 const createBranch = async (req, res, next) => {
   try {
-    const { name, address, currency, timezone } = req.body;
+    const { name, address, timezone } = req.body;
 
     if (!name) {
       return res.status(400).json({ success: false, message: 'Branch name is required.' });
@@ -23,7 +23,7 @@ const createBranch = async (req, res, next) => {
       restaurantId: req.tenantId,
       name,
       ...(address  && { address }),
-      ...(currency && { currency }),
+      currency: 'ETB',
       ...(timezone && { timezone }),
     });
 
@@ -37,9 +37,10 @@ const createBranch = async (req, res, next) => {
 const updateBranch = async (req, res, next) => {
   try {
     // Always scope update to the current tenant — prevents cross-tenant writes
+    const updates = { ...req.body, currency: 'ETB' };
     const branch = await Branch.findOneAndUpdate(
       { _id: req.params.id, restaurantId: req.tenantId },
-      req.body,
+      updates,
       { new: true, runValidators: true }
     );
 
@@ -72,4 +73,25 @@ const deleteBranch = async (req, res, next) => {
   }
 };
 
-module.exports = { listBranches, createBranch, updateBranch, deleteBranch };
+const updateBranchLocation = async (req, res, next) => {
+  try {
+    const { lat, lng, radiusMeters = 150, locationStrictMode = false } = req.body;
+    if (!Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) {
+      return res.status(400).json({ success: false, message: 'Valid latitude and longitude are required.' });
+    }
+    const branch = await Branch.findOneAndUpdate(
+      { _id: req.params.id, restaurantId: req.tenantId },
+      {
+        location: { lat: Number(lat), lng: Number(lng), radiusMeters: Number(radiusMeters) || 150 },
+        locationStrictMode: Boolean(locationStrictMode),
+      },
+      { new: true, runValidators: true }
+    );
+    if (!branch) return res.status(404).json({ success: false, message: 'Branch not found.' });
+    return res.json({ success: true, branch });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = { listBranches, createBranch, updateBranch, deleteBranch, updateBranchLocation };

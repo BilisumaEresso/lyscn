@@ -5,6 +5,8 @@ const { Server } = require('socket.io');
 
 const app = require('./src/app');
 const { initSockets } = require('./src/sockets');
+const Table = require('./src/models/Table');
+const Order = require('./src/models/Order');
 
 const PORT = process.env.PORT || 5000;
 
@@ -41,6 +43,32 @@ app.set('io', io);
 // Initialise socket event handlers
 initSockets(io);
 
+const sweepExpiredTableSessions = async () => {
+  try {
+    const expiredTables = await Table.find({
+      status: 'occupied',
+      sessionExpiresAt: { $ne: null, $lte: new Date() },
+    });
+    for (const table of expiredTables) {
+      const hasOrders = await Order.exists({
+        tableId: table._id,
+        restaurantId: table.restaurantId,
+        status: { $nin: ['served', 'cancelled'] },
+      });
+      if (hasOrders) continue;
+      table.status = 'available';
+      table.occupiedSince = null;
+      table.activeSessionToken = null;
+      table.sessionExpiresAt = null;
+      table.sessionLocationVerified = null;
+      await table.save();
+      io.to(`restaurant:${table.restaurantId}`).emit('table:updated', table);
+    }
+  } catch (err) {
+    console.error('[LayoScan] Table session sweep failed:', err.message);
+  }
+};
+
 // ── MongoDB connection (placeholder) ─────────────────────────────────────────
 (async () => {
   if (!process.env.MONGO_URI) {
@@ -63,4 +91,5 @@ initSockets(io);
     console.log(`[LayoScan] 🚀  Server running on http://localhost:${PORT}`);
     console.log(`[LayoScan]     Health check → GET http://localhost:${PORT}/api/health`);
   });
+  setInterval(sweepExpiredTableSessions, 60_000);
 })();

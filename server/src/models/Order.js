@@ -74,6 +74,20 @@ const orderSchema = new mongoose.Schema(
     },
 
     totalAmount: { type: Number, required: true },
+
+    // Optional customer feedback, submitted after the order is served.
+    rating: {
+      type: Number,
+      min: 1,
+      max: 5,
+      default: null,
+    },
+    feedback: {
+      type: String,
+      trim: true,
+      maxlength: 1000,
+      default: null,
+    },
   },
   { timestamps: true }
 );

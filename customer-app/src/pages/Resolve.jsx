@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
@@ -14,6 +14,7 @@ export default function Resolve() {
   const { qrToken } = useParams();
   const navigate    = useNavigate();
   const setSession  = useSessionStore((s) => s.setSession);
+  const [locationBlocked, setLocationBlocked] = useState(false);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['table-resolve', qrToken],
@@ -32,12 +33,55 @@ export default function Resolve() {
         restaurant: data.restaurant,
         branch:     data.branch,
         table:      data.table,
+        sessionToken: data.sessionToken,
       });
-      navigate('/menu', { replace: true });
+      if (data.locationCheckRequired && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          async ({ coords }) => {
+            try {
+              await api.post(`/public/table/${qrToken}/verify-location`, {
+                sessionToken: data.sessionToken,
+                lat: coords.latitude,
+                lng: coords.longitude,
+              });
+              navigate('/menu', { replace: true });
+            } catch (error) {
+              if (error.response?.status === 403) {
+                setLocationBlocked(true);
+                return;
+              }
+              navigate('/menu', { replace: true });
+            }
+          },
+          () => {
+            if (data.branch?.locationStrictMode) setLocationBlocked(true);
+            else navigate('/menu', { replace: true });
+          },
+          { enableHighAccuracy: false, timeout: 8000, maximumAge: 60_000 }
+        );
+      } else if (data.locationCheckRequired && data.branch?.locationStrictMode) {
+        setLocationBlocked(true);
+      } else {
+        navigate('/menu', { replace: true });
+      }
     }
   }, [data, qrToken, setSession, navigate]);
 
   /* ── Error state ──────────────────────────────────────────────────── */
+  if (locationBlocked) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-8 text-center bg-paper">
+        <h1 className="font-display font-bold text-2xl text-ink mb-3">Location access required</h1>
+        <p className="text-ink-muted text-sm max-w-sm leading-relaxed">
+          This restaurant only accepts orders while you are nearby. Enable location access and scan the QR code again.
+        </p>
+        <button type="button" onClick={() => window.location.reload()} className="mt-6 px-5 py-3 rounded-2xl text-white font-semibold" style={{ background: 'var(--color-primary)' }}>
+          Try again
+        </button>
+      </div>
+    );
+  }
+
   if (isError) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-8 text-center bg-paper">

@@ -194,6 +194,16 @@ export async function renderPrintCardCanvas({ table, restaurant }) {
   ctx.stroke();
   ctx.restore();
 
+  const location = restaurant?.contactInfo?.address;
+  if (location) {
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#667085';
+    ctx.font = '500 24px Inter, sans-serif';
+    ctx.fillText(location, width / 2, logoY + logoSize + 130, cardW - 120);
+    ctx.restore();
+  }
+
   // --- Middle: QR Code Container + Scan Frame Brackets ---
   const qrBoxSize = 680;
   const qrBoxX = width / 2 - qrBoxSize / 2; // 260

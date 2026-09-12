@@ -5,6 +5,8 @@
 @tailwind utilities;
 
 @layer base {
+  /* Layer scale: content 0-10, sticky headers 30, bottom nav 40, FABs 50,
+     sheets/modals 50, and transient toasts above all app chrome. */
   :root {
     --color-primary:      #14B8A6;
     --color-primary-dark: #0F8077;
