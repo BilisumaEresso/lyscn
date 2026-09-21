@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, UtensilsCrossed, QrCode,
-  ClipboardList, Settings, LogOut, X, Download
+  ClipboardList, Settings, LogOut, X, Download, MapPin
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useInstallPrompt } from '../../hooks/useInstallPrompt';
@@ -61,10 +61,10 @@ export default function Sidebar({ isOpen, onClose }) {
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-lg text-white/60 hover:text-white hover:bg-white/10 lg:hidden transition-colors"
+            className="p-2 min-h-11 min-w-11 rounded-lg text-white/60 hover:text-white hover:bg-white/10 lg:hidden transition-colors flex items-center justify-center"
             aria-label="Close navigation drawer"
           >
-            <X size={18} />
+            <X size={20} />
           </button>
         )}
       </div>
@@ -186,7 +186,7 @@ export default function Sidebar({ isOpen, onClose }) {
             role="dialog"
             aria-modal="true"
             aria-label="Navigation drawer"
-            className="fixed inset-y-0 left-0 z-50 w-64 bg-ink flex flex-col h-full shadow-2xl lg:hidden transform transition-transform duration-200 ease-out"
+            className="fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-ink flex flex-col h-full shadow-2xl lg:hidden transform transition-transform duration-200 ease-out"
           >
             {navContent}
           </aside>

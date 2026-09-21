@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { ShoppingBag, Clock, DollarSign, AlertCircle, MapPin } from 'lucide-react';
+import { ShoppingBag, Clock, DollarSign, AlertCircle, MapPin, ClipboardList } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import api from '../lib/api';
 import { useAuthStore } from '../store/authStore';
@@ -59,9 +59,9 @@ export default function Dashboard() {
   const recentOrders = [...allOrders].slice(0, 5);
 
   return (
-    <div className="max-w-[1200px] mx-auto px-8 py-8">
+    <div className="max-w-[1200px] mx-auto px-4 py-5 md:px-6 md:py-6 lg:px-8 lg:py-8">
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-6 md:mb-8">
         <h1 className="font-display font-bold text-2xl text-ink">
           Good {getGreeting()},{' '}
           <span className="text-teal">{restaurant?.name ?? 'Dashboard'}</span>
@@ -83,8 +83,8 @@ export default function Dashboard() {
         </div>
       ) : (
         <>
-          {/* Stat cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+          {/* Stat cards: 1 col on xs, 2 cols on mobile/tablet, 4 cols on desktop */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8 md:mb-10">
             <StatCard
               icon={ShoppingBag}
               label="Orders today"
@@ -133,47 +133,96 @@ export default function Dashboard() {
                 </p>
               </div>
             ) : (
-              <div className="border border-ink/8 rounded-xl overflow-hidden bg-white">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-ink/6 bg-ink/2">
-                      <th className="text-left px-4 py-3 text-xs font-medium text-ink-muted">Table</th>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-ink-muted">Items</th>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-ink-muted">Total</th>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-ink-muted">Status</th>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-ink-muted">Payment</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recentOrders.map((order) => (
-                      <tr key={order._id} className="border-b border-ink/4 last:border-0 hover:bg-ink/1.5">
-                        <td className="px-4 py-3 font-medium text-ink">
-                          {order.tableId?.label ?? '—'}
-                        </td>
-                        <td className="px-4 py-3 text-ink-muted">
-                          {order.items.length} item{order.items.length !== 1 ? 's' : ''}
-                        </td>
-                        <td className="px-4 py-3 font-medium text-ink">
-                          <Currency value={order.totalAmount} />
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge status={order.status} label={capitalize(order.status)} />
-                        </td>
-                        <td className="px-4 py-3">
+              <>
+                {/* Mobile Order Cards (< 768px) */}
+                <div className="md:hidden space-y-3">
+                  {recentOrders.map((order) => (
+                    <div key={order._id} className="rounded-xl border border-ink/8 bg-white p-4 shadow-2xs">
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className="font-semibold text-sm text-ink">
+                          {order.tableId?.label ?? 'Table —'}
+                        </span>
+                        <Badge status={order.status} label={capitalize(order.status)} />
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-ink-muted">
+                        <span>{order.items.length} item{order.items.length !== 1 ? 's' : ''}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-ink text-sm">
+                            <Currency value={order.totalAmount} />
+                          </span>
                           <Badge
                             status={order.paymentStatus}
                             label={capitalize(order.paymentStatus)}
                           />
-                        </td>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Tablet & Desktop Table (>= 768px) */}
+                <div className="hidden md:block border border-ink/8 rounded-xl overflow-hidden bg-white">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-ink/6 bg-ink/2">
+                        <th className="text-left px-4 py-3 text-xs font-medium text-ink-muted">Table</th>
+                        <th className="text-left px-4 py-3 text-xs font-medium text-ink-muted">Items</th>
+                        <th className="text-left px-4 py-3 text-xs font-medium text-ink-muted">Total</th>
+                        <th className="text-left px-4 py-3 text-xs font-medium text-ink-muted">Status</th>
+                        <th className="text-left px-4 py-3 text-xs font-medium text-ink-muted">Payment</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {recentOrders.map((order) => (
+                        <tr key={order._id} className="border-b border-ink/4 last:border-0 hover:bg-ink/1.5">
+                          <td className="px-4 py-3 font-medium text-ink">
+                            {order.tableId?.label ?? '—'}
+                          </td>
+                          <td className="px-4 py-3 text-ink-muted">
+                            {order.items.length} item{order.items.length !== 1 ? 's' : ''}
+                          </td>
+                          <td className="px-4 py-3 font-medium text-ink">
+                            <Currency value={order.totalAmount} />
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge status={order.status} label={capitalize(order.status)} />
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge
+                              status={order.paymentStatus}
+                              label={capitalize(order.paymentStatus)}
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </div>
         </>
       )}
+
+      {/* FAB: quick jump to Live Orders on mobile/tablet */}
+      <Link
+        to="/orders"
+        aria-label="Open live orders"
+        className="lg:hidden fixed right-6 z-40 rounded-full flex items-center gap-2 px-4 shadow-xl text-white font-semibold text-xs transition-transform active:scale-95 hover:shadow-2xl"
+        style={{
+          height: '52px',
+          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)',
+          background: 'var(--color-primary)'
+        }}
+      >
+        <ClipboardList size={18} />
+        <span>Live Orders</span>
+        {placedCount > 0 && (
+          <span className="w-5 h-5 rounded-full bg-white text-ink text-[10px] font-bold flex items-center justify-center">
+            {placedCount}
+          </span>
+        )}
+      </Link>
     </div>
   );
 }

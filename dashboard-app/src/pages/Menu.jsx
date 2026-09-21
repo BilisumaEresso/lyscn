@@ -975,9 +975,9 @@ export default function Menu() {
   const isPanelOpen = panelProduct !== undefined;
 
   return (
-    <div className="flex flex-col lg:flex-row h-full bg-paper" style={{ height: 'calc(100vh - 0px)' }}>
-      {/* ── Left: Categories (full width on mobile, fixed width on md+) ───────────────── */}
-      <div className={`w-full lg:w-64 shrink-0 border-r border-ink/8 flex-col bg-white ${mobileCategoryList ? 'flex' : 'hidden'} lg:flex`}>
+    <div className="flex flex-col md:flex-row h-full bg-paper" style={{ height: 'calc(100vh - 0px)' }}>
+      {/* ── Left: Categories (full width on mobile, sidebar on tablet & desktop) ────── */}
+      <div className={`w-full md:w-60 lg:w-64 shrink-0 border-r border-ink/8 flex-col bg-white ${mobileCategoryList ? 'flex' : 'hidden'} md:flex`}>
         <div className="px-4 py-5 border-b border-ink/8">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -1032,7 +1032,7 @@ export default function Menu() {
       </div>
 
       {/* ── Right: Products ───────────────────────────────────────────── */}
-      <div className={`flex-1 overflow-y-auto ${mobileCategoryList ? 'hidden' : 'block'} lg:block`}>
+      <div className={`flex-1 overflow-y-auto ${mobileCategoryList ? 'hidden' : 'block'} md:block`}>
         {!selectedCat ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
@@ -1050,7 +1050,7 @@ export default function Menu() {
                 <button
                   type="button"
                   onClick={() => setMobileCategoryList(true)}
-                  className="lg:hidden mb-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-teal"
+                  className="md:hidden mb-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-teal"
                 >
                   <ArrowLeft size={16} /> Categories
                 </button>
@@ -1147,37 +1147,32 @@ export default function Menu() {
         }}
       />
 
-      {/* FAB: primary add action on mobile/tablet (placed above bottom tab bar) */}
-      {mobileCategoryList && <button
-        type="button"
-        onClick={() => setAddCategoryOpen(true)}
-        aria-label="Add category"
-        className="lg:hidden fixed right-4 z-50 rounded-full flex items-center justify-center shadow-lg text-white"
-        style={{
-          width: '56px',
-          height: '56px',
-          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 84px)',
-          background: 'var(--color-primary)'
-        }}
-      >
-        <Plus size={20} />
-      </button>}
-      {!mobileCategoryList && (
-        <button
-          type="button"
-          onClick={() => setPanelProduct(null)}
-          aria-label={`Add product to ${selectedCat?.name || 'category'}`}
-          className="lg:hidden fixed right-4 z-50 rounded-full flex items-center justify-center shadow-lg text-white"
-          style={{
-            width: '56px',
-            height: '56px',
-            bottom: 'calc(env(safe-area-inset-bottom, 0px) + 84px)',
-            background: 'var(--color-primary)'
-          }}
-        >
-          <Plus size={20} />
-        </button>
-      )}
+      {/* FAB: primary add action on mobile/tablet */}
+      <div className="lg:hidden fixed right-6 z-40" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)' }}>
+        {/* On mobile: if category list is active, FAB adds category. If products view is active, FAB adds product.
+            On tablet (md): if category is selected, FAB adds product; else adds category */}
+        {selectedCat ? (
+          <button
+            type="button"
+            onClick={() => setPanelProduct(null)}
+            aria-label={`Add product to ${selectedCat.name}`}
+            className="w-14 h-14 rounded-full flex items-center justify-center shadow-xl text-white transition-transform active:scale-95 hover:shadow-2xl"
+            style={{ background: 'var(--color-primary)' }}
+          >
+            <Plus size={24} />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setAddCategoryOpen(true)}
+            aria-label="Add category"
+            className="w-14 h-14 rounded-full flex items-center justify-center shadow-xl text-white transition-transform active:scale-95 hover:shadow-2xl"
+            style={{ background: 'var(--color-primary)' }}
+          >
+            <Plus size={24} />
+          </button>
+        )}
+      </div>
     </div>
   );
 }

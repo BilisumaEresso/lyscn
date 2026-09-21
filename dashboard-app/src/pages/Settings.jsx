@@ -5,6 +5,7 @@ import {
   Palette,
   Settings as SettingsIcon,
   Upload,
+  Check,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -490,6 +491,24 @@ export default function Settings() {
           </Button>
         </div>
       </form>
+
+      {/* FAB: quick Save button on mobile/tablet */}
+      <button
+        type="button"
+        onClick={handleSubmit(onSubmit)}
+        disabled={updateMutation.isPending}
+        aria-label="Save settings"
+        className="lg:hidden fixed right-6 z-40 rounded-full flex items-center gap-2 px-5 shadow-xl text-white font-semibold text-xs transition-transform active:scale-95 hover:shadow-2xl"
+        style={{
+          height: '52px',
+          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)',
+          background: isDirty ? 'var(--color-primary)' : '#121A2C',
+          opacity: updateMutation.isPending ? 0.7 : 1
+        }}
+      >
+        <Check size={18} strokeWidth={2.5} />
+        <span>{updateMutation.isPending ? 'Saving…' : isDirty ? 'Save changes*' : 'Save changes'}</span>
+      </button>
     </div>
   );
 }

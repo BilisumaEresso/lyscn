@@ -876,7 +876,7 @@ function BranchGroup({ branch, tables, selectedIds, onToggleSelect, onToggleSele
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 min-[400px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 p-3">
+            <div className="grid grid-cols-1 min-[400px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 p-3">
             {tables.map((t) => (
               <TableRow
                 key={t._id}
@@ -1332,21 +1332,23 @@ export default function Tables() {
         initialBranchId={addModalState.branchId}
       />
 
-      {/* FAB: primary add action on mobile/tablet (placed above bottom tab bar) */}
-      <button
-        type="button"
-        onClick={() => openAddModal('single')}
-        aria-label="Add table"
-        className="lg:hidden fixed right-4 z-50 rounded-full flex items-center justify-center shadow-lg text-white"
-        style={{
-          width: '56px',
-          height: '56px',
-          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 84px)',
-          background: 'var(--color-primary)'
-        }}
-      >
-        <Plus size={20} />
-      </button>
+      {/* FAB: primary add action on mobile/tablet (hidden if bulk selection bar is active) */}
+      {selectedIds.size === 0 && (
+        <button
+          type="button"
+          onClick={() => openAddModal('single')}
+          aria-label="Add table"
+          className="lg:hidden fixed right-6 z-40 rounded-full flex items-center justify-center shadow-xl text-white transition-transform active:scale-95 hover:shadow-2xl"
+          style={{
+            width: '56px',
+            height: '56px',
+            bottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)',
+            background: 'var(--color-primary)'
+          }}
+        >
+          <Plus size={24} />
+        </button>
+      )}
 
       {/* QR Code Modal */}
       <QRModal
@@ -1391,7 +1393,7 @@ export default function Tables() {
 
       {/* Bulk Action Bar */}
       {selectedIds.size > 0 && (
-        <div className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+5.5rem)] lg:bottom-4 left-3 right-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-40 bg-ink text-white rounded-2xl px-3 sm:px-6 py-3.5 shadow-2xl flex flex-wrap items-center justify-center gap-2 sm:gap-4 animate-in fade-in slide-in-from-bottom-4 duration-200">
+        <div className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+1.25rem)] lg:bottom-4 left-3 right-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-40 bg-ink text-white rounded-2xl px-3 sm:px-6 py-3.5 shadow-2xl flex flex-wrap items-center justify-center gap-2 sm:gap-4 animate-in fade-in slide-in-from-bottom-4 duration-200">
           <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-white/15">
             {selectedIds.size} selected
           </span>

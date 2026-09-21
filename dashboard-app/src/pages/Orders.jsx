@@ -695,10 +695,10 @@ export default function Orders() {
     served: useRef(null),
   };
 
-  // Ensure we don't keep board view active on small screens
+  // Ensure we don't keep board view active on phone screens (< 768px)
   useEffect(() => {
     function handleResize() {
-      if (window.innerWidth < 1024 && viewMode === 'board') setViewMode('list');
+      if (window.innerWidth < 768 && viewMode === 'board') setViewMode('list');
     }
     handleResize();
     window.addEventListener('resize', handleResize);
@@ -742,8 +742,8 @@ export default function Orders() {
 
         {/* Header Controls: View Density + Filters + Refresh */}
         <div className="flex items-center gap-3">
-          {/* Board vs List toggle — only visible on wide screens (>=1024px). Default is List. */}
-          <div className="hidden lg:flex bg-ink/5 p-0.5 rounded-xl border border-ink/8">
+          {/* Board vs List toggle — visible on tablet & desktop (>=768px). Default is List on mobile. */}
+          <div className="hidden md:flex bg-ink/5 p-0.5 rounded-xl border border-ink/8">
             <button
               onClick={() => setViewMode('board')}
               className={clsx(
@@ -944,6 +944,31 @@ export default function Orders() {
           </div>
         )}
       </div>
+
+      {/* FAB: quick switch between Board and List view on mobile/tablet */}
+      <button
+        type="button"
+        onClick={() => setViewMode((prev) => (prev === 'board' ? 'list' : 'board'))}
+        aria-label={viewMode === 'board' ? 'Switch to list view' : 'Switch to board view'}
+        className="lg:hidden fixed right-6 z-40 rounded-full flex items-center gap-2 px-4 shadow-xl text-white font-semibold text-xs transition-transform active:scale-95 hover:shadow-2xl"
+        style={{
+          height: '52px',
+          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)',
+          background: 'var(--color-primary)'
+        }}
+      >
+        {viewMode === 'board' ? (
+          <>
+            <ListFilter size={18} />
+            <span>List view</span>
+          </>
+        ) : (
+          <>
+            <LayoutGrid size={18} />
+            <span>Board view</span>
+          </>
+        )}
+      </button>
     </div>
   );
 }

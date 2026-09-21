@@ -4,7 +4,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Bell, Check, Menu, Volume2, X, MapPin } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Sidebar from './Sidebar';
-import BottomTabBar from './BottomTabBar';
 import { useAuthStore } from '../../store/authStore';
 import { applyBrandColor } from '../../lib/theme';
 import api from '../../lib/api';
@@ -243,13 +242,10 @@ export default function AppShell() {
       />
 
       {/* Main Content Viewport */}
-      <main className="relative flex-1 overflow-y-auto min-w-0 pb-24 lg:pb-0">
+      <main className="relative flex-1 overflow-y-auto min-w-0 pb-16 lg:pb-0">
         <AssistanceBell />
         <Outlet />
       </main>
-
-      {/* Bottom tab bar for mobile/tablet (CSS-only visibility) */}
-      <BottomTabBar />
     </div>
   );
 }
