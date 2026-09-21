@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "LayoScan API server — Express + MongoDB + Socket.io",
   "main": "server.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",

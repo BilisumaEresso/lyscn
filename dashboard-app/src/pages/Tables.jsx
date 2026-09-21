@@ -19,7 +19,7 @@ import EmptyState from '../components/ui/EmptyState';
 import Spinner from '../components/ui/Spinner';
 import logoImg from '../assets/logo.png';
 
-const CUSTOMER_URL = import.meta.env.VITE_CUSTOMER_APP_URL || 'http://localhost:5173';
+const CUSTOMER_URL = import.meta.env.VITE_CUSTOMER_APP_URL;
 const PREFIX_CHIPS = ['Table', 'Booth', 'Patio', 'VIP', 'Bar', 'Outdoor'];
 
 // ── Helper: Parse label trailing number ───────────────────────────────────────

@@ -7,8 +7,7 @@ import { io } from 'socket.io-client';
  * autoConnect: false — the OrderTracking page connects on mount
  * and disconnects on unmount.
  */
-const SOCKET_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api')
-  .replace(/\/api\/?$/, '');
+const SOCKET_URL = (import.meta.env.VITE_API_URL || '').replace(/\/api\/?$/, '');
 
 const socket = io(SOCKET_URL, {
   autoConnect:       false,

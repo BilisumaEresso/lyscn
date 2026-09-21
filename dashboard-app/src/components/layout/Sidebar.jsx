@@ -2,9 +2,10 @@ import { useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, UtensilsCrossed, QrCode,
-  ClipboardList, Settings, LogOut, X, MapPin
+  ClipboardList, Settings, LogOut, X, Download
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
+import { useInstallPrompt } from '../../hooks/useInstallPrompt';
 import logo from '../../assets/logo.png';
 
 const NAV_ITEMS = [
@@ -17,6 +18,7 @@ const NAV_ITEMS = [
 
 export default function Sidebar({ isOpen, onClose }) {
   const { user, restaurant, logout } = useAuthStore();
+  const { canInstall, promptInstall } = useInstallPrompt();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -141,6 +143,17 @@ export default function Sidebar({ isOpen, onClose }) {
             <p className="text-white/35 text-[10px] capitalize">{user?.role}</p>
           </div>
         </div>
+        {canInstall && (
+          <button
+            onClick={promptInstall}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm mb-1
+                       text-teal hover:bg-teal/10 transition-colors font-medium
+                       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal"
+          >
+            <Download size={15} strokeWidth={2} />
+            Install app
+          </button>
+        )}
         <button
           onClick={handleLogout}
           className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm

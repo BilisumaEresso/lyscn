@@ -11,8 +11,7 @@ import { useAuthStore } from '../store/authStore';
  * The server uses the token to auto-join this socket to the correct restaurant
  * room (restaurant:<restaurantId>) — no client-side join event needed for staff.
  */
-const SOCKET_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api')
-  .replace(/\/api\/?$/, ''); // strip trailing /api
+const SOCKET_URL = (import.meta.env.VITE_API_URL || '').replace(/\/api\/?$/, ''); // strip trailing /api
 
 function createSocket() {
   const { accessToken } = useAuthStore.getState();

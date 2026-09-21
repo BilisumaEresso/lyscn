@@ -6,7 +6,7 @@ import logoImg from '../assets/logo.png';
 
 const saveAs = fileSaver.saveAs || fileSaver;
 
-const CUSTOMER_URL = import.meta.env.VITE_CUSTOMER_APP_URL || 'http://localhost:5173';
+const CUSTOMER_URL = import.meta.env.VITE_CUSTOMER_APP_URL;
 
 /** Helper: Load an HTMLImageElement safely with fallback */
 function loadImage(src) {

@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Camera, X, QrCode, ArrowRight, AlertCircle, RefreshCw } from 'lucide-react';
-import { Html5Qrcode } from 'html5-qrcode';
-import logo from '../assets/logo.png';
-import { useSessionStore } from '../store/sessionStore';
-import { applyBrandColor } from '../lib/theme';
+import { Html5Qrcode } from "html5-qrcode";
+import { AlertCircle, ArrowRight, Camera, QrCode, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import logo from "../assets/logo.png";
+import { useInstallPrompt } from "../hooks/useInstallPrompt";
+import { applyBrandColor } from "../lib/theme";
+import { useSessionStore } from "../store/sessionStore";
 
 /**
  * NOTE ON SECURITY & CAMERA PERMISSIONS:
@@ -19,20 +20,43 @@ export default function Landing() {
 
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [showManual, setShowManual] = useState(false);
-  const [manualCode, setManualCode] = useState('');
+  const [manualCode, setManualCode] = useState("");
   const [cameraError, setCameraError] = useState(null);
   const [invalidCodeError, setInvalidCodeError] = useState(null);
+  const [installBannerDismissed, setInstallBannerDismissed] = useState(false);
 
   const scannerInstanceRef = useRef(null);
+  const { canInstall, promptInstall } = useInstallPrompt();
 
   // Apply default LayoScan theme (teal/ink/mint) for landing screen
   useEffect(() => {
-    applyBrandColor('#14B8A6');
-    document.title = 'LayoScan · Order at your table';
+    applyBrandColor("#14B8A6");
+    document.title = "LayoScan · Order at your table";
   }, []);
 
   // Remembered session info if customer previously resolved a table
-  const hasRememberedSession = !!(session?.restaurant?.name && session?.table?.label && session?.qrToken);
+  const hasRememberedSession = !!(
+    session?.restaurant?.name &&
+    session?.table?.label &&
+    session?.qrToken
+  );
+
+  useEffect(() => {
+    const storedDismissal = localStorage.getItem(
+      "layoscan-install-banner-dismissed",
+    );
+    if (storedDismissal === "true") {
+      setInstallBannerDismissed(true);
+    }
+  }, []);
+
+  const showInstallBanner =
+    hasRememberedSession && canInstall && !installBannerDismissed;
+
+  const handleDismissInstallBanner = () => {
+    setInstallBannerDismissed(true);
+    localStorage.setItem("layoscan-install-banner-dismissed", "true");
+  };
 
   // --- Camera Scanner Lifecycle ---
   useEffect(() => {
@@ -44,11 +68,11 @@ export default function Landing() {
 
     const startScanner = async () => {
       try {
-        const html5QrCode = new Html5Qrcode('qr-reader-viewport');
+        const html5QrCode = new Html5Qrcode("qr-reader-viewport");
         scannerInstanceRef.current = html5QrCode;
 
         await html5QrCode.start(
-          { facingMode: 'environment' },
+          { facingMode: "environment" },
           {
             fps: 10,
             qrbox: { width: 230, height: 230 },
@@ -59,12 +83,12 @@ export default function Landing() {
           },
           () => {
             // Transient frame decode failure — ignore
-          }
+          },
         );
       } catch (err) {
         if (!isMounted) return;
         setCameraError(
-          "We couldn't access your camera. You can allow camera access in your browser settings, or ask a staff member to help you order."
+          "We couldn't access your camera. You can allow camera access in your browser settings, or ask a staff member to help you order.",
         );
       }
     };
@@ -81,7 +105,9 @@ export default function Landing() {
             .then(() => instance.clear())
             .catch(() => {});
         } else {
-          try { instance.clear(); } catch (_) {}
+          try {
+            instance.clear();
+          } catch (_) {}
         }
         scannerInstanceRef.current = null;
       }
@@ -146,14 +172,14 @@ export default function Landing() {
       setTimeout(() => closeButtonRef.current?.focus(), 50);
 
       const handleKeyDown = (e) => {
-        if (e.key === 'Escape') {
+        if (e.key === "Escape") {
           closeScanner();
           return;
         }
 
-        if (e.key === 'Tab' && overlayRef.current) {
+        if (e.key === "Tab" && overlayRef.current) {
           const focusables = overlayRef.current.querySelectorAll(
-            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
           );
           if (focusables.length === 0) return;
 
@@ -170,8 +196,8 @@ export default function Landing() {
         }
       };
 
-      document.addEventListener('keydown', handleKeyDown);
-      return () => document.removeEventListener('keydown', handleKeyDown);
+      document.addEventListener("keydown", handleKeyDown);
+      return () => document.removeEventListener("keydown", handleKeyDown);
     } else {
       // Return focus to trigger button when closed
       triggerButtonRef.current?.focus();
@@ -183,7 +209,11 @@ export default function Landing() {
       {/* ── Top Header / Logo ────────────────────────────────────────── */}
       <div className="flex flex-col items-center mt-4">
         <div className="w-20 h-20 rounded-3xl gradient-brand flex items-center justify-center mb-4 shadow-xl overflow-hidden p-0.5">
-          <img src={logo} alt="LayoScan" className="w-full h-full rounded-[22px] object-cover" />
+          <img
+            src={logo}
+            alt="LayoScan"
+            className="w-full h-full rounded-[22px] object-cover"
+          />
         </div>
         <span className="font-display font-bold text-lg text-ink tracking-tight">
           LayoScan
@@ -204,7 +234,7 @@ export default function Landing() {
           ref={triggerButtonRef}
           onClick={() => setIsScannerOpen(true)}
           className="w-full py-4 px-6 rounded-2xl font-display font-bold text-lg text-white shadow-xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] hover:opacity-95 focus-visible:outline focus-visible:outline-2"
-          style={{ backgroundColor: 'var(--color-primary, #14B8A6)' }}
+          style={{ backgroundColor: "var(--color-primary, #14B8A6)" }}
         >
           <Camera size={22} strokeWidth={2.25} />
           Scan Now
@@ -213,12 +243,45 @@ export default function Landing() {
         {/* Remembered Session Shortcut */}
         {hasRememberedSession && (
           <button
-            onClick={() => navigate('/menu')}
+            onClick={() => navigate("/menu")}
             className="mt-4 w-full py-3.5 px-5 rounded-2xl font-display font-semibold text-sm border border-ink/12 text-ink hover:bg-ink/5 flex items-center justify-center gap-2 transition-all min-w-0"
           >
-            <span className="truncate">Continue to {session.restaurant.name} ({session.table.label})</span>
+            <span className="truncate">
+              Continue to {session.restaurant.name} ({session.table.label})
+            </span>
             <ArrowRight size={16} className="text-teal shrink-0" />
           </button>
+        )}
+
+        {showInstallBanner && (
+          <div className="mt-4 w-full rounded-2xl border border-ink/10 bg-white/80 p-3 shadow-sm backdrop-blur-sm">
+            <div className="flex items-start gap-3">
+              <div className="flex-1 text-left">
+                <p className="text-xs font-semibold text-ink">
+                  Add LayoScan to your home screen for faster ordering next
+                  time.
+                </p>
+              </div>
+              <button
+                type="button"
+                aria-label="Dismiss install prompt"
+                onClick={handleDismissInstallBanner}
+                className="text-ink-muted hover:text-ink"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={async () => {
+                const installed = await promptInstall();
+                if (installed) handleDismissInstallBanner();
+              }}
+              className="mt-2 w-full rounded-xl bg-ink text-white px-3 py-2 text-xs font-semibold"
+            >
+              Install app
+            </button>
+          </div>
         )}
 
         {/* Manual Code Fallback Toggle */}
@@ -231,7 +294,10 @@ export default function Landing() {
               <QrCode size={14} /> Enter table code manually
             </button>
           ) : (
-            <form onSubmit={handleManualSubmit} className="w-full flex items-center gap-2 mt-2">
+            <form
+              onSubmit={handleManualSubmit}
+              className="w-full flex items-center gap-2 mt-2"
+            >
               <input
                 type="text"
                 value={manualCode}
@@ -270,15 +336,17 @@ export default function Landing() {
           tabIndex={-1}
           className="fixed inset-0 z-50 bg-ink flex flex-col justify-between items-center text-white overflow-hidden animate-fade-in"
           style={{
-            paddingTop: 'max(20px, env(safe-area-inset-top))',
-            paddingBottom: 'max(24px, env(safe-area-inset-bottom))',
+            paddingTop: "max(20px, env(safe-area-inset-top))",
+            paddingBottom: "max(24px, env(safe-area-inset-bottom))",
           }}
         >
           {/* Top Bar */}
           <div className="w-full px-6 py-4 flex items-center justify-between z-10">
             <div className="flex items-center gap-2">
               <img src={logo} alt="" className="w-6 h-6 rounded" />
-              <span className="font-display font-semibold text-sm">LayoScan Scanner</span>
+              <span className="font-display font-semibold text-sm">
+                LayoScan Scanner
+              </span>
             </div>
             <button
               ref={closeButtonRef}
@@ -360,7 +428,10 @@ export default function Landing() {
           {/* Footer Manual Link inside Overlay */}
           <div className="pb-4">
             <button
-              onClick={() => { closeScanner(); setShowManual(true); }}
+              onClick={() => {
+                closeScanner();
+                setShowManual(true);
+              }}
               className="text-xs text-white/60 hover:text-white underline underline-offset-4"
             >
               Having trouble? Enter code manually
