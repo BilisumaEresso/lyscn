@@ -16,28 +16,35 @@ export default function Modal({ open, onClose, title, children, size = 'md', mob
   const widths = { sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-lg', xl: 'max-w-xl' };
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div
+      className={`fixed inset-0 z-50 flex justify-center ${
+        mobileSheet
+          ? 'items-end sm:items-center p-0 sm:p-4'
+          : 'items-center p-4'
+      }`}
+    >
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-ink/40 backdrop-blur-sm"
+        className="fixed inset-0 bg-ink/50 backdrop-blur-xs transition-opacity z-0"
         onClick={onClose}
+        aria-hidden="true"
       />
-      {/* Panel */}
+      {/* Panel: strictly relative z-10 so it is always above the backdrop on all screen sizes */}
       <div
-        className={`relative w-full ${widths[size]} bg-white shadow-xl flex flex-col max-h-[90vh] ${
+        className={`relative z-10 w-full ${widths[size]} bg-white shadow-2xl flex flex-col ${
           mobileSheet
-            ? 'rounded-t-3xl sm:rounded-2xl fixed bottom-0 sm:static max-h-[92dvh] sm:max-h-[90vh]'
-            : 'rounded-2xl'
+            ? 'rounded-t-3xl sm:rounded-2xl max-h-[90dvh] sm:max-h-[90vh]'
+            : 'rounded-2xl max-h-[90vh]'
         }`}
         style={{ animation: 'modal-in 150ms ease-out' }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-ink/8">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-ink/8 shrink-0">
           <h2 className="font-display font-semibold text-lg text-ink">{title}</h2>
           <button
             onClick={onClose}
             aria-label={`Close ${title}`}
-            className="min-h-11 min-w-11 p-2 rounded-lg text-ink-muted hover:text-ink hover:bg-ink/6 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal"
+            className="min-h-11 min-w-11 p-2 rounded-lg text-ink-muted hover:text-ink hover:bg-ink/6 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal flex items-center justify-center"
           >
             <X size={18} />
           </button>

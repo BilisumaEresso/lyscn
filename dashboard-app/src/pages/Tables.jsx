@@ -587,9 +587,9 @@ function formatElapsed(date, now) {
 function TableActionSheet({ table, open, onClose, onViewQR, onRelease, onEdit, onRegenerate, onDeactivate, canRelease }) {
   if (!table || !open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      <button type="button" aria-label="Close table actions" className="absolute inset-0 bg-ink/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full sm:max-w-sm bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl p-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] sm:pb-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <button type="button" aria-label="Close table actions" className="fixed inset-0 bg-ink/40 backdrop-blur-xs z-0" onClick={onClose} />
+      <div className="relative z-10 w-full sm:max-w-sm bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl p-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] sm:pb-4">
         <div className="flex items-center justify-between px-2 pb-3 border-b border-ink/8">
           <div>
             <p className="font-display font-bold text-ink">{table.label}</p>
