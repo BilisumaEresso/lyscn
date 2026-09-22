@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import api from '../lib/api';
 import CulinaryPlaceholder from '../components/menu/CulinaryPlaceholder';
+import ImageUploader from '../components/ui/ImageUploader';
 import { useAuthStore } from '../store/authStore';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
@@ -450,49 +451,34 @@ function ProductPanel({ product, selectedCategory, restaurantId, onClose, onSave
               {...register('description')}
             />
           </div>
-
-          {/* Image & Visual Artwork Preview */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-medium text-ink-muted flex items-center gap-1.5">
-                <Camera size={13} className="text-teal" />
-                Product Imagery & Artwork
-              </label>
-              <span className="text-[11px] text-ink-muted">Optional</span>
-            </div>
-
-            {/* Live Visual Card Preview */}
-            <div className="h-28 w-full rounded-xl overflow-hidden border border-ink/10 shadow-2xs relative bg-ink/4">
-              {typedImageUrl ? (
-                <img
-                  src={typedImageUrl}
-                  alt="Preview"
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                  }}
-                />
-              ) : (
-                <CulinaryPlaceholder
-                  name={typedName || 'Product Name'}
-                  categoryName={categoryName}
-                  size="md"
-                />
-              )}
-              <div className="absolute bottom-2 left-2 z-20">
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-black/40 backdrop-blur-md text-white border border-white/10">
-                  {typedImageUrl ? 'Custom Photo' : 'Procedural Culinary Canvas'}
-                </span>
-              </div>
-            </div>
-
-            <Input
-              placeholder="https://... image URL (or leave blank to use artwork)"
-              {...register('imageUrl')}
+          {/* Image & Artwork Section */}
+          <div className="space-y-3">
+            <ImageUploader
+              label="Product Photo (Cloudinary)"
+              description={`Upload a photo to Cloudinary or leave blank to display ambient culinary artwork matched to ${categoryName || 'this item'}.`}
+              value={typedImageUrl}
+              onChange={(url) => setValue('imageUrl', url, { shouldDirty: true })}
+              folder="products"
+              aspectRatio="square"
             />
-            <p className="text-[11px] text-ink/45">
-              Leave blank to automatically display our ambient culinary artwork matched to {categoryName || 'this item'}.
-            </p>
+
+            {!typedImageUrl && (
+              <div className="space-y-1">
+                <span className="text-[11px] font-semibold text-ink/60 uppercase tracking-wider">Fallback Artwork Canvas</span>
+                <div className="h-24 w-full rounded-xl overflow-hidden border border-ink/10 shadow-2xs relative">
+                  <CulinaryPlaceholder
+                    name={typedName || 'Product Name'}
+                    categoryName={categoryName}
+                    size="md"
+                  />
+                  <div className="absolute bottom-2 left-2 z-20">
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-black/40 backdrop-blur-md text-white border border-white/10">
+                      Procedural Culinary Canvas
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Price */}

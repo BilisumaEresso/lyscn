@@ -13,6 +13,7 @@ import toast from "react-hot-toast";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import Spinner from "../components/ui/Spinner";
+import ImageUploader from "../components/ui/ImageUploader";
 import { useInstallPrompt } from "../hooks/useInstallPrompt";
 import api from "../lib/api";
 import { useAuthStore } from "../store/authStore";
@@ -285,61 +286,23 @@ export default function Settings() {
             title="Branding images"
             description="Logo and cover banner shown on customer menu and QR code landing."
           />
-          <div className="space-y-6">
-            {/* Logo */}
-            <div className="flex items-start gap-5">
-              <div className="w-20 h-20 rounded-2xl border border-ink/12 bg-ink/4 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
-                {logoUrl ? (
-                  <img
-                    src={logoUrl}
-                    alt="Logo preview"
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <Upload size={22} className="text-ink/25" strokeWidth={1.5} />
-                )}
-              </div>
-              <div className="flex-1 space-y-2">
-                <Input
-                  label="Logo URL"
-                  placeholder="https://example.com/logo.png"
-                  {...register("logoUrl")}
-                />
-                <p className="text-xs text-ink-muted">
-                  Paste a direct image link for your restaurant logo mark.
-                </p>
-              </div>
-            </div>
-
-            {/* Cover photo */}
-            <div className="flex items-start gap-5">
-              <div className="w-32 h-20 rounded-2xl border border-ink/12 bg-ink/4 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
-                {coverUrl ? (
-                  <img
-                    src={coverUrl}
-                    alt="Cover preview"
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <ImageIcon
-                    size={22}
-                    className="text-ink/25"
-                    strokeWidth={1.5}
-                  />
-                )}
-              </div>
-              <div className="flex-1 space-y-2">
-                <Input
-                  label="Cover Photo URL"
-                  placeholder="https://example.com/cover.jpg"
-                  {...register("coverUrl")}
-                />
-                <p className="text-xs text-ink-muted">
-                  Banner image displayed at the top of your customer-facing
-                  menu.
-                </p>
-              </div>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <ImageUploader
+              label="Restaurant Logo"
+              description="Uploaded to Cloudinary. Appears on QR cards, customer header, and bill receipts."
+              value={logoUrl}
+              onChange={(url) => setValue("logoUrl", url, { shouldDirty: true })}
+              folder="branding"
+              aspectRatio="square"
+            />
+            <ImageUploader
+              label="Cover Banner Photo"
+              description="Uploaded to Cloudinary. High-res banner image displayed at the top of your customer menu."
+              value={coverUrl}
+              onChange={(url) => setValue("coverUrl", url, { shouldDirty: true })}
+              folder="branding"
+              aspectRatio="banner"
+            />
           </div>
         </section>
 

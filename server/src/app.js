@@ -10,6 +10,7 @@ const productRoutes = require("./routes/productRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const assistanceRoutes = require("./routes/assistanceRoutes");
 const publicRoutes = require("./routes/publicRoutes");
+const uploadRoutes = require("./routes/uploadRoutes");
 const { notFound, errorHandler } = require("./middleware/errorHandler");
 
 function getAllowedOrigins() {
@@ -78,6 +79,7 @@ app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/assistance", assistanceRoutes);
 app.use("/api/public", publicRoutes);
+app.use("/api/upload", uploadRoutes);
 
 // ── Catch-all & error handler (must be last) ──────────────────────────────────
 app.use(notFound);
