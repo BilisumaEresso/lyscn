@@ -11,6 +11,7 @@ import { useCartStore, cartItemCount, cartSubtotal } from '../store/cartStore';
 import logo from '../assets/logo.png';
 import AssistanceButton from '../components/AssistanceButton';
 import Currency, { formatBirr } from '../components/Currency';
+import CulinaryPlaceholder from '../components/menu/CulinaryPlaceholder';
 
 // ── "Powered by LayoScan" mark ────────────────────────────────────────────────
 function PoweredBy() {
@@ -25,7 +26,7 @@ function PoweredBy() {
 }
 
 // ── Product detail bottom sheet ───────────────────────────────────────────────
-function ProductSheet({ product, onClose }) {
+function ProductSheet({ product, categoryName, onClose }) {
   const addItem = useCartStore((s) => s.addItem);
   const [qty, setQty]         = useState(1);
   const [selected, setSelected] = useState({});
@@ -121,8 +122,12 @@ function ProductSheet({ product, onClose }) {
               loading="lazy"
             />
           ) : (
-            <div className="w-full h-40 flex items-center justify-center" style={{ background: 'var(--color-surface-wash)' }}>
-              <ImageOff size={36} className="text-ink/20" strokeWidth={1.25} />
+            <div className="w-full h-48 relative overflow-hidden">
+              <CulinaryPlaceholder
+                name={product.name}
+                categoryName={categoryName}
+                size="lg"
+              />
             </div>
           )}
 
@@ -261,7 +266,7 @@ function ProductSheet({ product, onClose }) {
 }
 
 // ── Product card ──────────────────────────────────────────────────────────────
-function ProductCard({ product, onOpen }) {
+function ProductCard({ product, categoryName, onOpen }) {
   const addItem    = useCartStore((s) => s.addItem);
   const hasRequired = (product.modifierGroups ?? []).some((g) => g.required);
 
@@ -288,7 +293,7 @@ function ProductCard({ product, onOpen }) {
       className="bg-white rounded-2xl overflow-hidden border border-ink/6 cursor-pointer active:scale-[0.98] transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
       style={{ '--tw-outline-color': 'var(--color-primary)' }}
     >
-      <div className="relative aspect-[4/3]" style={{ background: 'var(--color-surface-wash)' }}>
+      <div className="relative aspect-[4/3] overflow-hidden" style={{ background: 'var(--color-surface-wash)' }}>
         {product.imageUrl ? (
           <img
             src={product.imageUrl}
@@ -297,9 +302,11 @@ function ProductCard({ product, onOpen }) {
             loading="lazy"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <ImageOff size={22} className="text-ink/20" strokeWidth={1.25} />
-          </div>
+          <CulinaryPlaceholder
+            name={product.name}
+            categoryName={categoryName}
+            size="md"
+          />
         )}
         {/* Quick-add button */}
         {!hasRequired && (
@@ -544,7 +551,11 @@ export default function Menu() {
           <div className="grid grid-cols-2 gap-3" role="list" aria-label="Menu items">
             {visibleProducts.map((p) => (
               <div key={p._id} role="listitem">
-                <ProductCard product={p} onOpen={setSheetProduct} />
+                <ProductCard
+                  product={p}
+                  categoryName={categories.find((c) => c._id === activeCat)?.name || ''}
+                  onOpen={setSheetProduct}
+                />
               </div>
             ))}
           </div>
@@ -567,6 +578,7 @@ export default function Menu() {
       {sheetProduct && (
         <ProductSheet
           product={sheetProduct}
+          categoryName={categories.find((c) => c._id === activeCat)?.name || ''}
           onClose={() => setSheetProduct(null)}
         />
       )}

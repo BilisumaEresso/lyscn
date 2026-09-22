@@ -35,12 +35,15 @@ const resolveQRCode = async (req, res, next) => {
     }
 
     const io = req.app.get('io');
-    const now = new Date();
-    const hasOrders = await Order.exists({
+    const activeOrders = await Order.find({
       tableId: table._id,
       restaurantId: table.restaurantId,
       status: { $nin: ['served', 'cancelled'] },
-    });
+    })
+      .select('_id status guestName totalAmount createdAt items sessionId')
+      .sort({ createdAt: -1 });
+
+    const hasOrders = activeOrders.length > 0;
 
     if (
       table.status === 'occupied' &&
@@ -75,6 +78,16 @@ const resolveQRCode = async (req, res, next) => {
       table,
       sessionToken: table.activeSessionToken,
       locationCheckRequired: hasConfiguredLocation(branch) && table.sessionLocationVerified === null,
+      activeOrderCount: activeOrders.length,
+      activeOrders: activeOrders.map((o) => ({
+        id: o._id,
+        status: o.status,
+        guestName: o.guestName,
+        itemCount: (o.items || []).reduce((acc, it) => acc + (it.qty || 1), 0),
+        totalAmount: o.totalAmount,
+        createdAt: o.createdAt,
+        sessionId: o.sessionId,
+      })),
     });
   } catch (err) {
     return next(err);

@@ -184,9 +184,22 @@ export default function OrderTracking() {
     <div className="min-h-screen bg-paper max-w-[560px] mx-auto flex flex-col">
       {/* Header */}
       <div className="px-5 pt-8 pb-6">
-        <p className="text-xs font-medium text-ink-muted uppercase tracking-wider mb-1">
-          Order tracking
-        </p>
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-xs px-2.5 py-1 rounded-full bg-ink/6 font-semibold text-ink">
+            {session.table?.label ?? 'Table'}
+          </span>
+          {(data?.guestName || session.guestName) && (
+            <span
+              className="text-xs px-2.5 py-1 rounded-full font-medium"
+              style={{
+                background: 'color-mix(in srgb, var(--color-primary) 12%, transparent)',
+                color: 'var(--color-primary)',
+              }}
+            >
+              Guest: {data?.guestName || session.guestName}
+            </span>
+          )}
+        </div>
         <h1 className="font-display font-bold text-2xl text-ink">
           {isCancelled ? 'Order cancelled' : 'Hang tight!'}
         </h1>
@@ -330,21 +343,21 @@ export default function OrderTracking() {
       <div className="px-4 pb-4 space-y-3">
         <button
           onClick={() => navigate('/menu')}
-          className="w-full py-4 rounded-2xl font-display font-bold text-base active:scale-[0.98] transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+          className="w-full py-4 rounded-2xl font-display font-bold text-base active:scale-[0.98] transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 flex items-center justify-center gap-2"
           style={{
             background:   'var(--color-primary)',
             color:        'var(--color-on-primary)',
             outlineColor: 'var(--color-primary)',
           }}
         >
-          Order again
+          <span>+ Order more items / Next round</span>
         </button>
         <button
           onClick={() => navigate('/menu')}
-          className="w-full py-3 rounded-2xl border border-ink/15 font-semibold text-ink-muted text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+          className="w-full py-3 rounded-2xl border border-ink/15 font-semibold text-ink-muted text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 hover:bg-ink/3 transition-colors"
           style={{ outlineColor: 'var(--color-primary)' }}
         >
-          Back to menu
+          Browse full menu
         </button>
       </div>
 

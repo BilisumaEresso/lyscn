@@ -5,9 +5,11 @@ import toast from 'react-hot-toast';
 import {
   Plus, Pencil, Trash2, ChevronUp, ChevronDown,
   X, ImageOff, Check, GripVertical, Sparkles, Search, CheckCircle2,
-  SlidersHorizontal, PackageOpen, Eye, EyeOff, ArrowLeft
+  SlidersHorizontal, PackageOpen, Eye, EyeOff, ArrowLeft,
+  Camera, LayoutGrid, List
 } from 'lucide-react';
 import api from '../lib/api';
+import CulinaryPlaceholder from '../components/menu/CulinaryPlaceholder';
 import { useAuthStore } from '../store/authStore';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
@@ -195,6 +197,7 @@ function ProductPanel({ product, selectedCategory, restaurantId, onClose, onSave
           name: product.name,
           description: product.description ?? '',
           price: product.price,
+          imageUrl: product.imageUrl ?? '',
           isAvailable: product.isAvailable,
           modifierGroups: product.modifierGroups ?? [],
         }
@@ -202,6 +205,7 @@ function ProductPanel({ product, selectedCategory, restaurantId, onClose, onSave
           name: '',
           description: '',
           price: '',
+          imageUrl: '',
           isAvailable: true,
           modifierGroups: [],
         },
@@ -214,6 +218,7 @@ function ProductPanel({ product, selectedCategory, restaurantId, onClose, onSave
 
   const isAvailable = watch('isAvailable');
   const typedName = watch('name') || '';
+  const typedImageUrl = watch('imageUrl') || '';
 
   // Close autocomplete on click outside
   useEffect(() => {
@@ -284,7 +289,12 @@ function ProductPanel({ product, selectedCategory, restaurantId, onClose, onSave
     onError: (err) => toast.error(err.response?.data?.message || 'Delete failed'),
   });
 
-  const onSubmit = (data) => saveMutation.mutate({ ...data, price: Number(data.price) });
+  const onSubmit = (data) =>
+    saveMutation.mutate({
+      ...data,
+      price: Number(data.price),
+      imageUrl: data.imageUrl?.trim() || null,
+    });
 
   const [activeIndex, setActiveIndex] = useState(-1);
 
@@ -439,6 +449,50 @@ function ProductPanel({ product, selectedCategory, restaurantId, onClose, onSave
               className="w-full px-3 py-2 text-sm border border-ink/12 rounded-lg resize-none focus:outline-none focus:border-teal focus:ring-1 focus:ring-teal/15"
               {...register('description')}
             />
+          </div>
+
+          {/* Image & Visual Artwork Preview */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-ink-muted flex items-center gap-1.5">
+                <Camera size={13} className="text-teal" />
+                Product Imagery & Artwork
+              </label>
+              <span className="text-[11px] text-ink-muted">Optional</span>
+            </div>
+
+            {/* Live Visual Card Preview */}
+            <div className="h-28 w-full rounded-xl overflow-hidden border border-ink/10 shadow-2xs relative bg-ink/4">
+              {typedImageUrl ? (
+                <img
+                  src={typedImageUrl}
+                  alt="Preview"
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                  }}
+                />
+              ) : (
+                <CulinaryPlaceholder
+                  name={typedName || 'Product Name'}
+                  categoryName={categoryName}
+                  size="md"
+                />
+              )}
+              <div className="absolute bottom-2 left-2 z-20">
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-black/40 backdrop-blur-md text-white border border-white/10">
+                  {typedImageUrl ? 'Custom Photo' : 'Procedural Culinary Canvas'}
+                </span>
+              </div>
+            </div>
+
+            <Input
+              placeholder="https://... image URL (or leave blank to use artwork)"
+              {...register('imageUrl')}
+            />
+            <p className="text-[11px] text-ink/45">
+              Leave blank to automatically display our ambient culinary artwork matched to {categoryName || 'this item'}.
+            </p>
           </div>
 
           {/* Price */}
@@ -823,8 +877,8 @@ function AddCategoryModal({ open, onClose, existingCategories, onCategoryAdded }
   );
 }
 
-// ── Product card ──────────────────────────────────────────────────────────────
-function ProductCard({ product, onEdit }) {
+// ── Product card (Grid View) ────────────────────────────────────────────────
+function ProductCard({ product, categoryName, onEdit }) {
   const qc = useQueryClient();
 
   const toggleMutation = useMutation({
@@ -835,11 +889,124 @@ function ProductCard({ product, onEdit }) {
   });
 
   return (
-    <article className="border border-ink/8 rounded-2xl bg-white overflow-hidden hover:border-ink/16 transition-colors group shadow-xs">
-      {/* Image area */}
+    <article className="border border-ink/8 rounded-2xl bg-white overflow-hidden hover:border-teal/30 hover:shadow-md transition-all duration-200 group flex flex-col">
+      {/* Image / Culinary Artwork Area */}
       <div
         onClick={() => onEdit(product)}
-        className="h-40 sm:h-36 bg-ink/4 flex items-center justify-center cursor-pointer relative"
+        className="h-44 sm:h-40 relative cursor-pointer overflow-hidden bg-ink/4"
+      >
+        {product.imageUrl ? (
+          <img
+            src={product.imageUrl}
+            alt={product.name}
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+          />
+        ) : (
+          <CulinaryPlaceholder
+            name={product.name}
+            categoryName={categoryName}
+            size="md"
+          />
+        )}
+
+        {/* Floating Price Badge */}
+        <div className="absolute top-2.5 right-2.5 z-20 pointer-events-none">
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold font-display backdrop-blur-md bg-ink/80 text-white shadow-sm border border-white/10">
+            <Currency value={product.price} />
+          </span>
+        </div>
+
+        {/* Hover Action Overlay */}
+        <div className="absolute inset-0 bg-ink/40 backdrop-blur-2xs opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2 z-20">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white text-ink text-xs font-semibold shadow-lg transform translate-y-1 group-hover:translate-y-0 transition-transform">
+            {product.imageUrl ? <Pencil size={13} /> : <Camera size={13} className="text-teal" />}
+            {product.imageUrl ? 'Edit item' : 'Add photo'}
+          </span>
+        </div>
+      </div>
+
+      {/* Card Body */}
+      <div className="p-4 flex-1 flex flex-col justify-between">
+        <div>
+          <div className="flex items-start justify-between gap-2 mb-1.5">
+            <h3
+              className="text-sm font-semibold text-ink leading-snug cursor-pointer hover:text-teal transition-colors line-clamp-1"
+              onClick={() => onEdit(product)}
+              title={product.name}
+            >
+              {product.name}
+            </h3>
+          </div>
+
+          {product.description && (
+            <p className="text-xs text-ink-muted line-clamp-2 leading-relaxed mb-2.5">
+              {product.description}
+            </p>
+          )}
+
+          {product.modifierGroups?.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-3">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-ink/4 text-[11px] font-medium text-ink-muted border border-ink/6">
+                <Sparkles size={10} className="text-teal" />
+                {product.modifierGroups.length} modifier group{product.modifierGroups.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Card Footer: Status & Actions */}
+        <div className="flex items-center justify-between gap-3 pt-3 border-t border-ink/6 mt-auto">
+          <span
+            className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
+              product.isAvailable ? 'text-emerald-700' : 'text-ink/40'
+            }`}
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${
+                product.isAvailable ? 'bg-emerald-500 animate-pulse' : 'bg-ink/30'
+              }`}
+            />
+            {product.isAvailable ? 'Available' : 'Hidden'}
+          </span>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onEdit(product)}
+              aria-label={`Edit ${product.name}`}
+              className="min-h-9 min-w-9 p-1.5 rounded-lg text-ink-muted hover:text-ink hover:bg-ink/6 flex items-center justify-center transition-colors"
+            >
+              <Pencil size={14} />
+            </button>
+            <Toggle
+              checked={product.isAvailable}
+              onChange={(val) => toggleMutation.mutate(val)}
+              id={`toggle-${product._id}`}
+            />
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+// ── Product Compact Row (Bistro List View) ──────────────────────────────────
+function ProductCompactRow({ product, categoryName, onEdit }) {
+  const qc = useQueryClient();
+
+  const toggleMutation = useMutation({
+    mutationFn: (val) =>
+      api.patch(`/products/${product._id}`, { isAvailable: val }).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['products'] }),
+    onError: () => toast.error('Failed to update availability'),
+  });
+
+  return (
+    <div className="flex items-center gap-3.5 p-3 sm:p-3.5 rounded-xl border border-ink/8 bg-white hover:border-teal/30 hover:shadow-xs transition-all group">
+      {/* Thumbnail */}
+      <div
+        onClick={() => onEdit(product)}
+        className="w-12 h-12 rounded-xl overflow-hidden shrink-0 cursor-pointer relative bg-ink/4"
       >
         {product.imageUrl ? (
           <img
@@ -848,54 +1015,71 @@ function ProductCard({ product, onEdit }) {
             className="w-full h-full object-cover"
           />
         ) : (
-          <ImageOff size={28} className="text-ink/20" strokeWidth={1.5} />
+          <CulinaryPlaceholder
+            name={product.name}
+            categoryName={categoryName}
+            size="sm"
+          />
         )}
-        <div className="absolute inset-0 bg-ink/0 group-hover:bg-ink/5 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-          <div className="bg-white/90 rounded-full p-2 shadow">
-            <Pencil size={14} className="text-ink" />
-          </div>
-        </div>
       </div>
 
       {/* Info */}
-      <div className="px-4 py-4">
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <p
-            className="text-sm font-semibold text-ink leading-tight cursor-pointer hover:text-teal transition-colors"
-            onClick={() => onEdit(product)}
-          >
+      <div className="flex-1 min-w-0" onClick={() => onEdit(product)}>
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-semibold text-ink hover:text-teal transition-colors truncate cursor-pointer">
             {product.name}
           </p>
-          <span className="text-sm font-bold text-ink shrink-0">
-            <Currency value={product.price} />
-          </span>
+          {product.modifierGroups?.length > 0 && (
+            <span className="hidden sm:inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-ink/4 text-ink-muted">
+              {product.modifierGroups.length} opts
+            </span>
+          )}
         </div>
-        {product.modifierGroups?.length > 0 && (
-          <p className="text-xs text-ink-muted mb-2">
-            {product.modifierGroups.length} modifier group{product.modifierGroups.length !== 1 ? 's' : ''}
+        {product.description && (
+          <p className="text-xs text-ink-muted truncate max-w-md mt-0.5">
+            {product.description}
           </p>
         )}
-        <div className="flex items-center justify-between gap-3 pt-2 border-t border-ink/6">
-          <span
-            className={`inline-flex items-center gap-1.5 text-xs font-semibold ${product.isAvailable ? 'text-emerald-700' : 'text-ink-muted'}`}
-          >
-            {product.isAvailable ? <Eye size={13} /> : <EyeOff size={13} />}
-            {product.isAvailable ? 'Available' : 'Hidden'}
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => onEdit(product)}
-              aria-label={`Edit ${product.name}`}
-              className="min-h-10 min-w-10 rounded-lg text-ink-muted hover:bg-ink/6 flex items-center justify-center"
-            >
-              <Pencil size={15} />
-            </button>
-            <Toggle checked={product.isAvailable} onChange={(val) => toggleMutation.mutate(val)} id={`toggle-${product._id}`} />
-          </div>
-        </div>
       </div>
-    </article>
+
+      {/* Price */}
+      <div className="text-right shrink-0 px-2">
+        <span className="font-display font-bold text-sm text-ink">
+          <Currency value={product.price} />
+        </span>
+      </div>
+
+      {/* Availability Status & Toggle */}
+      <div className="flex items-center gap-3 shrink-0">
+        <span
+          className={`hidden md:inline-flex items-center gap-1.5 text-xs font-semibold ${
+            product.isAvailable ? 'text-emerald-700' : 'text-ink/40'
+          }`}
+        >
+          <span
+            className={`w-2 h-2 rounded-full ${
+              product.isAvailable ? 'bg-emerald-500' : 'bg-ink/30'
+            }`}
+          />
+          {product.isAvailable ? 'Available' : 'Hidden'}
+        </span>
+
+        <Toggle
+          checked={product.isAvailable}
+          onChange={(val) => toggleMutation.mutate(val)}
+          id={`toggle-row-${product._id}`}
+        />
+
+        <button
+          type="button"
+          onClick={() => onEdit(product)}
+          aria-label={`Edit ${product.name}`}
+          className="min-h-9 min-w-9 p-1.5 rounded-lg text-ink-muted hover:text-ink hover:bg-ink/6 flex items-center justify-center transition-colors"
+        >
+          <Pencil size={14} />
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -907,6 +1091,7 @@ export default function Menu() {
   const [addCategoryOpen, setAddCategoryOpen] = useState(false);
   const [productSearch, setProductSearch] = useState('');
   const [productFilter, setProductFilter] = useState('all');
+  const [viewDensity, setViewDensity] = useState('grid'); // 'grid' | 'compact'
   const qc = useQueryClient();
   const { restaurant } = useAuthStore();
 
@@ -933,7 +1118,8 @@ export default function Menu() {
     const matchesFilter = productFilter === 'all'
       || (productFilter === 'available' && product.isAvailable)
       || (productFilter === 'hidden' && !product.isAvailable)
-      || (productFilter === 'modifiers' && product.modifierGroups?.length > 0);
+      || (productFilter === 'modifiers' && product.modifierGroups?.length > 0)
+      || (productFilter === 'no-photo' && !product.imageUrl);
     return matchesSearch && matchesFilter;
   });
 
@@ -1064,35 +1250,71 @@ export default function Menu() {
               </Button>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-2 mb-5">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 mb-5">
               <div className="relative flex-1">
                 <Search size={16} className="absolute left-3 top-3 text-ink-muted" />
                 <input
                   value={productSearch}
                   onChange={(e) => setProductSearch(e.target.value)}
-                  placeholder="Search products…"
+                  placeholder="Search products by name or description…"
                   aria-label="Search products"
-                  className="w-full min-h-11 pl-9 pr-3 rounded-xl border border-ink/10 bg-white text-sm focus:outline-none focus:border-teal focus:ring-2 focus:ring-teal/10"
+                  className="w-full min-h-11 pl-9 pr-3 rounded-xl border border-ink/10 bg-white text-sm focus:outline-none focus:border-teal focus:ring-2 focus:ring-teal/10 shadow-2xs"
                 />
               </div>
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-                {[
-                  ['all', 'All'],
-                  ['available', 'Available'],
-                  ['hidden', 'Hidden'],
-                  ['modifiers', 'Modifiers'],
-                ].map(([value, label]) => (
+
+              <div className="flex items-center gap-2 justify-between sm:justify-start">
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+                  {[
+                    ['all', 'All'],
+                    ['available', 'Available'],
+                    ['hidden', 'Hidden'],
+                    ['modifiers', 'Modifiers'],
+                    ['no-photo', 'Needs Photo'],
+                  ].map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setProductFilter(value)}
+                      className={`min-h-10 px-3 rounded-xl text-xs font-semibold whitespace-nowrap border transition-all ${
+                        productFilter === value
+                          ? 'border-teal bg-teal/10 text-teal shadow-2xs'
+                          : 'border-ink/10 bg-white text-ink-muted hover:border-ink/20 hover:text-ink'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* View Density Switcher (Grid vs Compact Bistro List) */}
+                <div className="flex items-center bg-ink/5 p-1 rounded-xl border border-ink/8 shrink-0">
                   <button
-                    key={value}
                     type="button"
-                    onClick={() => setProductFilter(value)}
-                    className={`min-h-11 px-3 rounded-xl text-xs font-semibold whitespace-nowrap border transition-colors ${
-                      productFilter === value ? 'border-teal bg-teal/10 text-teal' : 'border-ink/10 bg-white text-ink-muted'
+                    onClick={() => setViewDensity('grid')}
+                    className={`p-1.5 rounded-lg transition-all ${
+                      viewDensity === 'grid'
+                        ? 'bg-white text-ink shadow-xs'
+                        : 'text-ink-muted hover:text-ink'
                     }`}
+                    title="Grid view"
+                    aria-label="Grid view"
                   >
-                    {label}
+                    <LayoutGrid size={15} />
                   </button>
-                ))}
+                  <button
+                    type="button"
+                    onClick={() => setViewDensity('compact')}
+                    className={`p-1.5 rounded-lg transition-all ${
+                      viewDensity === 'compact'
+                        ? 'bg-white text-ink shadow-xs'
+                        : 'text-ink-muted hover:text-ink'
+                    }`}
+                    title="Bistro list view"
+                    aria-label="Bistro list view"
+                  >
+                    <List size={15} />
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1102,7 +1324,7 @@ export default function Menu() {
               </div>
             ) : products.length === 0 ? (
               <EmptyState
-                icon={ImageOff}
+                icon={PackageOpen}
                 title="No products yet"
                 description={`Add your first product to the ${selectedCat.name} category to get started.`}
                 action={() => setPanelProduct(null)}
@@ -1114,10 +1336,26 @@ export default function Menu() {
                 <p className="text-sm font-semibold text-ink mt-3">No matching products</p>
                 <p className="text-xs text-ink-muted mt-1">Try a different search or filter.</p>
               </div>
-            ) : (
+            ) : viewDensity === 'grid' ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                 {visibleProducts.map((p) => (
-                  <ProductCard key={p._id} product={p} onEdit={setPanelProduct} />
+                  <ProductCard
+                    key={p._id}
+                    product={p}
+                    categoryName={selectedCat.name}
+                    onEdit={setPanelProduct}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {visibleProducts.map((p) => (
+                  <ProductCompactRow
+                    key={p._id}
+                    product={p}
+                    categoryName={selectedCat.name}
+                    onEdit={setPanelProduct}
+                  />
                 ))}
               </div>
             )}

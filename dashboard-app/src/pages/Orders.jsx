@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import toast from 'react-hot-toast';
@@ -113,7 +113,7 @@ function RatingBadge({ rating }) {
 }
 
 // ── Redesigned Order Card Component ──────────────────────────────────────────
-function OrderCard({ order, highlighted, isShaking, now, index }) {
+function OrderCard({ order, highlighted, isShaking, now, index, tableOrderCount = 1 }) {
   const qc = useQueryClient();
   const [isExpanded, setIsExpanded] = useState(false);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
@@ -192,9 +192,9 @@ function OrderCard({ order, highlighted, isShaking, now, index }) {
             onClick={() => setIsExpanded((v) => !v)}
             className="pl-4 pr-3.5 pt-3.5 pb-2.5 cursor-pointer hover:bg-ink/1 transition-colors"
           >
-            {/* Top row: Table Label + Elapsed Time */}
+            {/* Top row: Table Label + Multi-order badge + Guest + Elapsed Time */}
             <div className="flex items-center justify-between mb-1.5">
-              <div className="flex items-center gap-1.5 min-w-0">
+              <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
                 <span className="font-display font-bold text-ink text-base tracking-tight truncate">
                   {order.tableId?.label ?? 'Takeaway'}
                 </span>
@@ -203,8 +203,16 @@ function OrderCard({ order, highlighted, isShaking, now, index }) {
                     <MapPin size={12} />
                   </span>
                 )}
+                {tableOrderCount > 1 && (
+                  <span
+                    title={`${tableOrderCount} active orders at this table`}
+                    className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold border border-amber-200 shrink-0"
+                  >
+                    {tableOrderCount} orders
+                  </span>
+                )}
                 {order.guestName && (
-                  <span className="text-xs text-ink-muted flex items-center gap-1 truncate">
+                  <span className="text-[11px] px-2 py-0.5 rounded-md bg-teal/8 text-teal font-medium flex items-center gap-1 shrink-0">
                     <User size={10} /> {order.guestName}
                   </span>
                 )}
@@ -382,8 +390,8 @@ function OrderCard({ order, highlighted, isShaking, now, index }) {
   );
 }
 
-// ── Column Component ──────────────────────────────────────────────────────────
-function Column({ status, orders, highlightedId, shakingId, now }) {
+// ── Column Component ──────────────────────────────────────────
+function Column({ status, orders, highlightedId, shakingId, now, activeOrdersPerTable }) {
   const config = STATUS_CONFIG[status] || STATUS_CONFIG.placed;
 
   return (
@@ -429,6 +437,7 @@ function Column({ status, orders, highlightedId, shakingId, now }) {
                   now={now}
                   highlighted={o._id === highlightedId}
                   isShaking={o._id === shakingId}
+                  tableOrderCount={activeOrdersPerTable?.[o.tableId?._id] || 1}
                 />
               ))
             )}
@@ -581,6 +590,16 @@ export default function Orders() {
   });
 
   const orders = data?.orders ?? [];
+
+  const activeOrdersPerTable = useMemo(() => {
+    const counts = {};
+    for (const o of orders) {
+      if (o.status !== 'served' && o.status !== 'cancelled' && o.tableId?._id) {
+        counts[o.tableId._id] = (counts[o.tableId._id] || 0) + 1;
+      }
+    }
+    return counts;
+  }, [orders]);
 
   // Status mutation for Drag-and-Drop & Buttons
   const updateStatusMutation = useMutation({
@@ -813,6 +832,7 @@ export default function Orders() {
                     highlightedId={highlightedId}
                     shakingId={shakingId}
                     now={now}
+                    activeOrdersPerTable={activeOrdersPerTable}
                   />
                 ))
               )}
@@ -890,10 +910,23 @@ export default function Orders() {
                               <div className="flex items-start gap-3 min-w-0">
                                 <div className="w-2 rounded-full shrink-0" style={{ backgroundColor: cfg.accentColor, height: '48px' }} />
                                 <div className="min-w-0">
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-2 flex-wrap">
                                     <span className="font-display font-bold text-ink text-base truncate">
                                       {order.tableId?.label ?? 'Table'}
                                     </span>
+                                    {order.guestName && (
+                                      <span className="text-xs px-2 py-0.5 rounded-md bg-teal/8 text-teal font-medium flex items-center gap-1">
+                                        <User size={11} /> {order.guestName}
+                                      </span>
+                                    )}
+                                    {(activeOrdersPerTable[order.tableId?._id] || 1) > 1 && (
+                                      <span
+                                        title={`${activeOrdersPerTable[order.tableId?._id]} active orders at this table`}
+                                        className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold border border-amber-200"
+                                      >
+                                        {activeOrdersPerTable[order.tableId?._id]} orders
+                                      </span>
+                                    )}
                                     <span className={clsx('text-xs px-2 py-0.5 rounded-full border font-semibold', cfg.badgeStyle)}>
                                       {cfg.label}
                                     </span>

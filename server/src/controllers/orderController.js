@@ -32,13 +32,39 @@ const suggestTableReadyToClear = async (req, tableId, restaurantId) => {
 // Prices are ALWAYS computed server-side — client totals are ignored.
 const placeOrder = async (req, res, next) => {
   try {
-    const { tableId, restaurantId, branchId, sessionId, sessionToken, guestName, items } = req.body;
+    const { tableId, restaurantId, branchId, sessionId, sessionToken, guestName, clientOrderId, items } = req.body;
 
     if (!tableId || !restaurantId || !branchId || !sessionId || !sessionToken || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({
         success: false,
         message: 'tableId, restaurantId, branchId, sessionId, sessionToken, and at least one item are required.',
       });
+    }
+
+    // ── Idempotency: Check if this clientOrderId was already processed ──────────
+    if (clientOrderId) {
+      const existing = await Order.findOne({ restaurantId, clientOrderId });
+      if (existing) {
+        return res.status(200).json({ success: true, order: existing, reused: true });
+      }
+    }
+
+    // ── Rapid-duplicate debounce: Prevent identical double-tap within 6 seconds ─
+    const recentDuplicate = await Order.findOne({
+      restaurantId,
+      tableId,
+      sessionId,
+      createdAt: { $gte: new Date(Date.now() - 6000) },
+    }).sort({ createdAt: -1 });
+
+    if (recentDuplicate && recentDuplicate.items.length === items.length) {
+      const itemsMatch = items.every((it, idx) => {
+        const dupItem = recentDuplicate.items[idx];
+        return dupItem && String(dupItem.productId) === String(it.productId) && dupItem.qty === it.qty;
+      });
+      if (itemsMatch) {
+        return res.status(200).json({ success: true, order: recentDuplicate, reused: true });
+      }
     }
 
     // Validate that the triple (tableId, restaurantId, branchId) refers to a real active table
@@ -122,7 +148,8 @@ const placeOrder = async (req, res, next) => {
       branchId,
       tableId,
       sessionId,
-      guestName: guestName || null,
+      clientOrderId: clientOrderId || null,
+      guestName: guestName ? guestName.trim() : null,
       items:     orderItems,
       totalAmount,
     });

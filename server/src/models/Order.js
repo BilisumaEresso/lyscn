@@ -50,6 +50,8 @@ const orderSchema = new mongoose.Schema(
 
     // Client-generated UUID that groups items from the same ordering session
     sessionId: { type: String, required: true },
+    // Idempotency key per submission to guarantee safe retries / eliminate double-submit
+    clientOrderId: { type: String, sparse: true, index: true },
     guestName: { type: String, default: null },
 
     items: [orderItemSchema],

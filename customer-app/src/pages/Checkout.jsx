@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
+import { v4 as uuidv4 } from 'uuid';
 import toast from 'react-hot-toast';
 import Currency from '../components/Currency';
 import { Minus, Plus, Trash2, ChevronLeft } from 'lucide-react';
@@ -19,7 +20,9 @@ export default function Checkout() {
   const itemCount   = useCartStore(cartItemCount);
   const subtotal    = useCartStore(cartSubtotal);
 
-  const [guestName, setGuestName] = useState('');
+  const [guestName, setGuestName] = useState(session.guestName || '');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const clientOrderIdRef = useRef(uuidv4());
 
   const { restaurant, branch, table, sessionId, sessionToken } = session;
 
@@ -38,9 +41,15 @@ export default function Checkout() {
     mutationFn: (body) => api.post('/orders/public', body).then((r) => r.data),
     onSuccess: (data) => {
       clearCart();
+      setIsSubmitting(false);
+      if (guestName.trim()) {
+        useSessionStore.getState().setGuestName(guestName.trim());
+      }
+      useSessionStore.getState().setActiveOrderId(data.order._id);
       navigate(`/order/${data.order._id}`, { replace: true });
     },
     onError: (err) => {
+      setIsSubmitting(false);
       if (err.response?.status === 401 || err.response?.data?.message?.includes('session has expired')) {
         toast.error('Your session has ended — please scan the QR code again to continue ordering.');
         useSessionStore.getState().clearSession();
@@ -52,7 +61,9 @@ export default function Checkout() {
   });
 
   const handlePlaceOrder = () => {
-    if (items.length === 0) return;
+    if (items.length === 0 || isSubmitting || placeMutation.isPending) return;
+    setIsSubmitting(true);
+
     const orderItems = items.map((item) => ({
       productId:         item.productId,
       qty:               item.qty,
@@ -61,14 +72,16 @@ export default function Checkout() {
         optionName: m.optionName,
       })),
     }));
+
     placeMutation.mutate({
-      restaurantId: restaurant._id,
-      branchId:     branch._id,
-      tableId:      table._id,
+      restaurantId:  restaurant._id,
+      branchId:      branch._id,
+      tableId:       table._id,
       sessionId,
       sessionToken,
-      guestName:    guestName.trim() || null,
-      items:        orderItems,
+      clientOrderId: clientOrderIdRef.current,
+      guestName:     guestName.trim() || null,
+      items:         orderItems,
     });
   };
 
@@ -114,8 +127,14 @@ export default function Checkout() {
         >
           <ChevronLeft size={20} className="text-ink" />
         </button>
-        <h1 className="font-display font-bold text-xl text-ink">Your order</h1>
-        <span className="ml-auto text-sm text-ink-muted">{table?.label}</span>
+        <h1 className="font-display font-bold text-xl text-ink">
+          {session.orderHistory?.length > 0 ? `Next round (#${session.orderHistory.length + 1})` : 'Your order'}
+        </h1>
+        <div className="ml-auto flex items-center gap-1.5">
+          <span className="text-xs px-2.5 py-1 rounded-full bg-ink/6 font-semibold text-ink">
+            {table?.label}
+          </span>
+        </div>
       </div>
 
       <div className="px-4 py-4 space-y-4">
@@ -207,17 +226,19 @@ export default function Checkout() {
       >
         <button
           onClick={handlePlaceOrder}
-          disabled={placeMutation.isPending}
-          className="w-full py-4 rounded-2xl font-display font-bold text-base transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+          disabled={placeMutation.isPending || isSubmitting}
+          className="w-full py-4 rounded-2xl font-display font-bold text-base transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 flex items-center justify-center gap-2"
           style={{
-            background:   placeMutation.isPending ? 'rgba(18,26,44,0.25)' : 'var(--color-primary)',
+            background:   (placeMutation.isPending || isSubmitting) ? 'rgba(18,26,44,0.25)' : 'var(--color-primary)',
             color:        'var(--color-on-primary)',
             outlineColor: 'var(--color-primary)',
           }}
         >
-          {placeMutation.isPending
+          {(placeMutation.isPending || isSubmitting)
             ? 'Placing order…'
-            : `Place order · ${itemCount} item${itemCount !== 1 ? 's' : ''}`}
+            : session.orderHistory?.length > 0
+              ? `Place round #${session.orderHistory.length + 1} · ${itemCount} item${itemCount !== 1 ? 's' : ''}`
+              : `Place order · ${itemCount} item${itemCount !== 1 ? 's' : ''}`}
         </button>
       </div>
     </div>

@@ -28,6 +28,21 @@ export default function Resolve() {
       // Apply per-restaurant brand color to CSS custom properties
       applyBrandColor(data.restaurant?.brandColor);
 
+      const existing = useSessionStore.getState();
+      const isSameTable = existing.qrToken === qrToken;
+      const myActiveOrderId = existing.activeOrderId;
+
+      // If user had an active order on this device for this table and it's still active, resume to order tracking
+      const orderStillActive =
+        isSameTable &&
+        myActiveOrderId &&
+        Array.isArray(data.activeOrders) &&
+        data.activeOrders.some(
+          (o) => o.id === myActiveOrderId && !['served', 'cancelled'].includes(o.status)
+        );
+
+      const destination = orderStillActive ? `/order/${myActiveOrderId}` : '/menu';
+
       setSession({
         qrToken,
         restaurant: data.restaurant,
@@ -35,6 +50,11 @@ export default function Resolve() {
         table:      data.table,
         sessionToken: data.sessionToken,
       });
+
+      const proceed = () => {
+        navigate(destination, { replace: true });
+      };
+
       if (data.locationCheckRequired && navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           async ({ coords }) => {
@@ -44,25 +64,25 @@ export default function Resolve() {
                 lat: coords.latitude,
                 lng: coords.longitude,
               });
-              navigate('/menu', { replace: true });
+              proceed();
             } catch (error) {
               if (error.response?.status === 403) {
                 setLocationBlocked(true);
                 return;
               }
-              navigate('/menu', { replace: true });
+              proceed();
             }
           },
           () => {
             if (data.branch?.locationStrictMode) setLocationBlocked(true);
-            else navigate('/menu', { replace: true });
+            else proceed();
           },
           { enableHighAccuracy: false, timeout: 8000, maximumAge: 60_000 }
         );
       } else if (data.locationCheckRequired && data.branch?.locationStrictMode) {
         setLocationBlocked(true);
       } else {
-        navigate('/menu', { replace: true });
+        proceed();
       }
     }
   }, [data, qrToken, setSession, navigate]);
