@@ -3,6 +3,8 @@
  * Production requires a full set of secrets and frontend URLs for CORS.
  */
 
+const logger = require('./logger');
+
 const isProduction = () => process.env.NODE_ENV === 'production';
 
 const REQUIRED_ALWAYS = ['JWT_SECRET', 'JWT_REFRESH_SECRET'];
@@ -23,7 +25,7 @@ function validateEnv() {
   }
 
   if (missing.length > 0) {
-    console.error(
+    logger.fatal(
       `[LayoScan] Missing required environment variables: ${missing.join(', ')}\n` +
         '           Copy server/.env.example → server/.env and set all values.',
     );
@@ -34,7 +36,7 @@ function validateEnv() {
     for (const key of ['JWT_SECRET', 'JWT_REFRESH_SECRET']) {
       const value = process.env[key];
       if (value.length < MIN_JWT_SECRET_LENGTH) {
-        console.error(
+        logger.fatal(
           `[LayoScan] ${key} must be at least ${MIN_JWT_SECRET_LENGTH} characters in production.`,
         );
         process.exit(1);

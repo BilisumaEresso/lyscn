@@ -11,16 +11,30 @@ const notFound = (req, res, next) => {
 /**
  * errorHandler
  * Centralized Express error-handling middleware.
- * Returns a consistent JSON shape: { success, message, [stack] }.
- * The stack trace is only included in development mode.
+ * Returns a consistent JSON shape: { success, message, requestId, [stack] }.
+ *
+ * IMPORTANT: This middleware now LOGS every error server-side via pino
+ * (attached to req.log by the requestLogger middleware). Previously,
+ * errors were silently swallowed — 500s produced zero server-side output.
  */
 // eslint-disable-next-line no-unused-vars
 const errorHandler = (err, req, res, next) => {
   const statusCode = err.statusCode || err.status || 500;
 
+  // ── Log the error server-side ───────────────────────────────────────────────
+  // req.log is the pino child logger set by pino-http; falls back to console
+  // for the rare case where errorHandler runs without the request logger.
+  const log = req.log || console;
+  if (statusCode >= 500) {
+    log.error({ err, statusCode }, 'Unhandled server error');
+  } else if (statusCode >= 400) {
+    log.warn({ err: { message: err.message }, statusCode }, 'Client error');
+  }
+
   const response = {
     success: false,
     message: err.message || 'Internal Server Error',
+    requestId: req.id || undefined,
   };
 
   // Expose stack trace only in development
@@ -53,3 +67,4 @@ const errorHandler = (err, req, res, next) => {
 };
 
 module.exports = { notFound, errorHandler };
+

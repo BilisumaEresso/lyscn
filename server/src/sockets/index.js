@@ -2,6 +2,8 @@ const jwt = require('jsonwebtoken');
 const Order = require('../models/Order');
 const Table = require('../models/Table');
 
+const logger = require('../config/logger');
+
 /**
  * Initialises all Socket.io event handlers.
  * Called once from server.js after the io instance is created.
@@ -36,15 +38,13 @@ function initSockets(io) {
 
   // ── Connection handler ────────────────────────────────────────────────────────
   io.on('connection', (socket) => {
-    const isDev = process.env.NODE_ENV !== 'production';
-
     // Staff: auto-join their restaurant's room (derived from verified token)
     if (socket.data.restaurantId) {
       const room = `restaurant:${socket.data.restaurantId}`;
       socket.join(room);
-      if (isDev) console.log(`[socket] staff connected  id=${socket.id}  room=${room}`);
+      logger.debug({ socketId: socket.id, room }, 'Staff socket connected');
     } else {
-      if (isDev) console.log(`[socket] customer connected  id=${socket.id}`);
+      logger.debug({ socketId: socket.id }, 'Customer socket connected');
     }
 
     // Any client (customer or staff) can join an order room to receive updates.
@@ -55,13 +55,13 @@ function initSockets(io) {
       // Authenticated staff can always join order rooms for their restaurant
       if (socket.data.restaurantId) {
         socket.join(`order:${orderId}`);
-        if (isDev) console.log(`[socket] staff ${socket.id} joined order:${orderId}`);
+        logger.debug({ socketId: socket.id, orderId }, 'Staff socket joined order room');
         return;
       }
 
       // Customers must prove session ownership
       if (!sessionToken) {
-        if (isDev) console.log(`[socket] ${socket.id} denied order:${orderId} — no sessionToken`);
+        logger.debug({ socketId: socket.id, orderId }, 'Socket denied order room — no sessionToken');
         return;
       }
 
@@ -71,19 +71,19 @@ function initSockets(io) {
 
         const table = await Table.findById(order.tableId).select('activeSessionToken').lean();
         if (!table || table.activeSessionToken !== sessionToken) {
-          if (isDev) console.log(`[socket] ${socket.id} denied order:${orderId} — bad session`);
+          logger.debug({ socketId: socket.id, orderId }, 'Socket denied order room — bad session');
           return;
         }
 
         socket.join(`order:${orderId}`);
-        if (isDev) console.log(`[socket] ${socket.id} joined order:${orderId}`);
+        logger.debug({ socketId: socket.id, orderId }, 'Customer socket joined order room');
       } catch (err) {
-        console.error(`[socket] join:order error for ${orderId}:`, err.message);
+        logger.error({ err, orderId }, 'Socket join:order error');
       }
     });
 
     socket.on('disconnect', () => {
-      if (isDev) console.log(`[socket] disconnected  id=${socket.id}`);
+      logger.debug({ socketId: socket.id }, 'Socket disconnected');
     });
   });
 }

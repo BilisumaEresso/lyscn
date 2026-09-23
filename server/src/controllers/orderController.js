@@ -329,7 +329,7 @@ const updateOrderStatus = async (req, res, next) => {
 
     if (order.status === 'served' && order.paymentStatus === 'paid') {
       suggestTableReadyToClear(req, order.tableId?._id || order.tableId, order.restaurantId)
-        .catch((err) => console.error('Unable to evaluate table clear suggestion:', err));
+        .catch((err) => (req.log || console).error({ err }, 'Unable to evaluate table clear suggestion'));
     }
 
     return res.json({ success: true, order });
@@ -372,7 +372,7 @@ const updateOrderPayment = async (req, res, next) => {
 
     if (order.status === 'served' && order.paymentStatus === 'paid') {
       suggestTableReadyToClear(req, order.tableId?._id || order.tableId, order.restaurantId)
-        .catch((err) => console.error('Unable to evaluate table clear suggestion:', err));
+        .catch((err) => (req.log || console).error({ err }, 'Unable to evaluate table clear suggestion'));
     }
 
     return res.json({ success: true, order });

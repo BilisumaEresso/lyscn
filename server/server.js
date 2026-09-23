@@ -3,6 +3,7 @@ const http = require("http");
 const mongoose = require("mongoose");
 const { Server } = require("socket.io");
 
+const logger = require("./src/config/logger");
 const { validateEnv, isProduction } = require("./src/config/env");
 const { getAllowedOrigins } = require("./src/config/cors");
 const app = require("./src/app");
@@ -13,6 +14,17 @@ const Order = require("./src/models/Order");
 const PORT = process.env.PORT || 5000;
 
 validateEnv();
+
+// ── Process-level crash handlers ──────────────────────────────────────────────
+process.on("uncaughtException", (err) => {
+  logger.fatal({ err }, "Uncaught exception — shutting down");
+  process.exit(1);
+});
+
+process.on("unhandledRejection", (reason) => {
+  logger.fatal({ err: reason }, "Unhandled promise rejection — shutting down");
+  process.exit(1);
+});
 
 // ── HTTP server ───────────────────────────────────────────────────────────────
 const server = http.createServer(app);
@@ -67,14 +79,14 @@ const sweepExpiredTableSessions = async () => {
       io.to(`restaurant:${table.restaurantId}`).emit("table:updated", table);
     }
   } catch (err) {
-    console.error("[LayoScan] Table session sweep failed:", err.message);
+    logger.error({ err }, "Table session sweep failed");
   }
 };
 
 async function connectDatabase() {
   if (!process.env.MONGO_URI) {
-    console.warn(
-      "[LayoScan] MONGO_URI is not set — skipping database connection. " +
+    logger.warn(
+      "MONGO_URI is not set — skipping database connection. " +
         "Copy .env.example → .env and fill in your connection string.",
     );
     return false;
@@ -82,10 +94,10 @@ async function connectDatabase() {
 
   try {
     await mongoose.connect(process.env.MONGO_URI);
-    console.log("[LayoScan] MongoDB connected successfully.");
+    logger.info("MongoDB connected successfully");
     return true;
   } catch (err) {
-    console.error("[LayoScan] MongoDB connection failed:", err.message);
+    logger.error({ err }, "MongoDB connection failed");
     return false;
   }
 }
@@ -94,16 +106,17 @@ async function connectDatabase() {
   const dbConnected = await connectDatabase();
 
   if (isProduction() && !dbConnected) {
-    console.error("[LayoScan] Cannot start in production without a working MongoDB connection.");
+    logger.fatal("Cannot start in production without a working MongoDB connection");
     process.exit(1);
   }
 
   server.listen(PORT, () => {
-    console.log(`[LayoScan] Server running on http://localhost:${PORT}`);
-    console.log(`[LayoScan] Health check → GET http://localhost:${PORT}/api/health`);
+    logger.info({ port: PORT }, "Server running");
+    logger.info({ url: `http://localhost:${PORT}/api/health` }, "Health check endpoint");
   });
 
   if (dbConnected) {
     setInterval(sweepExpiredTableSessions, 60_000);
   }
 })();
+

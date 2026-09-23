@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server:
+    name: Server — lint & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci
+        working-directory: server
+      - run: npm run lint
+        working-directory: server
+      - run: npm test
+        working-directory: server
+
+  customer-app:
+    name: Customer App — build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: customer-app/package-lock.json
+      - run: npm ci
+        working-directory: customer-app
+      - run: npm run build
+        working-directory: customer-app
+        env:
+          VITE_API_URL: https://api.example.com
+
+  dashboard-app:
+    name: Dashboard App — build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: dashboard-app/package-lock.json
+      - run: npm ci
+        working-directory: dashboard-app
+      - run: npm run build
+        working-directory: dashboard-app
+        env:
+          VITE_API_URL: https://api.example.com
+          VITE_CUSTOMER_APP_URL: https://customer.example.com

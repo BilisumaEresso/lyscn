@@ -47,12 +47,11 @@ const restaurantSchema = new mongoose.Schema(
 restaurantSchema.pre('save', async function (next) {
   if (this.slug) return next();
 
-  let baseSlug = slugify(this.name);
+  const baseSlug = slugify(this.name);
   let slug = baseSlug;
   let count = 0;
 
   // Ensure uniqueness
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     // Use the model reference via mongoose.model to avoid circular issues
     const existing = await mongoose.model('Restaurant').findOne({ slug });

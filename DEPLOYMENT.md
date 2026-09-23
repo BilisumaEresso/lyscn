@@ -97,6 +97,19 @@ The Render service should point at `/api/health` for an HTTP health check.
 
 The server **will not start** in production if required env vars are missing, JWT secrets are too short, or the initial MongoDB connection fails.
 
+## Operations & Incident Response
+
+For detailed disaster recovery, database backup configuration, secret rotation, and incident playbooks, refer to the [Production Operations & Incident Response Runbook](docs/RUNBOOK.md).
+
+### MongoDB Atlas Backups
+Enable continuous cloud backup in Atlas (with 7-day minimum point-in-time recovery window and daily snapshots) to protect against accidental data loss or corruption.
+
+### Structured Logging
+The server uses `pino` for high-throughput structured logging:
+- Set `LOG_LEVEL` (e.g. `fatal`, `error`, `warn`, `info`, `debug`, `trace`). Defaults to `info` in production and `debug` in development.
+- Logs output formatted JSON in production (ready for log drains) and human-friendly colorized logs in development via `pino-pretty`.
+- Every request receives a unique `X-Request-Id` for correlation.
+
 ## Notes
 
 - The backend listens on `process.env.PORT` automatically in production.

@@ -14,6 +14,7 @@ const assistanceRoutes = require("./routes/assistanceRoutes");
 const publicRoutes = require("./routes/publicRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
 const { notFound, errorHandler } = require("./middleware/errorHandler");
+const requestLogger = require("./middleware/requestLogger");
 const { isProduction } = require("./config/env");
 const { getAllowedOrigins } = require("./config/cors");
 
@@ -22,6 +23,9 @@ app.set("trust proxy", 1);
 
 // ── Security headers ──────────────────────────────────────────────────────────
 app.use(helmet());
+
+// ── Structured request logging ────────────────────────────────────────────────
+app.use(requestLogger);
 
 app.use(
   cors({
