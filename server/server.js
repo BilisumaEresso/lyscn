@@ -3,6 +3,7 @@ const http = require("http");
 const mongoose = require("mongoose");
 const { Server } = require("socket.io");
 
+const { validateEnv, isProduction } = require("./src/config/env");
 const app = require("./src/app");
 const { initSockets } = require("./src/sockets");
 const Table = require("./src/models/Table");
@@ -11,9 +12,7 @@ const Order = require("./src/models/Order");
 const PORT = process.env.PORT || 5000;
 
 function getAllowedOrigins() {
-  const isProduction = process.env.NODE_ENV === "production";
-
-  if (isProduction) {
+  if (isProduction()) {
     const envOrigins = [
       process.env.CLIENT_URL_CUSTOMER,
       process.env.CLIENT_URL_DASHBOARD,
@@ -35,16 +34,7 @@ function getAllowedOrigins() {
   ];
 }
 
-// ── Fail-fast: crash loudly if required secrets are missing ───────────────────
-const REQUIRED_ENV = ["JWT_SECRET", "JWT_REFRESH_SECRET"];
-const missing = REQUIRED_ENV.filter((k) => !process.env[k]);
-if (missing.length > 0) {
-  console.error(
-    `[LayoScan] ❌  Missing required environment variables: ${missing.join(", ")}\n` +
-      "           Copy server/.env.example → server/.env and set all values.",
-  );
-  process.exit(1);
-}
+validateEnv();
 
 // ── HTTP server ───────────────────────────────────────────────────────────────
 const server = http.createServer(app);
@@ -55,7 +45,7 @@ const io = new Server(server, {
     origin: (origin, callback) => {
       const allowedOrigins = getAllowedOrigins();
 
-      if (process.env.NODE_ENV === "production") {
+      if (isProduction()) {
         if (!origin) return callback(null, false);
         const matches = allowedOrigins.includes(origin);
         return matches
@@ -72,13 +62,12 @@ const io = new Server(server, {
   },
 });
 
-// Expose io so controllers can reach it via req.app.get('io')
 app.set("io", io);
-
-// Initialise socket event handlers
 initSockets(io);
 
 const sweepExpiredTableSessions = async () => {
+  if (mongoose.connection.readyState !== 1) return;
+
   try {
     const expiredTables = await Table.find({
       status: "occupied",
@@ -104,29 +93,39 @@ const sweepExpiredTableSessions = async () => {
   }
 };
 
-// ── MongoDB connection (placeholder) ─────────────────────────────────────────
-(async () => {
+async function connectDatabase() {
   if (!process.env.MONGO_URI) {
     console.warn(
-      "[LayoScan] ⚠  MONGO_URI is not set — skipping database connection. " +
+      "[LayoScan] MONGO_URI is not set — skipping database connection. " +
         "Copy .env.example → .env and fill in your connection string.",
     );
-  } else {
-    try {
-      await mongoose.connect(process.env.MONGO_URI);
-      console.log("[LayoScan] ✅  MongoDB connected successfully.");
-    } catch (err) {
-      console.error("[LayoScan] ❌  MongoDB connection failed:", err.message);
-      // Do not crash the process — server still starts for health-check purposes
-    }
+    return false;
   }
 
-  // ── Start listening ─────────────────────────────────────────────────────────
+  try {
+    await mongoose.connect(process.env.MONGO_URI);
+    console.log("[LayoScan] MongoDB connected successfully.");
+    return true;
+  } catch (err) {
+    console.error("[LayoScan] MongoDB connection failed:", err.message);
+    return false;
+  }
+}
+
+(async () => {
+  const dbConnected = await connectDatabase();
+
+  if (isProduction() && !dbConnected) {
+    console.error("[LayoScan] Cannot start in production without a working MongoDB connection.");
+    process.exit(1);
+  }
+
   server.listen(PORT, () => {
-    console.log(`[LayoScan] 🚀  Server running on http://localhost:${PORT}`);
-    console.log(
-      `[LayoScan]     Health check → GET http://localhost:${PORT}/api/health`,
-    );
+    console.log(`[LayoScan] Server running on http://localhost:${PORT}`);
+    console.log(`[LayoScan] Health check → GET http://localhost:${PORT}/api/health`);
   });
-  setInterval(sweepExpiredTableSessions, 60_000);
+
+  if (dbConnected) {
+    setInterval(sweepExpiredTableSessions, 60_000);
+  }
 })();

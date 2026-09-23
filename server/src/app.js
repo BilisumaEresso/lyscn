@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const mongoose = require("mongoose");
 
 const authRoutes = require("./routes/authRoutes");
 const restaurantRoutes = require("./routes/restaurantRoutes");
@@ -64,9 +65,40 @@ app.use(
 );
 app.use(express.json());
 
-// ── Health check (unauthenticated) ────────────────────────────────────────────
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", service: "LayoScan API" });
+// ── Health check (unauthenticated) — used by Render; returns 503 if DB is down ─
+app.get("/api/health", async (req, res) => {
+  const readyState = mongoose.connection.readyState;
+  const stateLabels = {
+    0: "disconnected",
+    1: "connected",
+    2: "connecting",
+    3: "disconnecting",
+  };
+
+  if (readyState !== 1) {
+    return res.status(503).json({
+      status: "unhealthy",
+      service: "LayoScan API",
+      checks: {
+        database: stateLabels[readyState] || "unknown",
+      },
+    });
+  }
+
+  try {
+    await mongoose.connection.db.admin().ping();
+    return res.json({
+      status: "ok",
+      service: "LayoScan API",
+      checks: { database: "connected" },
+    });
+  } catch (_err) {
+    return res.status(503).json({
+      status: "unhealthy",
+      service: "LayoScan API",
+      checks: { database: "ping_failed" },
+    });
+  }
 });
 
 // ── API Routes ────────────────────────────────────────────────────────────────

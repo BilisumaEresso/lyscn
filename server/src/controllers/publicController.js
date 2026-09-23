@@ -34,6 +34,7 @@ const resolveQRCode = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Resource not found.' });
     }
 
+    const now = new Date();
     const io = req.app.get('io');
     const activeOrders = await Order.find({
       tableId: table._id,

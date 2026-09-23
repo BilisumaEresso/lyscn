@@ -175,11 +175,17 @@ No Phase 2 work is included in this codebase. The `paymentMethod: 'cash' | 'pos'
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `PORT` | No | `5000` | Server listen port |
-| `MONGO_URI` | Yes | — | MongoDB connection string |
-| `JWT_SECRET` | Yes | — | Access token signing secret (min 64 chars) |
-| `JWT_REFRESH_SECRET` | Yes | — | Refresh token signing secret (min 64 chars) |
-| `CLIENT_URL_CUSTOMER` | No | `http://localhost:5173` | CORS origin for customer app |
-| `CLIENT_URL_DASHBOARD` | No | `http://localhost:5174` | CORS origin for dashboard |
+| `NODE_ENV` | Prod | `development` | Set to `production` on Render |
+| `MONGO_URI` | Yes (prod) | — | MongoDB connection string |
+| `JWT_SECRET` | Yes | — | Access token signing secret (min 32 chars in prod; 64+ recommended) |
+| `JWT_REFRESH_SECRET` | Yes | — | Refresh token signing secret (same as above) |
+| `CLIENT_URL_CUSTOMER` | Yes (prod) | `http://localhost:5173` | CORS origin for customer app |
+| `CLIENT_URL_DASHBOARD` | Yes (prod) | `http://localhost:5174` | CORS origin for dashboard |
+| `ALLOWED_ORIGINS` | No | — | Comma-separated extra CORS origins |
+| `CLOUDINARY_*` | If uploads | — | Cloud name, API key, and secret for menu/branding images |
+| `RATE_LIMIT_*` | No | see `.env.example` | Optional abuse-protection tuning |
+
+`GET /api/health` returns **503** when MongoDB is unavailable (used by Render). See `DEPLOYMENT.md` for the full production checklist.
 
 ### `customer-app/.env` / `dashboard-app/.env`
 

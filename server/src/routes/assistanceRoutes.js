@@ -8,8 +8,9 @@ const {
 } = require('../controllers/assistanceController');
 const { protect } = require('../middleware/auth');
 const { resolveTenantFromAuth } = require('../middleware/tenantResolver');
+const { publicWriteLimiter } = require('../middleware/rateLimit');
 
-router.post('/public', requestAssistance);
+router.post('/public', publicWriteLimiter, requestAssistance);
 
 router.use(protect, resolveTenantFromAuth);
 router.get('/', listAssistance);
