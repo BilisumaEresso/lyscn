@@ -106,9 +106,12 @@ export default function OrderTracking() {
   // 5s polling fallback
   const { data, isLoading } = useQuery({
     queryKey: ['order-status', orderId],
-    queryFn: () => api.get(`/orders/public/${orderId}/status`).then((r) => r.data),
+    queryFn: () => api.get(`/orders/public/${orderId}/status`, {
+      params: { sessionToken: session.sessionToken },
+    }).then((r) => r.data),
     refetchInterval: 5_000,
     retry: 2,
+    enabled: !!session.sessionToken,
   });
 
   const status        = data?.status        ?? 'placed';
@@ -141,13 +144,13 @@ export default function OrderTracking() {
 
     const onConnect = () => {
       if (!joined.current) {
-        socket.emit('join:order', { orderId });
+        socket.emit('join:order', { orderId, sessionToken: session.sessionToken });
         joined.current = true;
       }
     };
 
     const onReconnect = () => {
-      socket.emit('join:order', { orderId });
+      socket.emit('join:order', { orderId, sessionToken: session.sessionToken });
       qc.invalidateQueries({ queryKey: ['order-status', orderId] });
     };
 
@@ -163,7 +166,7 @@ export default function OrderTracking() {
     };
 
     if (socket.connected) {
-      socket.emit('join:order', { orderId });
+      socket.emit('join:order', { orderId, sessionToken: session.sessionToken });
       joined.current = true;
     }
 
@@ -178,7 +181,7 @@ export default function OrderTracking() {
       socket.disconnect();
       joined.current = false;
     };
-  }, [orderId, qc]);
+  }, [orderId, qc, session.sessionToken]);
 
   return (
     <div className="min-h-screen bg-paper max-w-[560px] mx-auto flex flex-col">

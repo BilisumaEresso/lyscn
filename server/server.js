@@ -4,35 +4,13 @@ const mongoose = require("mongoose");
 const { Server } = require("socket.io");
 
 const { validateEnv, isProduction } = require("./src/config/env");
+const { getAllowedOrigins } = require("./src/config/cors");
 const app = require("./src/app");
 const { initSockets } = require("./src/sockets");
 const Table = require("./src/models/Table");
 const Order = require("./src/models/Order");
 
 const PORT = process.env.PORT || 5000;
-
-function getAllowedOrigins() {
-  if (isProduction()) {
-    const envOrigins = [
-      process.env.CLIENT_URL_CUSTOMER,
-      process.env.CLIENT_URL_DASHBOARD,
-      ...(process.env.ALLOWED_ORIGINS || "")
-        .split(",")
-        .map((origin) => origin.trim())
-        .filter(Boolean),
-    ];
-
-    return envOrigins.filter(
-      (origin, index, array) => origin && array.indexOf(origin) === index,
-    );
-  }
-
-  return [
-    "http://localhost:5173",
-    "http://localhost:5174",
-    /^http:\/\/localhost:\d+$/,
-  ];
-}
 
 validateEnv();
 

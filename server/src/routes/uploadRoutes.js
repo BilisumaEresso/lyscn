@@ -2,7 +2,7 @@ const express = require('express');
 const router  = express.Router();
 const multer  = require('multer');
 const { uploadImage, deleteImage } = require('../controllers/uploadController');
-const { protect } = require('../middleware/auth');
+const { protect, restrictTo } = require('../middleware/auth');
 const { resolveTenantFromAuth } = require('../middleware/tenantResolver');
 
 // Multer memory storage configuration
@@ -56,8 +56,8 @@ const uploadSingleMiddleware = (req, res, next) => {
   });
 };
 
-// ── Protected routes ──────────────────────────────────────────────────────────
-router.use(protect, resolveTenantFromAuth);
+// ── Protected routes (owner/manager only) ─────────────────────────────────────
+router.use(protect, resolveTenantFromAuth, restrictTo('owner', 'manager'));
 
 router.post('/', uploadSingleMiddleware, uploadImage);
 router.delete('/', deleteImage);

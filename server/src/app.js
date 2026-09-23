@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
 const mongoose = require("mongoose");
 
 const authRoutes = require("./routes/authRoutes");
@@ -13,41 +14,21 @@ const assistanceRoutes = require("./routes/assistanceRoutes");
 const publicRoutes = require("./routes/publicRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
 const { notFound, errorHandler } = require("./middleware/errorHandler");
-
-function getAllowedOrigins() {
-  const isProduction = process.env.NODE_ENV === "production";
-
-  if (isProduction) {
-    const envOrigins = [
-      process.env.CLIENT_URL_CUSTOMER,
-      process.env.CLIENT_URL_DASHBOARD,
-      ...(process.env.ALLOWED_ORIGINS || "")
-        .split(",")
-        .map((origin) => origin.trim())
-        .filter(Boolean),
-    ];
-
-    return envOrigins.filter(
-      (origin, index, array) => origin && array.indexOf(origin) === index,
-    );
-  }
-
-  return [
-    "http://localhost:5173",
-    "http://localhost:5174",
-    /^http:\/\/localhost:\d+$/,
-  ];
-}
+const { isProduction } = require("./config/env");
+const { getAllowedOrigins } = require("./config/cors");
 
 const app = express();
 app.set("trust proxy", 1);
+
+// ── Security headers ──────────────────────────────────────────────────────────
+app.use(helmet());
 
 app.use(
   cors({
     origin: (origin, callback) => {
       const allowedOrigins = getAllowedOrigins();
 
-      if (process.env.NODE_ENV === "production") {
+      if (isProduction()) {
         if (!origin) return callback(null, false);
         const matches = allowedOrigins.includes(origin);
         return matches

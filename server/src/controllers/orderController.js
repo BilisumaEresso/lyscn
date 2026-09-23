@@ -203,12 +203,32 @@ const listOrders = async (req, res, next) => {
 };
 
 // ── GET /api/orders/public/:id/status — PUBLIC (customer polling) ─────────────
+// Requires ?sessionToken= matching the order's table session for security.
 const getOrderStatus = async (req, res, next) => {
   try {
-    const order = await Order.findById(req.params.id).select('status paymentStatus rating feedback');
+    const { sessionToken } = req.query;
+    if (!sessionToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'sessionToken query parameter is required.',
+      });
+    }
+
+    const order = await Order.findById(req.params.id).select(
+      'status paymentStatus rating feedback tableId',
+    );
 
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found.' });
+    }
+
+    // Verify the caller owns the session that placed this order
+    const table = await Table.findById(order.tableId).select('activeSessionToken');
+    if (!table || table.activeSessionToken !== sessionToken) {
+      return res.status(403).json({
+        success: false,
+        message: 'Session does not match this order. Please scan the QR code again.',
+      });
     }
 
     return res.json({

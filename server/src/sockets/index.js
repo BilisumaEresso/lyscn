@@ -1,4 +1,6 @@
 const jwt = require('jsonwebtoken');
+const Order = require('../models/Order');
+const Table = require('../models/Table');
 
 /**
  * Initialises all Socket.io event handlers.
@@ -46,11 +48,38 @@ function initSockets(io) {
     }
 
     // Any client (customer or staff) can join an order room to receive updates.
-    // We validate the orderId looks like a Mongo ObjectId before joining.
-    socket.on('join:order', ({ orderId } = {}) => {
+    // Staff are trusted via JWT; customers must present a valid sessionToken.
+    socket.on('join:order', async ({ orderId, sessionToken } = {}) => {
       if (!orderId || !/^[a-f\d]{24}$/i.test(orderId)) return;
-      socket.join(`order:${orderId}`);
-      if (isDev) console.log(`[socket] ${socket.id} joined order:${orderId}`);
+
+      // Authenticated staff can always join order rooms for their restaurant
+      if (socket.data.restaurantId) {
+        socket.join(`order:${orderId}`);
+        if (isDev) console.log(`[socket] staff ${socket.id} joined order:${orderId}`);
+        return;
+      }
+
+      // Customers must prove session ownership
+      if (!sessionToken) {
+        if (isDev) console.log(`[socket] ${socket.id} denied order:${orderId} — no sessionToken`);
+        return;
+      }
+
+      try {
+        const order = await Order.findById(orderId).select('tableId').lean();
+        if (!order) return;
+
+        const table = await Table.findById(order.tableId).select('activeSessionToken').lean();
+        if (!table || table.activeSessionToken !== sessionToken) {
+          if (isDev) console.log(`[socket] ${socket.id} denied order:${orderId} — bad session`);
+          return;
+        }
+
+        socket.join(`order:${orderId}`);
+        if (isDev) console.log(`[socket] ${socket.id} joined order:${orderId}`);
+      } catch (err) {
+        console.error(`[socket] join:order error for ${orderId}:`, err.message);
+      }
     });
 
     socket.on('disconnect', () => {
@@ -60,3 +89,4 @@ function initSockets(io) {
 }
 
 module.exports = { initSockets };
+

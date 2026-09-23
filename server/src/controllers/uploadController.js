@@ -39,7 +39,7 @@ const uploadImage = async (req, res, next) => {
 };
 
 // ── DELETE /api/upload ────────────────────────────────────────────────────────
-// Protected endpoint: Deletes an asset by publicId
+// Protected endpoint: Deletes an asset by publicId (tenant-scoped)
 const deleteImage = async (req, res, next) => {
   try {
     const { publicId } = req.body;
@@ -47,6 +47,16 @@ const deleteImage = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'publicId is required.',
+      });
+    }
+
+    // Ensure the asset belongs to the requesting tenant's Cloudinary folder
+    const tenantId = req.tenantId ? String(req.tenantId) : null;
+    const expectedPrefix = `layoscan/${tenantId}/`;
+    if (!tenantId || !publicId.startsWith(expectedPrefix)) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only delete assets that belong to your restaurant.',
       });
     }
 
