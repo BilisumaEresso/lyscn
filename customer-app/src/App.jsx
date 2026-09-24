@@ -110,6 +110,16 @@ export default function App() {
                   </SessionRoute>
                 }
               />
+              <Route
+                path="/orders"
+                element={
+                  <SessionRoute>
+                    <Suspense fallback={<InlineSkeleton />}>
+                      <OrderTracking />
+                    </Suspense>
+                  </SessionRoute>
+                }
+              />
 
               {/* Catch-all */}
               <Route path="*" element={<Landing />} />

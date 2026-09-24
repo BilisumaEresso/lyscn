@@ -3,6 +3,7 @@ import JSZip from 'jszip';
 import fileSaver from 'file-saver';
 import { generateThemeFromColor } from './theme';
 import logoImg from '../assets/logo.png';
+import cafeLogoPlaceholder from '../assets/cafe_logo_placeholder.png';
 
 const saveAs = fileSaver.saveAs || fileSaver;
 
@@ -238,10 +239,13 @@ export async function renderPrintCardCanvas({ table, restaurant }) {
   const qrImage = await loadImage(qrBlobUrl);
   URL.revokeObjectURL(qrBlobUrl);
 
-  // 2. Load restaurant logo (or fallback)
+  // 2. Load restaurant logo (or placeholder fallback)
   let headerLogo = null;
   if (restaurant?.logoUrl) {
     headerLogo = await loadImage(restaurant.logoUrl);
+  }
+  if (!headerLogo) {
+    headerLogo = await loadImage(cafeLogoPlaceholder);
   }
   if (!headerLogo) {
     headerLogo = await loadImage(logoImg);

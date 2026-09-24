@@ -6,6 +6,7 @@ import logo from "../assets/logo.png";
 import { useInstallPrompt } from "../hooks/useInstallPrompt";
 import { applyBrandColor } from "../lib/theme";
 import { useSessionStore } from "../store/sessionStore";
+import { getRestaurantLogo } from "../lib/branding";
 
 /**
  * NOTE ON SECURITY & CAMERA PERMISSIONS:
@@ -244,11 +245,18 @@ export default function Landing() {
         {hasRememberedSession && (
           <button
             onClick={() => navigate("/menu")}
-            className="mt-4 w-full py-3.5 px-5 rounded-2xl font-display font-semibold text-sm border border-ink/12 text-ink hover:bg-ink/5 flex items-center justify-center gap-2 transition-all min-w-0"
+            className="mt-4 w-full py-3 px-4 rounded-2xl font-display font-semibold text-sm border border-ink/12 text-ink hover:bg-ink/5 flex items-center justify-between gap-3 transition-all min-w-0 bg-white/70 shadow-xs active:scale-[0.99]"
           >
-            <span className="truncate">
-              Continue to {session.restaurant.name} ({session.table.label})
-            </span>
+            <div className="flex items-center gap-2.5 min-w-0">
+              <img
+                src={getRestaurantLogo(session.restaurant)}
+                alt=""
+                className="w-7 h-7 rounded-lg object-cover border border-ink/10 shrink-0 bg-white"
+              />
+              <span className="truncate text-left text-xs font-semibold">
+                Continue to {session.restaurant.name} ({session.table.label})
+              </span>
+            </div>
             <ArrowRight size={16} className="text-teal shrink-0" />
           </button>
         )}

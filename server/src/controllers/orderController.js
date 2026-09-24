@@ -243,6 +243,88 @@ const getOrderStatus = async (req, res, next) => {
   }
 };
 
+// ── GET /api/orders/public/table/orders — PUBLIC (multi-round session orders) ──
+const getTableOrders = async (req, res, next) => {
+  try {
+    const { sessionToken } = req.query;
+    if (!sessionToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'sessionToken query parameter is required.',
+      });
+    }
+
+    const table = await Table.findOne({
+      activeSessionToken: sessionToken,
+      isActive: true,
+    }).select('_id label status restaurantId occupiedSince activeSessionToken');
+
+    if (!table) {
+      return res.status(403).json({
+        success: false,
+        message: 'Invalid or expired table session.',
+      });
+    }
+
+    const query = {
+      tableId: table._id,
+      restaurantId: table.restaurantId,
+      status: { $ne: 'cancelled' },
+    };
+
+    if (table.occupiedSince) {
+      query.createdAt = { $gte: table.occupiedSince };
+    }
+
+    const orders = await Order.find(query)
+      .select('_id status paymentStatus guestName items totalAmount createdAt sessionId rating feedback')
+      .sort({ createdAt: 1 });
+
+    const totalAmount = Math.round(orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0) * 100) / 100;
+    const paidAmount = Math.round(
+      orders
+        .filter((o) => o.paymentStatus === 'paid')
+        .reduce((sum, o) => sum + (o.totalAmount || 0), 0) * 100
+    ) / 100;
+    const unpaidAmount = Math.round((totalAmount - paidAmount) * 100) / 100;
+    const activeCount = orders.filter((o) => o.status !== 'served').length;
+
+    const rounds = orders.map((o, idx) => ({
+      roundNumber: idx + 1,
+      id: o._id,
+      status: o.status,
+      paymentStatus: o.paymentStatus,
+      guestName: o.guestName,
+      items: o.items || [],
+      totalAmount: o.totalAmount,
+      createdAt: o.createdAt,
+      rating: o.rating,
+      feedback: o.feedback,
+    }));
+
+    return res.json({
+      success: true,
+      table: {
+        id: table._id,
+        label: table.label,
+        status: table.status,
+      },
+      summary: {
+        roundCount: rounds.length,
+        activeCount,
+        totalAmount,
+        paidAmount,
+        unpaidAmount,
+        allServed: rounds.length > 0 && activeCount === 0,
+        allPaid: rounds.length > 0 && unpaidAmount === 0,
+      },
+      rounds,
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
 // PATCH /api/orders/public/:id/feedback — customer feedback after service
 const submitOrderFeedback = async (req, res, next) => {
   try {
@@ -385,6 +467,7 @@ module.exports = {
   placeOrder,
   listOrders,
   getOrderStatus,
+  getTableOrders,
   updateOrderStatus,
   updateOrderPayment,
   submitOrderFeedback,

@@ -1,34 +1,37 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { ShoppingCart, Plus, Minus, Trash2, ImageOff, Info, MapPin } from 'lucide-react';
+import {
+  ShoppingCart,
+  Plus,
+  Minus,
+  Trash2,
+  Info,
+  MapPin,
+  Search,
+  X,
+  Sparkles,
+  ChevronRight,
+  Clock,
+  UtensilsCrossed,
+  SlidersHorizontal,
+} from 'lucide-react';
 import clsx from 'clsx';
 import api from '../lib/api';
 import { applyBrandColor } from '../lib/theme';
 import { useSessionStore } from '../store/sessionStore';
 import { useCartStore, cartItemCount, cartSubtotal } from '../store/cartStore';
-import logo from '../assets/logo.png';
 import AssistanceButton from '../components/AssistanceButton';
 import Currency, { formatBirr } from '../components/Currency';
 import CulinaryPlaceholder from '../components/menu/CulinaryPlaceholder';
-
-// ── "Powered by LayoScan" mark ────────────────────────────────────────────────
-function PoweredBy() {
-  return (
-    <div className="flex items-center justify-center gap-1.5 py-5 opacity-30">
-      <img src={logo} alt="" aria-hidden="true" className="w-4 h-4 rounded object-cover" loading="lazy" />
-      <span className="text-[10px] text-ink-muted font-medium tracking-wide">
-        Powered by LayoScan
-      </span>
-    </div>
-  );
-}
+import PoweredBy from '../components/PoweredBy';
+import { getRestaurantLogo, getRestaurantCover } from '../lib/branding';
 
 // ── Product detail bottom sheet ───────────────────────────────────────────────
 function ProductSheet({ product, categoryName, onClose }) {
   const addItem = useCartStore((s) => s.addItem);
-  const [qty, setQty]         = useState(1);
+  const [qty, setQty] = useState(1);
   const [selected, setSelected] = useState({});
 
   if (!product) return null;
@@ -47,8 +50,8 @@ function ProductSheet({ product, categoryName, onClose }) {
   };
 
   const modifierExtra = getSelectedOptions().reduce((s, m) => s + m.priceDelta, 0);
-  const unitPrice     = product.price + modifierExtra;
-  const total         = unitPrice * qty;
+  const unitPrice = product.price + modifierExtra;
+  const total = unitPrice * qty;
 
   const allRequiredMet = groups
     .filter((g) => g.required)
@@ -72,12 +75,12 @@ function ProductSheet({ product, categoryName, onClose }) {
 
   const handleAdd = () => {
     addItem({
-      productId:         product._id,
-      name:              product.name,
+      productId: product._id,
+      name: product.name,
       unitPrice,
       qty,
       selectedModifiers: getSelectedOptions(),
-      subtotal:          total,
+      subtotal: total,
     });
     toast.success(`Added ${qty}× ${product.name}`);
     onClose();
@@ -265,22 +268,55 @@ function ProductSheet({ product, categoryName, onClose }) {
   );
 }
 
-// ── Product card ──────────────────────────────────────────────────────────────
+// ── Product Card with In-Card Stepper ─────────────────────────────────────────
 function ProductCard({ product, categoryName, onOpen }) {
-  const addItem    = useCartStore((s) => s.addItem);
+  const items = useCartStore((s) => s.items);
+  const addItem = useCartStore((s) => s.addItem);
+  const removeItem = useCartStore((s) => s.removeItem);
+  const updateQty = useCartStore((s) => s.updateQty);
+
   const hasRequired = (product.modifierGroups ?? []).some((g) => g.required);
+
+  // Cart item check (for standard items without modifiers)
+  const cartItemIndex = items.findIndex(
+    (i) => i.productId === product._id && (!i.selectedModifiers || i.selectedModifiers.length === 0)
+  );
+  const cartItem = cartItemIndex >= 0 ? items[cartItemIndex] : null;
+  const inCartQty = cartItem?.qty || 0;
+
+  // Total quantity in cart across any modifier configurations
+  const totalItemQty = items
+    .filter((i) => i.productId === product._id)
+    .reduce((sum, i) => sum + i.qty, 0);
 
   const handleQuickAdd = (e) => {
     e.stopPropagation();
     addItem({
-      productId:         product._id,
-      name:              product.name,
-      unitPrice:         product.price,
-      qty:               1,
+      productId: product._id,
+      name: product.name,
+      unitPrice: product.price,
+      qty: 1,
       selectedModifiers: [],
-      subtotal:          product.price,
+      subtotal: product.price,
     });
     toast.success(`Added ${product.name}`);
+  };
+
+  const handleDecrement = (e) => {
+    e.stopPropagation();
+    if (!cartItem) return;
+    if (inCartQty <= 1) {
+      removeItem(cartItemIndex);
+      toast(`Removed ${product.name}`, { icon: '🗑️' });
+    } else {
+      const updated = [...items];
+      updated[cartItemIndex] = {
+        ...cartItem,
+        qty: inCartQty - 1,
+        subtotal: cartItem.unitPrice * (inCartQty - 1),
+      };
+      useCartStore.setState({ items: updated });
+    }
   };
 
   return (
@@ -290,51 +326,235 @@ function ProductCard({ product, categoryName, onOpen }) {
       tabIndex={0}
       aria-label={`View ${product.name}, ${formatBirr(product.price)}`}
       onKeyDown={(e) => e.key === 'Enter' && onOpen(product)}
-      className="bg-white rounded-2xl overflow-hidden border border-ink/6 cursor-pointer active:scale-[0.98] transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+      className="bg-white rounded-2xl overflow-hidden border border-ink/8 shadow-xs cursor-pointer active:scale-[0.98] transition-all hover:shadow-md flex flex-col justify-between focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
       style={{ '--tw-outline-color': 'var(--color-primary)' }}
     >
-      <div className="relative aspect-[4/3] overflow-hidden" style={{ background: 'var(--color-surface-wash)' }}>
-        {product.imageUrl ? (
-          <img
-            src={product.imageUrl}
-            alt={product.name}
-            className="w-full h-full object-cover"
-            loading="lazy"
-          />
-        ) : (
-          <CulinaryPlaceholder
-            name={product.name}
-            categoryName={categoryName}
-            size="md"
-          />
-        )}
-        {/* Quick-add button */}
-        {!hasRequired && (
-          <button
-            onClick={handleQuickAdd}
-            aria-label={`Quick add ${product.name}`}
-            className="absolute bottom-2 right-2 w-8 h-8 rounded-full flex items-center justify-center shadow-md active:scale-90 transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
-            style={{
-              background:   'var(--color-primary)',
-              outlineColor: 'var(--color-primary)',
-            }}
-          >
-            <Plus size={16} className="text-white" strokeWidth={2.5} />
-          </button>
-        )}
+      <div>
+        <div className="relative aspect-[4/3] overflow-hidden" style={{ background: 'var(--color-surface-wash)' }}>
+          {product.imageUrl ? (
+            <img
+              src={product.imageUrl}
+              alt={product.name}
+              className="w-full h-full object-cover"
+              loading="lazy"
+            />
+          ) : (
+            <CulinaryPlaceholder
+              name={product.name}
+              categoryName={categoryName}
+              size="md"
+            />
+          )}
+
+          {/* Quick-add button or In-Card Stepper */}
+          {!hasRequired ? (
+            inCartQty > 0 ? (
+              <div
+                className="absolute bottom-2 right-2 bg-white/95 backdrop-blur-md rounded-full shadow-lg border border-ink/10 flex items-center p-0.5"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  onClick={handleDecrement}
+                  aria-label={`Decrease ${product.name}`}
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-ink hover:bg-ink/5 active:scale-90 transition-transform"
+                >
+                  <Minus size={13} strokeWidth={2.5} />
+                </button>
+                <span className="font-display font-bold text-xs text-ink min-w-[20px] text-center px-0.5">
+                  {inCartQty}
+                </span>
+                <button
+                  onClick={handleQuickAdd}
+                  aria-label={`Increase ${product.name}`}
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-white active:scale-90 transition-transform shadow-sm"
+                  style={{ background: 'var(--color-primary)' }}
+                >
+                  <Plus size={13} strokeWidth={2.5} />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleQuickAdd}
+                aria-label={`Quick add ${product.name}`}
+                className="absolute bottom-2 right-2 w-8 h-8 rounded-full flex items-center justify-center shadow-md active:scale-90 transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
+                style={{
+                  background: 'var(--color-primary)',
+                  outlineColor: 'var(--color-primary)',
+                }}
+              >
+                <Plus size={16} className="text-white" strokeWidth={2.5} />
+              </button>
+            )
+          ) : (
+            totalItemQty > 0 && (
+              <div
+                className="absolute bottom-2 right-2 px-2 py-0.5 rounded-full text-[11px] font-bold shadow-sm"
+                style={{
+                  background: 'var(--color-primary)',
+                  color: 'var(--color-on-primary)',
+                }}
+              >
+                {totalItemQty} in cart
+              </div>
+            )
+          )}
+        </div>
+
+        <div className="p-3">
+          <p className="font-semibold text-ink text-sm leading-tight mb-1 line-clamp-2">
+            {product.name}
+          </p>
+          {product.description && (
+            <p className="text-xs text-ink-muted line-clamp-1 mb-1.5">
+              {product.description}
+            </p>
+          )}
+        </div>
       </div>
 
-      <div className="p-3">
-        <p className="font-semibold text-ink text-sm leading-tight mb-1 line-clamp-2">
-          {product.name}
-        </p>
+      <div className="px-3 pb-3 pt-0 flex items-center justify-between">
         <p className="font-display font-bold text-ink text-base">
           <Currency value={product.price} />
         </p>
         {hasRequired && (
-          <p className="text-xs text-ink-muted mt-1">Tap to customise</p>
+          <span
+            className="text-[10px] font-semibold px-2 py-0.5 rounded-md"
+            style={{
+              background: 'color-mix(in srgb, var(--color-primary) 10%, transparent)',
+              color: 'var(--color-primary-dark, #0F8077)',
+            }}
+          >
+            Options
+          </span>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── Horizontal Recommended / Popular Carousel ────────────────────────────────
+function PopularCarousel({ products, onOpen }) {
+  if (!products || products.length === 0) return null;
+
+  return (
+    <div className="pt-2 pb-4">
+      <div className="px-4 mb-2.5 flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <Sparkles size={16} className="text-amber" />
+          <h2 className="font-display font-bold text-base text-ink tracking-tight">
+            Popular & Chef's Picks
+          </h2>
+        </div>
+        <span className="text-[11px] font-medium text-ink-muted">
+          Table favorites
+        </span>
+      </div>
+
+      <div
+        className="flex gap-3 px-4 overflow-x-auto pb-1"
+        style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
+      >
+        {products.map((product) => (
+          <div
+            key={product._id}
+            onClick={() => onOpen(product)}
+            role="button"
+            tabIndex={0}
+            aria-label={`View popular item ${product.name}`}
+            className="w-40 shrink-0 bg-white rounded-2xl border border-ink/8 shadow-xs overflow-hidden cursor-pointer active:scale-[0.98] transition-all hover:shadow-md flex flex-col justify-between"
+          >
+            <div>
+              <div className="relative aspect-[4/3] overflow-hidden" style={{ background: 'var(--color-surface-wash)' }}>
+                {product.imageUrl ? (
+                  <img
+                    src={product.imageUrl}
+                    alt={product.name}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                ) : (
+                  <CulinaryPlaceholder
+                    name={product.name}
+                    categoryName="Popular"
+                    size="sm"
+                  />
+                )}
+                <span className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber text-white shadow-xs flex items-center gap-0.5">
+                  ★ Popular
+                </span>
+              </div>
+              <div className="p-2.5">
+                <p className="font-semibold text-ink text-xs line-clamp-1 leading-snug">
+                  {product.name}
+                </p>
+                <p className="font-display font-bold text-ink text-sm mt-0.5">
+                  <Currency value={product.price} />
+                </p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Floating Action Button: Go to Table Orders ────────────────────────────────
+function TableOrdersFAB({ tableOrders, onClick, hasCart }) {
+  if (!tableOrders || !tableOrders.rounds || tableOrders.rounds.length === 0) return null;
+
+  const roundCount = tableOrders.rounds.length;
+  const activeCount = tableOrders.summary?.activeCount ?? 0;
+  const latestRound = tableOrders.rounds[tableOrders.rounds.length - 1];
+  const totalAmount = tableOrders.summary?.totalAmount ?? 0;
+  const isAllServed = tableOrders.summary?.allServed;
+
+  return (
+    <div
+      className={clsx(
+        'fixed left-1/2 -translate-x-1/2 w-[calc(100%-32px)] max-w-[528px] z-30 transition-all duration-300',
+        hasCart ? 'bottom-24' : 'bottom-6'
+      )}
+      style={{ animation: 'slide-up-spring 400ms ease-out' }}
+    >
+      <button
+        onClick={onClick}
+        aria-label={`View table orders, ${roundCount} rounds`}
+        className="w-full rounded-2xl px-4 py-3.5 flex items-center justify-between shadow-2xl active:scale-[0.98] transition-transform text-white border border-white/15"
+        style={{
+          background: 'linear-gradient(135deg, #121A2C 0%, #1E293B 100%)',
+        }}
+      >
+        <div className="flex items-center gap-3">
+          <div className="relative flex items-center justify-center">
+            <div
+              className={clsx(
+                'w-3 h-3 rounded-full',
+                !isAllServed ? 'bg-leaf animate-pulse' : 'bg-emerald-400'
+              )}
+            />
+            {!isAllServed && (
+              <span className="absolute w-5 h-5 rounded-full bg-leaf/30 animate-ping" />
+            )}
+          </div>
+          <div className="text-left">
+            <p className="font-display font-bold text-sm leading-tight flex items-center gap-1.5">
+              <span>{roundCount === 1 ? 'Round 1 Active' : `Table Orders (${roundCount} Rounds)`}</span>
+              <span className="text-[11px] font-normal text-white/70">
+                · {isAllServed ? 'All Served' : latestRound.status}
+              </span>
+            </p>
+            <p className="text-[11px] text-white/60 mt-0.5">
+              Total: {formatBirr(totalAmount)} · Tap to view details
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-xl bg-white/10 text-white">
+          <span>Track</span>
+          <ChevronRight size={14} />
+        </div>
+      </button>
     </div>
   );
 }
@@ -343,7 +563,7 @@ function ProductCard({ product, categoryName, onOpen }) {
 function CartBar({ itemCount, subtotal, onTap }) {
   return (
     <div
-      className="sticky-bottom px-4"
+      className="sticky-bottom px-4 z-40"
       style={{ animation: 'slide-up-spring 500ms cubic-bezier(0.34,1.56,0.64,1)' }}
     >
       <button
@@ -351,7 +571,7 @@ function CartBar({ itemCount, subtotal, onTap }) {
         aria-label={`View cart — ${itemCount} items, ${formatBirr(subtotal)}`}
         className="w-full rounded-2xl px-5 py-4 flex items-center justify-between shadow-xl active:scale-[0.98] transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
         style={{
-          background:   'var(--color-primary)',
+          background: 'var(--color-primary)',
           outlineColor: 'var(--color-primary)',
         }}
       >
@@ -373,17 +593,27 @@ function CartBar({ itemCount, subtotal, onTap }) {
 
 // ── Main Menu page ────────────────────────────────────────────────────────────
 export default function Menu() {
-  const navigate  = useNavigate();
-  const session   = useSessionStore();
+  const navigate = useNavigate();
+  const session = useSessionStore();
   const itemCount = useCartStore(cartItemCount);
-  const subtotal  = useCartStore(cartSubtotal);
+  const subtotal = useCartStore(cartSubtotal);
 
-  const [activeCat, setActiveCat]       = useState(null);
+  const [activeCat, setActiveCat] = useState(null);
   const [sheetProduct, setSheetProduct] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [slideDirection, setSlideDirection] = useState('none'); // 'left' | 'right' | 'none'
+  const [coverImgError, setCoverImgError] = useState(false);
+  const [logoImgError, setLogoImgError] = useState(false);
+
   const catRowRef = useRef(null);
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
 
   const { restaurant, branch, table } = session;
   const restaurantId = restaurant?._id;
+
+  useEffect(() => { setCoverImgError(false); }, [restaurant?.coverUrl]);
+  useEffect(() => { setLogoImgError(false); }, [restaurant?.logoUrl]);
 
   // Re-apply brand color in case session was restored from localStorage
   useEffect(() => {
@@ -398,7 +628,7 @@ export default function Menu() {
     return () => { document.title = 'LayoScan'; };
   }, [restaurant?.name]);
 
-  // Keep restaurant branding/metadata updated if owner changes logo/cover/theme
+  // Keep restaurant branding/metadata updated
   const { data: tableData } = useQuery({
     queryKey: ['table-resolve', session.qrToken],
     queryFn: () => api.get(`/public/table/${session.qrToken}`).then((r) => r.data),
@@ -418,6 +648,7 @@ export default function Menu() {
     }
   }, [tableData]);
 
+  // Fetch public products
   const { data, isLoading } = useQuery({
     queryKey: ['public-products', restaurantId],
     queryFn: () =>
@@ -426,17 +657,36 @@ export default function Menu() {
     staleTime: 60_000,
   });
 
+  // Query table orders for active rounds & floating action button
+  const { data: tableOrders } = useQuery({
+    queryKey: ['table-orders', session.sessionToken],
+    queryFn: () =>
+      api.get('/orders/public/table/orders', {
+        params: { sessionToken: session.sessionToken },
+      }).then((r) => r.data),
+    enabled: !!session.sessionToken,
+    refetchInterval: 8_000,
+  });
+
   const products = data?.products ?? [];
 
   // Build categories from populated products
-  const categories = (() => {
+  const categories = useMemo(() => {
     const seen = new Map();
     for (const p of products) {
       const cat = p.categoryId;
       if (cat && !seen.has(cat._id)) seen.set(cat._id, cat);
     }
     return [...seen.values()].sort((a, b) => a.sortOrder - b.sortOrder);
-  })();
+  }, [products]);
+
+  // Popular / Recommended items
+  const popularProducts = useMemo(() => {
+    if (!products || products.length === 0) return [];
+    const withImages = products.filter((p) => p.imageUrl);
+    if (withImages.length >= 3) return withImages.slice(0, 8);
+    return products.slice(0, 6);
+  }, [products]);
 
   useEffect(() => {
     if (categories.length > 0 && !activeCat) {
@@ -444,31 +694,68 @@ export default function Menu() {
     }
   }, [categories, activeCat]);
 
-  const visibleProducts = activeCat
-    ? products.filter((p) => p.categoryId?._id === activeCat)
-    : products;
+  // Filtered products: if searching, search all products; otherwise filter by active category
+  const filteredProducts = useMemo(() => {
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      return products.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          (p.description && p.description.toLowerCase().includes(q)) ||
+          (p.categoryId?.name && p.categoryId.name.toLowerCase().includes(q))
+      );
+    }
+    return activeCat
+      ? products.filter((p) => p.categoryId?._id === activeCat)
+      : products;
+  }, [products, activeCat, searchQuery]);
 
-  const handleCatClick = (catId) => {
+  const handleCatClick = (catId, direction = 'none') => {
+    setSlideDirection(direction);
     setActiveCat(catId);
     const el = document.getElementById(`cat-chip-${catId}`);
     el?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
   };
 
+  // ── Swipe gestures between categories ───────────────────────────────────────
+  const handleTouchStart = (e) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e) => {
+    if (categories.length <= 1 || searchQuery.trim()) return;
+
+    const diffX = e.changedTouches[0].clientX - touchStartX.current;
+    const diffY = e.changedTouches[0].clientY - touchStartY.current;
+
+    // Minimum horizontal swipe distance of 45px, with horizontal movement dominating vertical scroll
+    if (Math.abs(diffX) > 45 && Math.abs(diffX) > Math.abs(diffY) * 1.3) {
+      const currentIndex = categories.findIndex((c) => c._id === activeCat);
+      if (currentIndex === -1) return;
+
+      if (diffX < 0 && currentIndex < categories.length - 1) {
+        // Swiped left -> Next category
+        handleCatClick(categories[currentIndex + 1]._id, 'left');
+      } else if (diffX > 0 && currentIndex > 0) {
+        // Swiped right -> Previous category
+        handleCatClick(categories[currentIndex - 1]._id, 'right');
+      }
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-paper max-w-[560px] mx-auto relative">
+    <div className="min-h-screen bg-paper max-w-[560px] mx-auto relative flex flex-col">
       {/* ── Header / Cover ─────────────────────────────────────────────── */}
-      <div className="relative h-56 overflow-hidden">
-        {restaurant?.coverUrl ? (
-          <img
-            src={restaurant.coverUrl}
-            alt={`${restaurant.name} cover`}
-            className="w-full h-full object-cover"
-            loading="eager"
-          />
-        ) : (
-          <div className="w-full h-full gradient-cover-fallback" />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-ink/85 via-ink/40 to-transparent" />
+      <div className="relative h-56 overflow-hidden shrink-0">
+        <img
+          src={getRestaurantCover(restaurant, coverImgError)}
+          alt={`${restaurant?.name || 'Restaurant'} cover`}
+          className="w-full h-full object-cover"
+          loading="eager"
+          onError={() => setCoverImgError(true)}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-ink/95 via-ink/60 to-transparent" />
 
         {/* Top-right customer actions */}
         <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
@@ -483,74 +770,136 @@ export default function Menu() {
         </div>
 
         <div className="absolute bottom-0 left-0 right-0 px-5 pb-4 flex items-end gap-3">
-          {restaurant?.logoUrl && (
-            <img
-              src={restaurant.logoUrl}
-              alt={`${restaurant.name} logo`}
-              className="w-12 h-12 rounded-2xl border-2 border-white/30 shadow-md object-cover shrink-0"
-              loading="eager"
-            />
-          )}
+          <img
+            src={getRestaurantLogo(restaurant, logoImgError)}
+            alt={`${restaurant?.name || 'Restaurant'} logo`}
+            className="w-14 h-14 rounded-2xl border-2 border-white/40 shadow-lg object-cover shrink-0 bg-white"
+            loading="eager"
+            onError={() => setLogoImgError(true)}
+          />
           <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between gap-2">
-              <h1 className="font-display font-bold text-white text-xl leading-tight truncate">
-                {restaurant?.name}
-              </h1>
-            </div>
-            <p className="text-white/70 text-xs font-medium mt-0.5">
-              {branch?.name} · {table?.label}
+            <h1 className="font-display font-bold text-white text-xl leading-tight truncate drop-shadow-sm">
+              {restaurant?.name}
+            </h1>
+            <p className="text-white/85 text-xs font-semibold mt-0.5">
+              {branch?.name} · <span className="underline decoration-leaf underline-offset-2">{table?.label}</span>
             </p>
             {(restaurant?.contactInfo?.address || branch?.address) && (
-              <p className="text-white/65 text-xs mt-1 flex items-center gap-1 truncate">
+              <p className="text-white/70 text-xs mt-1 flex items-center gap-1 truncate">
                 <MapPin size={11} /> {restaurant?.contactInfo?.address || branch.address}
-              </p>
-            )}
-            {restaurant?.description && (
-              <p className="text-white/80 text-xs mt-1 leading-snug line-clamp-2">
-                {restaurant.description}
               </p>
             )}
           </div>
         </div>
       </div>
 
-      {/* ── Sticky category chip row ──────────────────────────────────── */}
-      <div className="sticky top-0 z-10 bg-paper/95 backdrop-blur-sm border-b border-ink/6">
-        <div
-          ref={catRowRef}
-          role="tablist"
-          aria-label="Menu categories"
-          className="flex items-center gap-2 px-4 py-3 overflow-x-auto"
-          style={{ scrollbarWidth: 'none' }}
-        >
-          {categories.map((cat) => {
-            const isActive = activeCat === cat._id;
-            return (
-              <button
-                key={cat._id}
-                id={`cat-chip-${cat._id}`}
-                role="tab"
-                aria-selected={isActive}
-                onClick={() => handleCatClick(cat._id)}
-                className="shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                style={isActive ? {
-                  background:   'var(--color-surface-wash)',
-                  color:        'var(--color-primary-dark, var(--color-primary))',
-                  outlineColor: 'var(--color-primary)',
-                } : {
-                  background: 'rgba(18,26,44,0.05)',
-                  color:      '#5B6B7A',
-                }}
-              >
-                {cat.name}
-              </button>
-            );
-          })}
+      {/* ── Search & Filter Bar ───────────────────────────────────────── */}
+      <div className="px-4 pt-3 pb-1 bg-paper">
+        <div className="relative flex items-center">
+          <Search size={16} className="absolute left-3.5 text-ink-muted pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search coffee, dishes, drinks…"
+            className="w-full pl-9 pr-9 py-2.5 rounded-2xl bg-white border border-ink/8 text-sm placeholder:text-ink-muted/70 focus:outline-none focus:border-primary shadow-xs transition-all"
+            style={{ '--tw-border-opacity': '1' }}
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 w-5 h-5 rounded-full bg-ink/10 flex items-center justify-center text-ink-muted hover:text-ink"
+            >
+              <X size={12} />
+            </button>
+          )}
         </div>
       </div>
 
-      {/* ── Product grid ─────────────────────────────────────────────── */}
-      <div className="px-4 py-4" style={{ paddingBottom: itemCount > 0 ? '96px' : '8px' }}>
+      {/* ── Popular & Chef's Picks section (when not searching) ───────── */}
+      {!searchQuery && popularProducts.length > 0 && (
+        <PopularCarousel
+          products={popularProducts}
+          onOpen={setSheetProduct}
+        />
+      )}
+
+      {/* ── Sticky category chip row (hidden when searching) ─────────── */}
+      {!searchQuery && (
+        <div className="sticky top-0 z-20 bg-paper/95 backdrop-blur-md border-b border-ink/6 shadow-xs">
+          <div
+            ref={catRowRef}
+            role="tablist"
+            aria-label="Menu categories"
+            className="flex items-center gap-2 px-4 py-2.5 overflow-x-auto"
+            style={{ scrollbarWidth: 'none' }}
+          >
+            {categories.map((cat) => {
+              const isActive = activeCat === cat._id;
+              const count = products.filter((p) => p.categoryId?._id === cat._id).length;
+              return (
+                <button
+                  key={cat._id}
+                  id={`cat-chip-${cat._id}`}
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => handleCatClick(cat._id)}
+                  className="shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 flex items-center gap-1.5"
+                  style={isActive ? {
+                    background:   'var(--color-surface-wash)',
+                    color:        'var(--color-primary-dark, var(--color-primary))',
+                    outlineColor: 'var(--color-primary)',
+                    boxShadow:    '0 1px 3px rgba(0,0,0,0.05)',
+                  } : {
+                    background: 'rgba(18,26,44,0.05)',
+                    color:      '#5B6B7A',
+                  }}
+                >
+                  <span>{cat.name}</span>
+                  {count > 0 && (
+                    <span
+                      className="text-[11px] font-normal px-1.5 py-0.2 rounded-full"
+                      style={isActive ? {
+                        background: 'color-mix(in srgb, var(--color-primary) 15%, transparent)',
+                        color: 'var(--color-primary-dark, #0F8077)'
+                      } : {
+                        background: 'rgba(18,26,44,0.08)',
+                        color: '#718096'
+                      }}
+                    >
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Product grid with Touch Gesture Swipe ─────────────────────── */}
+      <div
+        className="px-4 py-3 flex-1"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        style={{
+          paddingBottom: itemCount > 0 ? '110px' : tableOrders?.rounds?.length > 0 ? '90px' : '30px',
+        }}
+      >
+        {searchQuery && (
+          <div className="flex items-center justify-between mb-3 text-xs text-ink-muted">
+            <span>
+              {filteredProducts.length} item{filteredProducts.length !== 1 ? 's' : ''} found
+            </span>
+            <button
+              onClick={() => setSearchQuery('')}
+              className="text-xs font-semibold text-primary underline"
+            >
+              Clear search
+            </button>
+          </div>
+        )}
+
         {isLoading ? (
           <div className="grid grid-cols-2 gap-3 mt-2">
             {[...Array(6)].map((_, i) => (
@@ -563,17 +912,32 @@ export default function Menu() {
               </div>
             ))}
           </div>
-        ) : visibleProducts.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-ink-muted text-sm">No items in this category yet.</p>
+        ) : filteredProducts.length === 0 ? (
+          <div className="text-center py-16">
+            <UtensilsCrossed size={36} className="mx-auto text-ink/20 mb-3" />
+            <p className="font-display font-semibold text-ink text-base">
+              {searchQuery ? 'No matching items found' : 'No items in this category yet'}
+            </p>
+            <p className="text-ink-muted text-xs mt-1">
+              {searchQuery ? 'Try checking for typos or searching a different term.' : 'Please select another category above.'}
+            </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3" role="list" aria-label="Menu items">
-            {visibleProducts.map((p) => (
+          <div
+            key={activeCat + (searchQuery ? '-search' : '')}
+            className={clsx(
+              'grid grid-cols-2 gap-3',
+              slideDirection === 'left' && 'anim-slide-left',
+              slideDirection === 'right' && 'anim-slide-right'
+            )}
+            role="list"
+            aria-label="Menu items"
+          >
+            {filteredProducts.map((p) => (
               <div key={p._id} role="listitem">
                 <ProductCard
                   product={p}
-                  categoryName={categories.find((c) => c._id === activeCat)?.name || ''}
+                  categoryName={categories.find((c) => c._id === p.categoryId?._id)?.name || ''}
                   onOpen={setSheetProduct}
                 />
               </div>
@@ -581,11 +945,21 @@ export default function Menu() {
           </div>
         )}
 
-        {/* Powered by LayoScan mark */}
+        {/* High-visibility Powered by LayoScan */}
         <PoweredBy />
       </div>
 
-      {/* ── Cart bar ─────────────────────────────────────────────────── */}
+      {/* ── Floating Action Button: Go to Table Orders ────────────────── */}
+      <TableOrdersFAB
+        tableOrders={tableOrders}
+        hasCart={itemCount > 0}
+        onClick={() => {
+          const latest = tableOrders?.rounds?.[tableOrders.rounds.length - 1];
+          navigate(latest ? `/order/${latest.id}` : '/orders');
+        }}
+      />
+
+      {/* ── Sticky Cart Bar ───────────────────────────────────────────── */}
       {itemCount > 0 && (
         <CartBar
           itemCount={itemCount}
@@ -594,11 +968,11 @@ export default function Menu() {
         />
       )}
 
-      {/* ── Product detail sheet ─────────────────────────────────────── */}
+      {/* ── Product detail modal sheet ────────────────────────────────── */}
       {sheetProduct && (
         <ProductSheet
           product={sheetProduct}
-          categoryName={categories.find((c) => c._id === activeCat)?.name || ''}
+          categoryName={categories.find((c) => c._id === sheetProduct.categoryId?._id)?.name || ''}
           onClose={() => setSheetProduct(null)}
         />
       )}

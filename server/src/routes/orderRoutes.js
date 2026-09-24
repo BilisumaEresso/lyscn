@@ -4,6 +4,7 @@ const {
   placeOrder,
   listOrders,
   getOrderStatus,
+  getTableOrders,
   updateOrderStatus,
   updateOrderPayment,
   submitOrderFeedback,
@@ -15,6 +16,7 @@ const { publicWriteLimiter, tableResolveLimiter } = require('../middleware/rateL
 // ── Public routes (customer-facing, no auth) ──────────────────────────────────
 // Registered BEFORE router.use(protect) to skip the auth guard
 router.post('/public', publicWriteLimiter, placeOrder);
+router.get('/public/table/orders', tableResolveLimiter, getTableOrders);
 router.get('/public/:id/status', tableResolveLimiter, getOrderStatus);
 router.patch('/public/:id/feedback', publicWriteLimiter, submitOrderFeedback);
 

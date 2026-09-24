@@ -1,21 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Phone, Mail, MapPin } from 'lucide-react';
 import { applyBrandColor } from '../lib/theme';
 import { useSessionStore } from '../store/sessionStore';
-import logo from '../assets/logo.png';
-
-// ── "Powered by LayoScan" mark ────────────────────────────────────────────────
-function PoweredBy() {
-  return (
-    <div className="flex items-center justify-center gap-1.5 py-6 opacity-40">
-      <img src={logo} alt="" aria-hidden="true" className="w-4 h-4 rounded object-cover" loading="lazy" />
-      <span className="text-[10px] text-ink-muted font-medium tracking-wide">
-        Powered by LayoScan
-      </span>
-    </div>
-  );
-}
+import PoweredBy from '../components/PoweredBy';
+import { getRestaurantLogo, getRestaurantCover } from '../lib/branding';
 
 // ── Single-color inline brand SVG icons ───────────────────────────────────────
 function InstagramIcon({ className = 'w-5 h-5', style }) {
@@ -79,6 +68,12 @@ export default function About() {
     return () => { document.title = 'LayoScan'; };
   }, [restaurant?.name]);
 
+  const [coverImgError, setCoverImgError] = useState(false);
+  const [logoImgError, setLogoImgError] = useState(false);
+
+  useEffect(() => { setCoverImgError(false); }, [restaurant?.coverUrl]);
+  useEffect(() => { setLogoImgError(false); }, [restaurant?.logoUrl]);
+
   const contact = restaurant?.contactInfo || {};
   const phone = contact.phone?.trim();
   const email = contact.email?.trim();
@@ -104,15 +99,12 @@ export default function About() {
     <div className="min-h-screen bg-paper max-w-[560px] mx-auto flex flex-col relative pb-8">
       {/* ── Expressive Hero Section ────────────────────────────────────────── */}
       <div className="relative h-64 overflow-hidden">
-        {restaurant?.coverUrl ? (
-          <img
-            src={restaurant.coverUrl}
-            alt={`${restaurant.name} cover`}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full gradient-cover-fallback" />
-        )}
+        <img
+          src={getRestaurantCover(restaurant, coverImgError)}
+          alt={`${restaurant?.name || 'Restaurant'} cover`}
+          className="w-full h-full object-cover"
+          onError={() => setCoverImgError(true)}
+        />
         <div className="absolute inset-0 bg-gradient-to-t from-ink/90 via-ink/40 to-black/20" />
 
         {/* Floating Top Nav (Back to Menu) */}
@@ -129,22 +121,12 @@ export default function About() {
 
         {/* Hero Branding Info */}
         <div className="absolute bottom-0 inset-x-0 p-6 flex flex-col items-center text-center">
-          {restaurant?.logoUrl ? (
-            <img
-              src={restaurant.logoUrl}
-              alt={`${restaurant.name} logo`}
-              className="w-20 h-20 rounded-3xl border-4 border-white/40 shadow-xl object-cover -mb-3 z-10"
-            />
-          ) : (
-            <div
-              className="w-20 h-20 rounded-3xl border-4 border-white/40 shadow-xl flex items-center justify-center -mb-3 z-10"
-              style={{ background: 'var(--color-primary)', color: 'var(--color-on-primary)' }}
-            >
-              <span className="font-display font-bold text-3xl">
-                {restaurant?.name?.[0]?.toUpperCase() || 'R'}
-              </span>
-            </div>
-          )}
+          <img
+            src={getRestaurantLogo(restaurant, logoImgError)}
+            alt={`${restaurant?.name || 'Restaurant'} logo`}
+            className="w-20 h-20 rounded-3xl border-4 border-white/40 shadow-xl object-cover -mb-3 z-10 bg-white"
+            onError={() => setLogoImgError(true)}
+          />
         </div>
       </div>
 

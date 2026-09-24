@@ -18,6 +18,7 @@ import Modal from '../components/ui/Modal';
 import EmptyState from '../components/ui/EmptyState';
 import Spinner from '../components/ui/Spinner';
 import logoImg from '../assets/logo.png';
+import cafeLogoPlaceholder from '../assets/cafe_logo_placeholder.png';
 
 const CUSTOMER_URL = import.meta.env.VITE_CUSTOMER_APP_URL;
 const PREFIX_CHIPS = ['Table', 'Booth', 'Patio', 'VIP', 'Bar', 'Outdoor'];
@@ -150,7 +151,7 @@ function QRModal({ table, open, onClose }) {
             <div className="relative mb-2 mt-1">
               <div className="w-14 h-14 rounded-full border-2 border-[#884D25]/40 shadow-sm bg-white p-0.5 flex items-center justify-center overflow-hidden">
                 <img
-                  src={restaurant?.logoUrl || logoImg}
+                  src={restaurant?.logoUrl || cafeLogoPlaceholder || logoImg}
                   alt={restaurant?.name || 'Restaurant'}
                   className="w-full h-full object-cover rounded-full"
                 />

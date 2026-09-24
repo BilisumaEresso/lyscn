@@ -10,6 +10,8 @@ import api from '../lib/api';
 import { applyBrandColor } from '../lib/theme';
 import { useSessionStore } from '../store/sessionStore';
 import { useCartStore, cartItemCount, cartSubtotal } from '../store/cartStore';
+import PoweredBy from '../components/PoweredBy';
+import { getRestaurantLogo } from '../lib/branding';
 
 export default function Checkout() {
   const navigate    = useNavigate();
@@ -22,9 +24,12 @@ export default function Checkout() {
 
   const [guestName, setGuestName] = useState(session.guestName || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [logoImgError, setLogoImgError] = useState(false);
   const clientOrderIdRef = useRef(uuidv4());
 
   const { restaurant, branch, table, sessionId, sessionToken } = session;
+
+  useEffect(() => { setLogoImgError(false); }, [restaurant?.logoUrl]);
 
   // Re-apply brand color on refresh
   useEffect(() => {
@@ -118,19 +123,30 @@ export default function Checkout() {
   return (
     <div className="min-h-screen bg-paper max-w-[560px] mx-auto pb-40">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-paper/95 backdrop-blur-sm border-b border-ink/6 px-4 py-4 flex items-center gap-3">
+      <div className="sticky top-0 z-10 bg-paper/95 backdrop-blur-sm border-b border-ink/6 px-4 py-3.5 flex items-center gap-3">
         <button
           onClick={() => navigate(-1)}
           aria-label="Go back"
-          className="w-9 h-9 rounded-xl bg-ink/6 flex items-center justify-center focus-visible:outline focus-visible:outline-2"
+          className="w-9 h-9 rounded-xl bg-ink/6 flex items-center justify-center focus-visible:outline focus-visible:outline-2 shrink-0"
           style={{ outlineColor: 'var(--color-primary)' }}
         >
           <ChevronLeft size={20} className="text-ink" />
         </button>
-        <h1 className="font-display font-bold text-xl text-ink">
-          {session.orderHistory?.length > 0 ? `Next round (#${session.orderHistory.length + 1})` : 'Your order'}
-        </h1>
-        <div className="ml-auto flex items-center gap-1.5">
+        <img
+          src={getRestaurantLogo(restaurant, logoImgError)}
+          alt={restaurant?.name || 'Restaurant'}
+          className="w-8 h-8 rounded-xl object-cover border border-ink/10 bg-white shrink-0 shadow-2xs"
+          onError={() => setLogoImgError(true)}
+        />
+        <div className="flex-1 min-w-0">
+          <h1 className="font-display font-bold text-lg text-ink leading-tight truncate">
+            {session.orderHistory?.length > 0 ? `Next round (#${session.orderHistory.length + 1})` : 'Your order'}
+          </h1>
+          <p className="text-[11px] text-ink-muted truncate">
+            {restaurant?.name}
+          </p>
+        </div>
+        <div className="ml-auto flex items-center gap-1.5 shrink-0">
           <span className="text-xs px-2.5 py-1 rounded-full bg-ink/6 font-semibold text-ink">
             {table?.label}
           </span>
@@ -217,6 +233,8 @@ export default function Checkout() {
             Online payment isn't available yet — your server will bring your bill.
           </p>
         </div>
+
+        <PoweredBy />
       </div>
 
       {/* Sticky footer */}
