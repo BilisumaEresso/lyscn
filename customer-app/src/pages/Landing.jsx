@@ -156,7 +156,7 @@ export default function Landing() {
     if (!trimmed) return;
 
     const match = trimmed.match(/\/t\/([a-zA-Z0-9_-]+)/);
-    const token = match ? match[1] : trimmed;
+    const token = match ? match[1] : trimmed.replace(/[\s-]/g, '');
 
     navigate(`/t/${token}`);
   };

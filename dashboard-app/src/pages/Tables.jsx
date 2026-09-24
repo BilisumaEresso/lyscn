@@ -4,13 +4,13 @@ import toast from 'react-hot-toast';
 import {
   Plus, Download, RefreshCw, QrCode, ChevronDown, ChevronUp, Archive,
   Trash2, Edit2, Check, X, Layers, AlertTriangle, MoreVertical, Clock3,
-  Sparkles, ListChecks, RotateCcw, Search, SlidersHorizontal, Users, CircleCheck, CircleDot, MapPin
+  Sparkles, ListChecks, RotateCcw, Search, SlidersHorizontal, Users, CircleCheck, CircleDot, MapPin, Copy
 } from 'lucide-react';
 import api from '../lib/api';
 import socket from '../lib/socket';
 import { useAuthStore } from '../store/authStore';
 import { generateThemeFromColor } from '../lib/theme';
-import { createStyledQR, downloadTableCard, downloadAllTablesZip } from '../lib/qrCardComposer';
+import { createStyledQR, downloadTableCard, downloadAllTablesZip, formatTableCode } from '../lib/qrCardComposer';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Toggle from '../components/ui/Toggle';
@@ -104,67 +104,128 @@ function QRModal({ table, open, onClose }) {
     }
   };
 
+  const formattedCode = formatTableCode(table?.qrToken);
+
+  const handleCopyCode = () => {
+    if (table?.qrToken) {
+      navigator.clipboard?.writeText(table.qrToken);
+      toast.success('Table code copied to clipboard!');
+    }
+  };
+
   if (!table) return null;
 
   return (
     <Modal open={open} onClose={onClose} title={`Table Card — ${table.label}`} size="md">
       <div className="flex flex-col items-center gap-5">
+        {/* ── Vintage Stationery Card Preview ────────────────────────────── */}
         <div
-          className="w-full max-w-sm rounded-3xl p-6 border border-ink/10 shadow-lg flex flex-col items-center relative overflow-hidden transition-all"
+          className="w-full max-w-sm rounded-[32px] p-3.5 border-2 border-[#884D25]/35 shadow-xl flex flex-col items-center relative overflow-hidden transition-all"
           style={{
-            background: `linear-gradient(160deg, ${theme.surfaceWash} 0%, #FFFFFF 60%, ${theme.surfaceWash} 100%)`,
+            background: 'linear-gradient(180deg, #FAF7F1 0%, #F5ECE0 100%)',
             animation: 'qr-reveal 300ms ease-out',
           }}
         >
-          <div className="absolute top-0 inset-x-0 h-2.5" style={{ backgroundColor: theme.primary }} />
+          {/* Inner scalloped vintage border container */}
+          <div className="w-full rounded-[24px] border border-[#884D25]/25 p-5 flex flex-col items-center relative bg-transparent">
+            {/* Top-left botanical sprig decoration */}
+            <svg
+              className="absolute top-2 left-2 w-14 h-14 text-[#884D25]/30 pointer-events-none"
+              viewBox="0 0 100 100"
+              fill="currentColor"
+            >
+              <path d="M10,10 Q30,20 50,60 Q70,90 90,95 M20,15 Q40,-5 55,10 Q35,30 20,15 M35,35 Q10,40 5,60 Q30,55 35,35 M50,55 Q75,40 85,60 Q65,75 50,55 M65,75 Q45,95 40,100 Q65,95 65,75" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+            </svg>
 
-          <div className="flex flex-col items-center mb-4 mt-1 text-center">
-            <div className="w-12 h-12 rounded-xl overflow-hidden shadow-sm border border-ink/10 mb-2 bg-white flex items-center justify-center">
-              <img
-                src={restaurant?.logoUrl || logoImg}
-                alt="Logo"
-                className="w-full h-full object-cover"
-              />
+            {/* Bottom-right botanical sprig decoration */}
+            <svg
+              className="absolute bottom-2 right-2 w-14 h-14 text-[#884D25]/30 pointer-events-none rotate-180"
+              viewBox="0 0 100 100"
+              fill="currentColor"
+            >
+              <path d="M10,10 Q30,20 50,60 Q70,90 90,95 M20,15 Q40,-5 55,10 Q35,30 20,15 M35,35 Q10,40 5,60 Q30,55 35,35 M50,55 Q75,40 85,60 Q65,75 50,55 M65,75 Q45,95 40,100 Q65,95 65,75" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+            </svg>
+
+            {/* Header: Circular Logo Badge */}
+            <div className="relative mb-2 mt-1">
+              <div className="w-14 h-14 rounded-full border-2 border-[#884D25]/40 shadow-sm bg-white p-0.5 flex items-center justify-center overflow-hidden">
+                <img
+                  src={restaurant?.logoUrl || logoImg}
+                  alt={restaurant?.name || 'Restaurant'}
+                  className="w-full h-full object-cover rounded-full"
+                />
+              </div>
             </div>
-            <h3 className="font-display font-bold text-lg text-ink leading-tight">
+
+            {/* Restaurant Name */}
+            <h3 className="font-serif font-bold text-xl text-[#241810] leading-tight text-center tracking-tight">
               {restaurant?.name || 'LayoScan'}
             </h3>
-            <div
-              className="w-12 h-0.5 rounded-full mt-1"
-              style={{ backgroundColor: theme.primaryLight || theme.primary }}
-            />
-          </div>
+            <div className="w-8 h-0.5 bg-[#884D25]/40 rounded-full mt-1 mb-1.5" />
 
-          <div className="relative p-3 mb-4">
-            <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 rounded-tl-xl" style={{ borderColor: theme.primaryDark || theme.primary }} />
-            <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 rounded-tr-xl" style={{ borderColor: theme.primaryDark || theme.primary }} />
-            <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 rounded-bl-xl" style={{ borderColor: theme.primaryDark || theme.primary }} />
-            <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 rounded-br-xl" style={{ borderColor: theme.primaryDark || theme.primary }} />
+            {/* Location Tag */}
+            <p className="text-xs text-[#6E5C51] font-medium flex items-center gap-1 mb-4 text-center">
+              <MapPin size={11} className="text-[#884D25]" />
+              <span>{restaurant?.contactInfo?.address || 'Addis Ababa, Ethiopia'}</span>
+            </p>
 
-            <div
-              ref={qrContainerRef}
-              className="p-3 bg-white rounded-2xl shadow-sm border border-ink/8 flex items-center justify-center overflow-hidden"
-              style={{ width: '234px', height: '234px' }}
-            />
-          </div>
+            {/* QR Code Container */}
+            <div className="p-2.5 bg-white rounded-2xl shadow-md border border-[#884D25]/25 flex items-center justify-center overflow-hidden mb-4">
+              <div
+                ref={qrContainerRef}
+                style={{ width: '210px', height: '210px' }}
+                className="flex items-center justify-center"
+              />
+            </div>
 
-          <p className="text-xs font-semibold text-ink-muted uppercase tracking-wider mb-1">
-            Scan to order
-          </p>
-          <div
-            className="px-6 py-1.5 rounded-xl font-display font-bold text-lg shadow-sm border"
-            style={{
-              backgroundColor: theme.surfaceWash || '#E6FAF8',
-              color: theme.primaryDark || theme.primary,
-              borderColor: theme.primaryLight || theme.primary,
-            }}
-          >
-            {table.label}
-          </div>
+            {/* Scan Divider with Viewfinder Bracket */}
+            <div className="w-full flex items-center justify-center gap-2 mb-1.5">
+              <div className="h-px bg-[#884D25]/25 flex-1 max-w-[60px]" />
+              <div className="flex items-center justify-center text-[#884D25]">
+                <QrCode size={14} strokeWidth={2} />
+              </div>
+              <div className="h-px bg-[#884D25]/25 flex-1 max-w-[60px]" />
+            </div>
 
-          <div className="flex items-center gap-1.5 mt-4 opacity-40">
-            <img src={logoImg} alt="" className="w-3.5 h-3.5 rounded object-cover" />
-            <span className="text-[10px] text-ink-muted font-medium">Powered by LayoScan</span>
+            <p className="text-[10px] font-semibold text-[#6E5C51] uppercase tracking-[0.2em] mb-2.5">
+              Scan to order
+            </p>
+
+            {/* Table Badge Pill (Rich dark vintage button) */}
+            <div className="px-7 py-2 rounded-full bg-[#3E2415] text-white font-serif font-bold text-base shadow-md border border-white/25 tracking-wide mb-3">
+              {table.label}
+            </div>
+
+            {/* Manual Table Code Badge (for customer manual entry) */}
+            <div className="w-full bg-white/80 backdrop-blur-xs rounded-xl border border-dashed border-[#884D25]/45 px-3 py-2 flex flex-col items-center gap-0.5 shadow-2xs">
+              <span className="text-[9px] font-semibold text-[#856F62] uppercase tracking-wider">
+                Enter code manually on menu:
+              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="font-mono font-bold text-xs text-[#2D1B10] tracking-wider">
+                  {formattedCode}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleCopyCode}
+                  title="Copy table code"
+                  className="p-1 text-[#884D25] hover:bg-[#884D25]/10 rounded transition-colors"
+                >
+                  <Copy size={11} />
+                </button>
+              </div>
+              <span className="text-[9px] text-[#856F62]/80">
+                layoscancustomer.vercel.app
+              </span>
+            </div>
+
+            {/* Prominent "Powered by LayoScan" Footer Badge */}
+            <div className="mt-3.5 px-3.5 py-1 rounded-full bg-white/95 border border-[#884D25]/30 shadow-2xs flex items-center gap-1.5">
+              <img src={logoImg} alt="LayoScan" className="w-3.5 h-3.5 rounded object-cover" />
+              <span className="text-[10px] font-bold text-[#1E1510]">
+                Powered by <span className="text-[#884D25]">LayoScan</span>
+              </span>
+            </div>
           </div>
         </div>
 

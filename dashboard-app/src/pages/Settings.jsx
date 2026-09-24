@@ -152,6 +152,25 @@ export default function Settings() {
     });
   };
 
+  const handleBrandImageChange = async (field, url) => {
+    const cleanUrl = url ? url.trim() : null;
+    setValue(field, cleanUrl || "", { shouldDirty: true, shouldValidate: true });
+    try {
+      const res = await api.patch("/restaurants/me", { [field]: cleanUrl });
+      if (res.data?.success && res.data?.restaurant) {
+        setRestaurant(res.data.restaurant);
+        qc.invalidateQueries({ queryKey: ["restaurant-me"] });
+        toast.success(
+          cleanUrl
+            ? `${field === "logoUrl" ? "Restaurant logo" : "Cover banner"} saved`
+            : `${field === "logoUrl" ? "Restaurant logo" : "Cover banner"} removed`
+        );
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || `Failed to save ${field === "logoUrl" ? "logo" : "cover"}`);
+    }
+  };
+
   const handleColorChange = (colorHex) => {
     setValue("brandColor", colorHex, {
       shouldDirty: true,
@@ -311,12 +330,14 @@ export default function Settings() {
             title="Branding images"
             description="Logo and cover banner shown on customer menu and QR code landing."
           />
+          <input type="hidden" {...register("logoUrl")} />
+          <input type="hidden" {...register("coverUrl")} />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <ImageUploader
               label="Restaurant Logo"
               description="Uploaded to Cloudinary. Appears on QR cards, customer header, and bill receipts."
               value={logoUrl}
-              onChange={(url) => setValue("logoUrl", url, { shouldDirty: true, shouldValidate: true })}
+              onChange={(url) => handleBrandImageChange("logoUrl", url)}
               folder="branding"
               aspectRatio="square"
             />
@@ -324,7 +345,7 @@ export default function Settings() {
               label="Cover Banner Photo"
               description="Uploaded to Cloudinary. High-res banner image displayed at the top of your customer menu."
               value={coverUrl}
-              onChange={(url) => setValue("coverUrl", url, { shouldDirty: true, shouldValidate: true })}
+              onChange={(url) => handleBrandImageChange("coverUrl", url)}
               folder="branding"
               aspectRatio="banner"
             />

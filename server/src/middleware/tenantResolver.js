@@ -18,16 +18,20 @@ const resolveTenantFromAuth = (req, res, next) => {
  */
 const resolveTenantFromTable = async (req, res, next) => {
   try {
-    const qrToken = req.params.qrToken || req.query.qrToken;
+    const rawToken = req.params.qrToken || req.query.qrToken;
 
-    if (!qrToken) {
+    if (!rawToken || typeof rawToken !== 'string') {
       return res.status(400).json({
         success: false,
         message: 'QR token is required.',
       });
     }
 
-    const table = await Table.findOne({ qrToken, isActive: true });
+    const qrToken = rawToken.trim();
+    const table = await Table.findOne({
+      qrToken: { $regex: new RegExp(`^${qrToken}$`, 'i') },
+      isActive: true,
+    });
 
     if (!table) {
       return res.status(404).json({

@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react';
-import { Upload, Trash2, Loader2, RefreshCw, Cloud, CheckCircle2 } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Upload, Trash2, Loader2, RefreshCw, Cloud, CheckCircle2, ImageOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 import api from '../../lib/api';
@@ -21,7 +21,12 @@ export default function ImageUploader({
 }) {
   const [isUploading, setIsUploading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [hasImgError, setHasImgError] = useState(false);
   const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    setHasImgError(false);
+  }, [value]);
 
   const isCloudinaryUrl = typeof value === 'string' && value.includes('res.cloudinary.com');
 
@@ -122,14 +127,19 @@ export default function ImageUploader({
                 aspectRatio === 'banner' ? 'h-40' : aspectRatio === 'square' ? 'h-36' : 'h-44'
               )}
             >
-              <img
-                src={value}
-                alt="Uploaded preview"
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                }}
-              />
+              {!hasImgError ? (
+                <img
+                  src={value}
+                  alt="Uploaded preview"
+                  className="w-full h-full object-cover"
+                  onError={() => setHasImgError(true)}
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center gap-1.5 p-4 text-ink/50 text-center">
+                  <ImageOff size={24} className="text-ink/40" />
+                  <span className="text-[11px] font-medium">Image preview unavailable</span>
+                </div>
+              )}
 
               {isUploading && (
                 <div className="absolute inset-0 bg-ink/65 backdrop-blur-xs flex items-center justify-center text-white gap-2 text-xs font-medium z-20">

@@ -453,11 +453,12 @@ function ProductPanel({ product, selectedCategory, restaurantId, onClose, onSave
           </div>
           {/* Image & Artwork Section */}
           <div className="space-y-3">
+            <input type="hidden" {...register('imageUrl')} />
             <ImageUploader
               label="Product Photo (Cloudinary)"
               description={`Upload a photo to Cloudinary or leave blank to display ambient culinary artwork matched to ${categoryName || 'this item'}.`}
               value={typedImageUrl}
-              onChange={(url) => setValue('imageUrl', url, { shouldDirty: true })}
+              onChange={(url) => setValue('imageUrl', url || '', { shouldDirty: true, shouldValidate: true })}
               folder="products"
               aspectRatio="square"
             />
