@@ -10,6 +10,7 @@
     "dev": "nodemon server.js",
     "start": "node server.js",
     "seed": "node src/utils/seed.js",
+    "clear-urls": "node scripts/clear-urls.js",
     "lint": "eslint .",
     "test": "jest --forceExit --detectOpenHandles"
   },

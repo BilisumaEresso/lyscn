@@ -1,13 +1,14 @@
 import { useState, useRef } from 'react';
-import { Upload, Image as ImageIcon, Trash2, Link as LinkIcon, Loader2, RefreshCw } from 'lucide-react';
+import { Upload, Trash2, Loader2, RefreshCw, Cloud, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 import api from '../../lib/api';
 
 /**
  * ImageUploader component for LayoScan dashboard.
- * Supports direct drag-and-drop upload to Cloudinary via backend (/api/upload),
- * as well as direct URL paste input.
+ * Dedicated direct-to-Cloudinary image uploader.
+ * Uploads image files directly to the server's Cloudinary storage (/api/upload)
+ * and stores the resulting public Cloudinary URL.
  */
 export default function ImageUploader({
   value = '',
@@ -20,9 +21,9 @@ export default function ImageUploader({
 }) {
   const [isUploading, setIsUploading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
-  const [showUrlInput, setShowUrlInput] = useState(false);
-  const [urlDraft, setUrlDraft] = useState('');
   const fileInputRef = useRef(null);
+
+  const isCloudinaryUrl = typeof value === 'string' && value.includes('res.cloudinary.com');
 
   const handleFileChange = async (file) => {
     if (!file) return;
@@ -49,7 +50,7 @@ export default function ImageUploader({
 
       if (res.data?.success && res.data?.url) {
         onChange(res.data.url);
-        toast.success('Image uploaded to Cloudinary');
+        toast.success('Image uploaded directly to Cloudinary');
       } else {
         toast.error('Upload failed. Please try again.');
       }
@@ -80,58 +81,25 @@ export default function ImageUploader({
     setIsDragOver(false);
   };
 
-  const handleToggleUrlMode = () => {
-    setShowUrlInput((prev) => {
-      const next = !prev;
-      if (next) {
-        setUrlDraft(value || '');
-      }
-      return next;
-    });
-  };
-
-  const handleUrlApply = () => {
-    const trimmed = urlDraft.trim();
-    onChange(trimmed);
-    setShowUrlInput(false);
-    if (trimmed) {
-      toast.success('Image URL set');
-    } else {
-      toast.success('Image removed');
-    }
+  const handleRemove = () => {
+    onChange('');
+    toast.success('Image removed');
   };
 
   return (
     <div className={clsx('space-y-2', className)}>
+      {/* Header */}
       {label && (
         <div className="flex items-center justify-between">
           <label className="block text-xs font-semibold uppercase tracking-wider text-ink/70">
             {label}
           </label>
-          <div className="flex items-center gap-3">
-            {value && (
-              <button
-                type="button"
-                onClick={() => {
-                  onChange('');
-                  setUrlDraft('');
-                  toast.success('Image removed');
-                }}
-                className="text-[11px] text-danger hover:underline flex items-center gap-1 font-medium"
-              >
-                <Trash2 size={12} />
-                Remove
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={handleToggleUrlMode}
-              className="text-[11px] text-teal hover:underline flex items-center gap-1 font-medium"
-            >
-              <LinkIcon size={12} />
-              {showUrlInput ? 'Upload file' : 'Paste URL'}
-            </button>
-          </div>
+          {value && (
+            <span className="inline-flex items-center gap-1 text-[11px] text-teal font-medium">
+              <Cloud size={12} />
+              {isCloudinaryUrl ? 'Cloudinary Hosted' : 'Image Set'}
+            </span>
+          )}
         </div>
       )}
 
@@ -139,100 +107,95 @@ export default function ImageUploader({
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/png,image/jpeg,image/webp,image/gif"
         onChange={(e) => handleFileChange(e.target.files?.[0])}
         className="hidden"
       />
 
-      {showUrlInput ? (
-        /* Manual URL paste mode */
-        <div className="space-y-2">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={urlDraft}
-              onChange={(e) => setUrlDraft(e.target.value)}
-              placeholder="https://res.cloudinary.com/... or image link"
-              className="flex-1 px-3 py-2 text-xs rounded-xl border border-ink/15 bg-paper focus:outline-none focus:ring-2 focus:ring-teal/30"
-            />
-            <button
-              type="button"
-              onClick={handleUrlApply}
-              className="px-3 py-2 rounded-xl text-xs font-semibold bg-teal text-white hover:opacity-90 active:scale-95 transition-all"
+      {value ? (
+        /* Preview mode with active image */
+        <div className="space-y-2.5">
+          <div className="relative group rounded-2xl border border-ink/12 overflow-hidden bg-ink/4 shadow-xs">
+            <div
+              className={clsx(
+                'w-full relative flex items-center justify-center bg-ink/2 overflow-hidden',
+                aspectRatio === 'banner' ? 'h-40' : aspectRatio === 'square' ? 'h-36' : 'h-44'
+              )}
             >
-              {urlDraft.trim() ? 'Apply' : 'Clear'}
-            </button>
-          </div>
-          {value && (
-            <div className="flex items-center justify-between text-[11px] text-ink-muted">
-              <span className="truncate max-w-[260px]">Current: {value}</span>
+              <img
+                src={value}
+                alt="Uploaded preview"
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                }}
+              />
+
+              {isUploading && (
+                <div className="absolute inset-0 bg-ink/65 backdrop-blur-xs flex items-center justify-center text-white gap-2 text-xs font-medium z-20">
+                  <Loader2 size={20} className="animate-spin text-teal" />
+                  Uploading directly to Cloudinary…
+                </div>
+              )}
+            </div>
+
+            {/* Desktop hover actions overlay */}
+            <div className="absolute inset-0 bg-ink/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2.5 z-10">
               <button
                 type="button"
-                onClick={() => {
-                  onChange('');
-                  setUrlDraft('');
-                  setShowUrlInput(false);
-                  toast.success('Image removed');
-                }}
-                className="text-danger hover:underline shrink-0 ml-2"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="px-3.5 py-2 rounded-xl bg-white text-ink text-xs font-semibold flex items-center gap-1.5 shadow-md hover:bg-white/95 transition-transform active:scale-95"
               >
-                Remove image
+                <RefreshCw size={13} /> Change Image
+              </button>
+              <button
+                type="button"
+                onClick={handleRemove}
+                disabled={isUploading}
+                className="px-3.5 py-2 rounded-xl bg-danger text-white text-xs font-semibold flex items-center gap-1.5 shadow-md hover:bg-danger/90 transition-transform active:scale-95"
+              >
+                <Trash2 size={13} /> Remove
               </button>
             </div>
-          )}
-        </div>
-      ) : value ? (
-        /* Preview mode with existing image */
-        <div className="relative group rounded-2xl border border-ink/12 overflow-hidden bg-ink/4 shadow-xs">
-          <div
-            className={clsx(
-              'w-full relative flex items-center justify-center bg-ink/2 overflow-hidden',
-              aspectRatio === 'banner' ? 'h-36' : aspectRatio === 'square' ? 'h-32' : 'h-40'
-            )}
-          >
-            <img
-              src={value}
-              alt="Uploaded thumbnail"
-              className="w-full h-full object-cover"
-            />
-            {isUploading && (
-              <div className="absolute inset-0 bg-ink/60 backdrop-blur-xs flex items-center justify-center text-white gap-2 text-xs font-medium">
-                <Loader2 size={18} className="animate-spin text-teal" />
-                Uploading…
-              </div>
-            )}
           </div>
 
-          {/* Hover overlay actions */}
-          <div className="absolute inset-0 bg-ink/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-              className="px-3 py-1.5 rounded-lg bg-white/90 hover:bg-white text-ink text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-transform active:scale-95"
-            >
-              <RefreshCw size={13} /> Change
-            </button>
-            <button
-              type="button"
-              onClick={() => onChange('')}
-              disabled={isUploading}
-              className="px-3 py-1.5 rounded-lg bg-danger/90 hover:bg-danger text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-transform active:scale-95"
-            >
-              <Trash2 size={13} /> Remove
-            </button>
+          {/* Always-visible action buttons below preview (mobile & accessibility friendly) */}
+          <div className="flex items-center justify-between gap-2 px-1">
+            <div className="flex items-center gap-1.5 text-[11px] text-ink-muted truncate">
+              <CheckCircle2 size={13} className="text-teal shrink-0" />
+              <span className="truncate max-w-[200px] sm:max-w-xs">{value}</span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="px-2.5 py-1 text-xs font-medium text-ink bg-ink/6 hover:bg-ink/10 rounded-lg flex items-center gap-1 transition-colors active:scale-95"
+              >
+                <RefreshCw size={11} /> Change
+              </button>
+              <button
+                type="button"
+                onClick={handleRemove}
+                disabled={isUploading}
+                className="px-2.5 py-1 text-xs font-medium text-danger hover:bg-danger/10 rounded-lg flex items-center gap-1 transition-colors active:scale-95"
+              >
+                <Trash2 size={11} /> Remove
+              </button>
+            </div>
           </div>
         </div>
       ) : (
-        /* Upload Drag & Drop Dropzone */
+        /* Direct Upload Drag & Drop Dropzone */
         <div
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onClick={() => fileInputRef.current?.click()}
           className={clsx(
-            'border-2 border-dashed rounded-2xl p-4 transition-all cursor-pointer flex flex-col items-center justify-center text-center group',
-            aspectRatio === 'banner' ? 'h-32' : 'h-28',
+            'border-2 border-dashed rounded-2xl p-5 transition-all cursor-pointer flex flex-col items-center justify-center text-center group select-none',
+            aspectRatio === 'banner' ? 'h-36' : 'h-32',
             isDragOver
               ? 'border-teal bg-teal/5 scale-[1.01]'
               : 'border-ink/15 hover:border-teal/50 hover:bg-ink/2 bg-paper'
@@ -241,18 +204,18 @@ export default function ImageUploader({
           {isUploading ? (
             <div className="flex flex-col items-center gap-2 text-teal">
               <Loader2 size={24} className="animate-spin" />
-              <span className="text-xs font-semibold">Uploading to Cloudinary…</span>
+              <span className="text-xs font-semibold">Uploading directly to Cloudinary…</span>
             </div>
           ) : (
             <>
-              <div className="w-9 h-9 rounded-full bg-ink/6 group-hover:bg-teal/10 flex items-center justify-center mb-1.5 transition-colors">
-                <Upload size={18} className="text-ink/50 group-hover:text-teal transition-colors" />
+              <div className="w-10 h-10 rounded-full bg-ink/6 group-hover:bg-teal/10 flex items-center justify-center mb-2 transition-colors">
+                <Upload size={18} className="text-ink/60 group-hover:text-teal transition-colors" />
               </div>
               <p className="text-xs font-semibold text-ink group-hover:text-teal transition-colors">
                 Click or drag image to upload
               </p>
               <p className="text-[11px] text-ink-muted mt-0.5">
-                PNG, JPG, WebP up to 5MB · Cloudinary auto-optimized
+                PNG, JPG, WebP up to 5MB · Auto-stored on Cloudinary
               </p>
             </>
           )}

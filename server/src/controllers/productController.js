@@ -87,6 +87,10 @@ const createProduct = async (req, res, next) => {
 // ── PATCH /api/products/:id ───────────────────────────────────────────────────
 const updateProduct = async (req, res, next) => {
   try {
+    if (req.body.imageUrl !== undefined && typeof req.body.imageUrl === 'string') {
+      req.body.imageUrl = req.body.imageUrl.trim() || null;
+    }
+
     const product = await Product.findOneAndUpdate(
       { _id: req.params.id, restaurantId: req.tenantId },
       req.body,
