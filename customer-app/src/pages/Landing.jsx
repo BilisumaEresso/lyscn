@@ -1,12 +1,15 @@
 import { Html5Qrcode } from "html5-qrcode";
-import { AlertCircle, ArrowRight, Camera, QrCode, X } from "lucide-react";
+import { AlertCircle, ArrowRight, Camera, QrCode, X, UtensilsCrossed, MapPin } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import logo from "../assets/logo.png";
+import cafeLogoPlaceholder from "../assets/cafe_logo_placeholder.png";
 import { useInstallPrompt } from "../hooks/useInstallPrompt";
 import { applyBrandColor } from "../lib/theme";
 import { useSessionStore } from "../store/sessionStore";
 import { getRestaurantLogo } from "../lib/branding";
+import PoweredBy from "../components/PoweredBy";
+import { getVisitedRestaurants, clearVisitedRestaurants } from "../lib/visitedRestaurants";
 
 /**
  * NOTE ON SECURITY & CAMERA PERMISSIONS:
@@ -19,6 +22,7 @@ export default function Landing() {
   const navigate = useNavigate();
   const session = useSessionStore();
 
+  const [visitedRestaurants, setVisitedRestaurants] = useState([]);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [showManual, setShowManual] = useState(false);
   const [manualCode, setManualCode] = useState("");
@@ -50,6 +54,26 @@ export default function Landing() {
       setInstallBannerDismissed(true);
     }
   }, []);
+
+  // Load visited cafes & restaurants
+  useEffect(() => {
+    const list = getVisitedRestaurants();
+    if (list.length === 0 && session?.restaurant?.name) {
+      const seed = [{
+        id: session.restaurant._id || session.restaurant.name,
+        name: session.restaurant.name,
+        slug: session.restaurant.slug || '',
+        logoUrl: session.restaurant.logoUrl || null,
+        brandColor: session.restaurant.brandColor || '#14B8A6',
+        address: session.restaurant.contactInfo?.address || session.branch?.address || '',
+        qrToken: session.qrToken || null,
+        lastVisited: new Date().toISOString(),
+      }];
+      setVisitedRestaurants(seed);
+    } else {
+      setVisitedRestaurants(list);
+    }
+  }, [session?.restaurant, session?.branch, session?.qrToken]);
 
   const showInstallBanner =
     hasRememberedSession && canInstall && !installBannerDismissed;
@@ -241,24 +265,73 @@ export default function Landing() {
           Scan Now
         </button>
 
-        {/* Remembered Session Shortcut */}
-        {hasRememberedSession && (
-          <button
-            onClick={() => navigate("/menu")}
-            className="mt-4 w-full py-3 px-4 rounded-2xl font-display font-semibold text-sm border border-ink/12 text-ink hover:bg-ink/5 flex items-center justify-between gap-3 transition-all min-w-0 bg-white/70 shadow-xs active:scale-[0.99]"
-          >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <img
-                src={getRestaurantLogo(session.restaurant)}
-                alt=""
-                className="w-7 h-7 rounded-lg object-cover border border-ink/10 shrink-0 bg-white"
-              />
-              <span className="truncate text-left text-xs font-semibold">
-                Continue to {session.restaurant.name} ({session.table.label})
-              </span>
+        {/* ── Visited Cafes & Restaurants List ────────────────────── */}
+        {visitedRestaurants.length > 0 && (
+          <div className="mt-6 w-full text-left">
+            <div className="flex items-center justify-between mb-2.5 px-1">
+              <h2 className="font-display font-bold text-xs uppercase tracking-wider text-ink-muted flex items-center gap-1.5">
+                <UtensilsCrossed size={13} className="text-teal" />
+                Cafes & Restaurants You&apos;ve Visited
+              </h2>
+              <button
+                type="button"
+                onClick={() => {
+                  clearVisitedRestaurants();
+                  setVisitedRestaurants([]);
+                }}
+                className="text-[11px] text-ink-muted hover:text-danger transition-colors font-medium"
+              >
+                Clear
+              </button>
             </div>
-            <ArrowRight size={16} className="text-teal shrink-0" />
-          </button>
+
+            <div className="space-y-2.5">
+              {visitedRestaurants.map((place) => (
+                <div
+                  key={place.id}
+                  onClick={() => {
+                    if (place.qrToken) {
+                      navigate(`/t/${place.qrToken}`);
+                    } else {
+                      navigate("/menu");
+                    }
+                  }}
+                  className="w-full p-3.5 rounded-2xl border border-ink/10 bg-white/95 shadow-2xs hover:border-teal/50 hover:shadow-md transition-all flex items-center justify-between gap-3 cursor-pointer group active:scale-[0.99]"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <img
+                      src={place.logoUrl || cafeLogoPlaceholder}
+                      alt={place.name}
+                      className="w-10 h-10 rounded-xl object-cover border border-ink/10 shrink-0 bg-white shadow-2xs"
+                      onError={(e) => {
+                        e.currentTarget.src = cafeLogoPlaceholder;
+                      }}
+                    />
+                    <div className="min-w-0">
+                      <p className="font-display font-bold text-sm text-ink truncate group-hover:text-teal transition-colors">
+                        {place.name}
+                      </p>
+                      <p className="text-[11px] text-ink-muted truncate mt-0.5 flex items-center gap-1">
+                        {place.address ? (
+                          <>
+                            <MapPin size={11} className="shrink-0 text-ink/40" />
+                            <span>{place.address}</span>
+                          </>
+                        ) : (
+                          <span>Visited recently</span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0 text-xs font-semibold text-teal group-hover:translate-x-0.5 transition-transform">
+                    <span>Menu</span>
+                    <ArrowRight size={14} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
 
         {showInstallBanner && (
@@ -328,13 +401,8 @@ export default function Landing() {
         </div>
       </div>
 
-      {/* ── Footer ────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-1.5 opacity-35">
-        <img src={logo} alt="" className="w-4 h-4 rounded object-cover" />
-        <span className="text-[11px] text-ink-muted font-medium tracking-wide">
-          Powered by LayoScan
-        </span>
-      </div>
+      {/* ── High-visibility Powered by LayoScan ──────────────────────── */}
+      <PoweredBy className="mt-8 mb-2" />
 
       {/* ── FULL-SCREEN CAMERA SCANNER OVERLAY ───────────────────────── */}
       {isScannerOpen && (

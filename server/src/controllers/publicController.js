@@ -48,11 +48,28 @@ const resolveQRCode = async (req, res, next) => {
 
     if (
       table.status === 'occupied' &&
-      table.sessionExpiresAt &&
-      table.sessionExpiresAt <= now &&
-      !hasOrders
+      !hasOrders &&
+      (req.query.freshSession === 'true' || req.query.newSession === 'true')
     ) {
-      await releaseTable(table, io);
+      // Client explicitly requested a fresh session and no active orders remain on table.
+      table.activeSessionToken = crypto.randomBytes(24).toString('hex');
+      table.occupiedSince = now;
+      table.sessionExpiresAt = new Date(now.getTime() + 30 * 60 * 1000);
+      table.sessionLocationVerified = null;
+      await table.save();
+      if (io) io.to(`restaurant:${table.restaurantId}`).emit('table:updated', table);
+    } else if (
+      table.status === 'occupied' &&
+      table.sessionExpiresAt &&
+      table.sessionExpiresAt <= now
+    ) {
+      if (!hasOrders) {
+        await releaseTable(table, io);
+      } else {
+        // Active orders remain: extend session
+        table.sessionExpiresAt = new Date(now.getTime() + 30 * 60 * 1000);
+        await table.save();
+      }
     }
 
     if (table.status === 'available') {

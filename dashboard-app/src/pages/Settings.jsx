@@ -6,6 +6,11 @@ import {
   Settings as SettingsIcon,
   Upload,
   Check,
+  Volume2,
+  VolumeX,
+  Bell,
+  Play,
+  Monitor,
 } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { useForm } from "react-hook-form";
@@ -17,6 +22,8 @@ import ImageUploader from "../components/ui/ImageUploader";
 import { useInstallPrompt } from "../hooks/useInstallPrompt";
 import api from "../lib/api";
 import { useAuthStore } from "../store/authStore";
+import { useNotificationStore } from "../store/notificationStore";
+import { playSoundByType } from "../lib/soundEffects";
 
 function SectionHeader({ title, description }) {
   return (
@@ -34,6 +41,48 @@ export default function Settings() {
   const qc = useQueryClient();
   const [locationSaving, setLocationSaving] = useState(false);
   const { canInstall, promptInstall } = useInstallPrompt();
+
+  // Notification & Sound Store
+  const {
+    soundEnabled,
+    soundVolume,
+    eventSounds,
+    desktopNotificationsEnabled,
+    setSoundEnabled,
+    setSoundVolume,
+    setEventSound,
+    setDesktopNotificationsEnabled,
+  } = useNotificationStore();
+
+  const [desktopPermission, setDesktopPermission] = useState(
+    typeof window !== 'undefined' && 'Notification' in window
+      ? Notification.permission
+      : 'unsupported'
+  );
+
+  const handleRequestDesktopPermission = async () => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      toast.error('Browser desktop notifications are not supported on this device.');
+      return;
+    }
+    try {
+      const permission = await Notification.requestPermission();
+      setDesktopPermission(permission);
+      if (permission === 'granted') {
+        setDesktopNotificationsEnabled(true);
+        toast.success('Desktop notifications enabled!');
+        new Notification('LayoScan Alerts Active', {
+          body: 'You will receive background alerts when orders or requests arrive.',
+          icon: '/favicon.ico',
+        });
+      } else {
+        setDesktopNotificationsEnabled(false);
+        toast.error('Notification permission was denied or dismissed.');
+      }
+    } catch {
+      toast.error('Failed to request notification permission.');
+    }
+  };
 
   // Fetch latest restaurant data
   const { data, isLoading } = useQuery({
@@ -485,6 +534,205 @@ export default function Settings() {
                 </span>
               </span>
             </label>
+          </div>
+        </section>
+
+        {/* ── Notifications & Real-Time Sound Alerts ─────────────────────── */}
+        <section className="bg-white rounded-2xl border border-ink/8 p-6 shadow-2xs">
+          <SectionHeader
+            title="Notifications & Sound Alerts"
+            description="Customize audio chimes, event triggers, and browser background notifications"
+          />
+
+          <div className="space-y-6">
+            {/* Master Sound Controls */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-paper/70 border border-ink/8">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                    soundEnabled ? "bg-teal/15 text-teal" : "bg-ink/5 text-ink-muted"
+                  }`}
+                >
+                  {soundEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-ink">Master Sound Alerts</p>
+                  <p className="text-xs text-ink-muted">
+                    {soundEnabled
+                      ? "Audio chimes are currently active"
+                      : "All audio alerts are muted"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4 flex-wrap sm:flex-nowrap">
+                {/* Volume Slider */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-ink-muted">Volume</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={soundVolume}
+                    onChange={(e) => setSoundVolume(parseFloat(e.target.value))}
+                    disabled={!soundEnabled}
+                    className="w-24 sm:w-28 accent-teal cursor-pointer disabled:opacity-40"
+                  />
+                  <span className="text-xs font-mono text-ink-muted w-8 text-right">
+                    {Math.round(soundVolume * 100)}%
+                  </span>
+                </div>
+
+                {/* Master Switch Button */}
+                <Button
+                  type="button"
+                  variant={soundEnabled ? "outline" : "primary"}
+                  size="sm"
+                  onClick={() => {
+                    const next = !soundEnabled;
+                    setSoundEnabled(next);
+                    if (next) playSoundByType("order_created", soundVolume);
+                  }}
+                >
+                  {soundEnabled ? "Mute All" : "Enable Audio"}
+                </Button>
+              </div>
+            </div>
+
+            {/* Event Specific Sound Cues */}
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-ink-muted mb-3">
+                Event Sound Triggers & Previews
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {[
+                  {
+                    id: "order_created",
+                    label: "New Order Placed",
+                    sub: "Ascending 2-tone melodic chime",
+                  },
+                  {
+                    id: "order_ready",
+                    label: "Order Ready for Pickup",
+                    sub: "Bright upward tri-tone fanfare",
+                  },
+                  {
+                    id: "assistance",
+                    label: "Guest Call / Bill Request",
+                    sub: "Attention-grabbing double pulse ding",
+                  },
+                  {
+                    id: "table_occupied",
+                    label: "Table Occupied",
+                    sub: "Warm presence welcoming duo-tone",
+                  },
+                  {
+                    id: "table_ready_to_clear",
+                    label: "Table Ready to Clear",
+                    sub: "Crisp double bussing chime",
+                  },
+                  {
+                    id: "order_cancelled",
+                    label: "Order Cancelled",
+                    sub: "Downward warning tone",
+                  },
+                ].map(({ id, label, sub }) => (
+                  <div
+                    key={id}
+                    className="p-3 rounded-xl border border-ink/8 bg-white hover:border-ink/15 transition-all flex items-center justify-between gap-3"
+                  >
+                    <label className="flex items-start gap-2.5 cursor-pointer min-w-0">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(eventSounds?.[id])}
+                        onChange={(e) => setEventSound(id, e.target.checked)}
+                        disabled={!soundEnabled}
+                        className="mt-0.5 accent-teal rounded disabled:opacity-40"
+                      />
+                      <div className="min-w-0">
+                        <span className="block text-xs font-semibold text-ink truncate">
+                          {label}
+                        </span>
+                        <span className="block text-[11px] text-ink-muted truncate">
+                          {sub}
+                        </span>
+                      </div>
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={() => playSoundByType(id, soundVolume)}
+                      className="p-1.5 rounded-lg border border-ink/10 text-ink-muted hover:text-teal hover:border-teal/40 transition-colors shrink-0 text-xs flex items-center gap-1"
+                      title={`Test ${label} sound`}
+                    >
+                      <Play size={11} />
+                      <span className="text-[10px]">Test</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Desktop Browser Notifications */}
+            <div className="p-4 rounded-xl border border-ink/8 bg-paper/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+                  <Monitor size={18} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-ink">
+                      Desktop Push Notifications
+                    </p>
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                        desktopPermission === "granted"
+                          ? "bg-emerald-100 text-emerald-800"
+                          : desktopPermission === "denied"
+                          ? "bg-rose-100 text-rose-800"
+                          : "bg-amber-100 text-amber-800"
+                      }`}
+                    >
+                      {desktopPermission}
+                    </span>
+                  </div>
+                  <p className="text-xs text-ink-muted mt-0.5">
+                    {desktopPermission === "granted"
+                      ? "Active. You will receive notifications when the dashboard is minimized or in a background tab."
+                      : desktopPermission === "denied"
+                      ? "Blocked by browser permissions. Allow notifications in your browser address bar settings."
+                      : "Receive instant desktop popups when new orders and table requests arrive."}
+                  </p>
+                </div>
+              </div>
+
+              <div className="shrink-0">
+                {desktopPermission !== "granted" ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRequestDesktopPermission}
+                    disabled={desktopPermission === "denied"}
+                  >
+                    Enable Notifications
+                  </Button>
+                ) : (
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-ink">
+                    <input
+                      type="checkbox"
+                      checked={desktopNotificationsEnabled}
+                      onChange={(e) =>
+                        setDesktopNotificationsEnabled(e.target.checked)
+                      }
+                      className="accent-teal rounded"
+                    />
+                    Deliver in background
+                  </label>
+                )}
+              </div>
+            </div>
           </div>
         </section>
 

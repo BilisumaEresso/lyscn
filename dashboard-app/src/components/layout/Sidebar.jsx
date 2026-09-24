@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
   LayoutDashboard, UtensilsCrossed, QrCode,
   ClipboardList, Settings, LogOut, X, Download, MapPin, Users, AlertTriangle
@@ -20,11 +21,41 @@ export default function Sidebar({ isOpen, onClose }) {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Fetch orders and assistance for ambient badges
+  const { data: ordersData } = useQuery({
+    queryKey: ['orders-kanban'],
+    queryFn: () => api.get('/orders').then((r) => r.data),
+    staleTime: 30_000,
+  });
+
+  const { data: assistanceData } = useQuery({
+    queryKey: ['assistance'],
+    queryFn: () => api.get('/assistance').then((r) => r.data),
+    staleTime: 30_000,
+  });
+
+  const placedOrdersCount = ordersData?.orders?.filter((o) => o.status === 'placed').length || 0;
+  const pendingAssistanceCount = assistanceData?.assistance?.filter(
+    (a) => a.status === 'pending' || a.status === 'acknowledged'
+  ).length || 0;
+
   const navItems = [
     { to: '/',        icon: LayoutDashboard, label: 'Dashboard', end: true },
     { to: '/menu',    icon: UtensilsCrossed, label: 'Menu' },
-    { to: '/tables',  icon: QrCode,          label: 'Tables' },
-    { to: '/orders',  icon: ClipboardList,   label: 'Orders' },
+    {
+      to: '/tables',
+      icon: QrCode,
+      label: 'Tables',
+      badge: pendingAssistanceCount,
+      badgeColor: 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+    },
+    {
+      to: '/orders',
+      icon: ClipboardList,
+      label: 'Orders',
+      badge: placedOrdersCount,
+      badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+    },
     ...(user?.role === 'owner' || user?.role === 'manager'
       ? [{ to: '/staff', icon: Users, label: 'Staff' }]
       : []),
@@ -108,7 +139,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
       {/* ── Navigation ──────────────────────────────────────────────── */}
       <nav className="flex-1 overflow-y-auto py-3 px-2.5" aria-label="Main navigation">
-        {navItems.map(({ to, icon: Icon, label, end }) => (
+        {navItems.map(({ to, icon: Icon, label, end, badge, badgeColor }) => (
           <NavLink
             key={to}
             to={to}
@@ -137,7 +168,16 @@ export default function Sidebar({ isOpen, onClose }) {
                   strokeWidth={isActive ? 2.25 : 1.75}
                   className="shrink-0"
                 />
-                {label}
+                <span className="flex-1 truncate">{label}</span>
+                {badge > 0 && (
+                  <span
+                    className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full border shrink-0 ${
+                      badgeColor || 'bg-white/10 text-white border-white/20'
+                    }`}
+                  >
+                    {badge > 99 ? '99+' : badge}
+                  </span>
+                )}
               </>
             )}
           </NavLink>

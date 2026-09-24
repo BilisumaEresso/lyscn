@@ -12,31 +12,6 @@ import clsx from 'clsx';
 import api from '../lib/api';
 import socket from '../lib/socket';
 
-// ── Web Audio: soft two-tone beep (no external audio file) ────────────────────
-function playNewOrderBeep() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const play = (freq, start, duration) => {
-      const osc  = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.type      = 'sine';
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0, ctx.currentTime + start);
-      gain.gain.linearRampToValueAtTime(0.18, ctx.currentTime + start + 0.02);
-      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + start + duration);
-      osc.start(ctx.currentTime + start);
-      osc.stop(ctx.currentTime + start + duration + 0.05);
-    };
-    play(880, 0,    0.15);  // A5 tone
-    play(1100, 0.18, 0.18); // C#6 tone
-    setTimeout(() => ctx.close(), 1000);
-  } catch {
-    // Silent fallback
-  }
-}
-
 // ── Time & Formatting Helpers ────────────────────────────────────────────────
 function timeAgo(date, now = Date.now()) {
   const secs = Math.max(0, Math.floor((now - new Date(date).getTime()) / 1000));
@@ -673,9 +648,6 @@ export default function Orders() {
 
     const onOrderCreated = (order) => {
       qc.setQueryData(['orders-kanban'], (old) => mergeOrder(old, order));
-      const label = order.tableId?.label ?? 'a table';
-      toast.success(`New order — ${label}`, { duration: 5000, icon: '🔔' });
-      playNewOrderBeep();
       highlight(order._id);
     };
 

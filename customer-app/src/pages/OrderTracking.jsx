@@ -13,6 +13,8 @@ import {
   Utensils,
   AlertCircle,
   Sparkles,
+  Trash2,
+  RotateCcw,
 } from 'lucide-react';
 import clsx from 'clsx';
 import api from '../lib/api';
@@ -427,24 +429,41 @@ export default function OrderTracking() {
                     </span>
                   )}
                 </span>
-                <span
-                  className="text-xs px-2.5 py-1 rounded-full font-bold capitalize border"
-                  style={
-                    isServedRound
-                      ? {
-                          background: 'rgba(85,230,165,0.18)',
-                          color: '#0F8077',
-                          borderColor: 'rgba(85,230,165,0.4)',
-                        }
-                      : {
-                          background: 'color-mix(in srgb, var(--color-primary) 12%, transparent)',
-                          color: 'var(--color-primary)',
-                          borderColor: 'color-mix(in srgb, var(--color-primary) 25%, transparent)',
-                        }
-                  }
-                >
-                  {currentRound.status === 'served' ? 'Served ✓' : currentRound.status}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className="text-xs px-2.5 py-1 rounded-full font-bold capitalize border"
+                    style={
+                      isServedRound
+                        ? {
+                            background: 'rgba(85,230,165,0.18)',
+                            color: '#0F8077',
+                            borderColor: 'rgba(85,230,165,0.4)',
+                          }
+                        : {
+                            background: 'color-mix(in srgb, var(--color-primary) 12%, transparent)',
+                            color: 'var(--color-primary)',
+                            borderColor: 'color-mix(in srgb, var(--color-primary) 25%, transparent)',
+                          }
+                    }
+                  >
+                    {currentRound.status === 'served' ? 'Served ✓' : currentRound.status}
+                  </span>
+                  {(isServedRound || isCancelled) && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        session.dismissRound(currentRound.id);
+                        toast.success(`Round #${currentRound.roundNumber} dismissed`);
+                      }}
+                      className="p-1 rounded-lg text-ink-muted hover:text-danger hover:bg-danger/10 transition-colors"
+                      title="Dismiss this round from view"
+                      aria-label="Dismiss this round"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div aria-label="Order status" role="status" aria-live="polite">
@@ -574,6 +593,28 @@ export default function OrderTracking() {
         </div>
       </div>
 
+      {/* ── Meal Complete & Paid Card ─────────────────────────────────── */}
+      {summary.allServed && summary.allPaid && (
+        <div className="mx-4 my-2.5 p-4 rounded-3xl bg-emerald-50 border border-emerald-200/80 shadow-xs flex flex-col items-center text-center">
+          <span className="text-2xl mb-1">🎉</span>
+          <h4 className="font-display font-bold text-base text-ink">Meal Complete & Paid</h4>
+          <p className="text-xs text-ink-muted mt-0.5 mb-3 max-w-xs leading-relaxed">
+            All rounds have been served and paid for. Ready to start a brand new order at this table?
+          </p>
+          <button
+            onClick={() => {
+              session.startFreshSession();
+              toast.success('Session reset! You can now place a brand new order.');
+              navigate('/menu');
+            }}
+            className="px-5 py-2.5 rounded-2xl font-display font-bold text-xs text-white shadow-sm active:scale-95 transition-all flex items-center gap-1.5"
+            style={{ background: 'var(--color-primary)' }}
+          >
+            <Sparkles size={14} /> Start Fresh Order
+          </button>
+        </div>
+      )}
+
       {/* ── Table Bill & Payment Summary Card ─────────────────────────── */}
       <div className="mx-4 my-2 rounded-3xl bg-white border border-ink/8 shadow-xs p-4">
         <div className="flex items-center justify-between mb-3">
@@ -655,6 +696,19 @@ export default function OrderTracking() {
         >
           <Utensils size={15} />
           <span>Browse full menu</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            session.startFreshSession();
+            toast.success('Session reset for a fresh order');
+            navigate('/menu');
+          }}
+          className="w-full py-2 text-xs font-semibold text-ink-muted hover:text-ink transition-colors flex items-center justify-center gap-1.5 pt-1"
+        >
+          <RotateCcw size={13} />
+          <span>Start fresh order (clear past rounds)</span>
         </button>
       </div>
 

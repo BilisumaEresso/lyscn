@@ -4,10 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Session store — holds the resolved table context (restaurant, branch, table).
- * One sessionId per qrToken visit; persisted to localStorage so a page
- * refresh within the same visit keeps the same session identity.
- *
- * The session is keyed by qrToken so multiple tabs/tokens stay independent.
+ * Persisted to localStorage under 'layoscan-session'.
  */
 export const useSessionStore = create(
   persist(
@@ -24,15 +21,15 @@ export const useSessionStore = create(
 
       /**
        * Called by the /t/:qrToken page after a successful table resolution.
-       * Generates a new sessionId only if the qrToken has changed (new visit).
+       * If freshSession is true (e.g. previous meal ended, no ongoing orders),
+       * starts with a clean sessionId and empty order history.
        */
-      setSession: ({ qrToken, restaurant, branch, table, sessionToken }) => {
+      setSession: ({ qrToken, restaurant, branch, table, sessionToken, freshSession = false }) => {
         const existing = get();
         const isSameTable = existing.qrToken === qrToken;
-        const sessionId =
-          isSameTable && existing.sessionId
-            ? existing.sessionId   // same visit — reuse existing session
-            : uuidv4();            // new token / first visit — fresh session
+
+        const shouldStartFresh = freshSession || !isSameTable || !existing.sessionId;
+        const sessionId = shouldStartFresh ? uuidv4() : existing.sessionId;
 
         set({
           qrToken,
@@ -41,9 +38,8 @@ export const useSessionStore = create(
           restaurant,
           branch,
           table,
-          // Retain guestName & activeOrderId if staying at the same table
-          activeOrderId: isSameTable ? existing.activeOrderId : null,
-          orderHistory:  isSameTable ? (existing.orderHistory || []) : [],
+          activeOrderId: shouldStartFresh ? null : existing.activeOrderId,
+          orderHistory:  shouldStartFresh ? [] : (existing.orderHistory || []),
         });
       },
 
@@ -57,6 +53,33 @@ export const useSessionStore = create(
               ? [...state.orderHistory, activeOrderId]
               : state.orderHistory,
         })),
+
+      /**
+       * Starts a fresh session on the current table (for a new meal/order visit).
+       * Clears past round history and generates a new sessionId.
+       */
+      startFreshSession: () =>
+        set({
+          sessionId:     uuidv4(),
+          activeOrderId: null,
+          orderHistory:  [],
+        }),
+
+      /**
+       * Dismisses/removes a specific order round from the customer's history.
+       */
+      dismissRound: (orderId) =>
+        set((state) => {
+          const nextHistory = (state.orderHistory || []).filter((id) => id !== orderId);
+          const nextActiveId =
+            state.activeOrderId === orderId
+              ? nextHistory[nextHistory.length - 1] || null
+              : state.activeOrderId;
+          return {
+            orderHistory: nextHistory,
+            activeOrderId: nextActiveId,
+          };
+        }),
 
       clearActiveOrder: () => set({ activeOrderId: null }),
 

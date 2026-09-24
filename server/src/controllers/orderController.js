@@ -270,26 +270,21 @@ const getTableOrders = async (req, res, next) => {
       ? orderIds.split(',').filter((id) => id.match(/^[0-9a-fA-F]{24}$/))
       : [];
 
-    const matchConditions = [];
-    if (table.occupiedSince) {
-      // 10-minute safety buffer before occupiedSince so early orders are never dropped
-      matchConditions.push({ createdAt: { $gte: new Date(table.occupiedSince.getTime() - 10 * 60 * 1000) } });
-    }
-    if (sessionId) {
-      matchConditions.push({ sessionId });
-    }
-    if (clientOrderIds.length > 0) {
-      matchConditions.push({ _id: { $in: clientOrderIds } });
-    }
-
     const query = {
       tableId: table._id,
       restaurantId: table.restaurantId,
       status: { $ne: 'cancelled' },
     };
 
-    if (matchConditions.length > 0) {
-      query.$or = matchConditions;
+    if (sessionId && clientOrderIds.length > 0) {
+      query.$or = [{ sessionId }, { _id: { $in: clientOrderIds } }];
+    } else if (sessionId) {
+      query.sessionId = sessionId;
+    } else if (clientOrderIds.length > 0) {
+      query._id = { $in: clientOrderIds };
+    } else if (table.occupiedSince) {
+      // Fallback only when client provides neither sessionId nor specific orderIds
+      query.createdAt = { $gte: new Date(table.occupiedSince.getTime() - 10 * 60 * 1000) };
     }
 
     const orders = await Order.find(query)

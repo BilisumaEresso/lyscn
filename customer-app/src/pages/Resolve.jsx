@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
 import { useSessionStore } from '../store/sessionStore';
 import { applyBrandColor } from '../lib/theme';
+import { saveVisitedRestaurant } from '../lib/visitedRestaurants';
 import logo from '../assets/logo.png';
 
 /**
@@ -16,9 +17,14 @@ export default function Resolve() {
   const setSession  = useSessionStore((s) => s.setSession);
   const [locationBlocked, setLocationBlocked] = useState(false);
 
+  const existingSessionToken = useSessionStore.getState().sessionToken;
+
   const { data, isLoading, isError } = useQuery({
     queryKey: ['table-resolve', qrToken],
-    queryFn: () => api.get(`/public/table/${qrToken}`).then((r) => r.data),
+    queryFn: () =>
+      api.get(`/public/table/${qrToken}`, {
+        params: existingSessionToken ? { sessionToken: existingSessionToken } : undefined,
+      }).then((r) => r.data),
     retry: false,
     staleTime: 30_000,
   });
@@ -27,6 +33,13 @@ export default function Resolve() {
     if (data?.success) {
       // Apply per-restaurant brand color to CSS custom properties
       applyBrandColor(data.restaurant?.brandColor);
+
+      // Save restaurant to visited list
+      saveVisitedRestaurant({
+        restaurant: data.restaurant,
+        branch:     data.branch,
+        qrToken,
+      });
 
       const existing = useSessionStore.getState();
       const isSameTable = existing.qrToken === qrToken;
@@ -43,12 +56,14 @@ export default function Resolve() {
 
       const destination = orderStillActive ? `/order/${myActiveOrderId}` : '/menu';
 
+      // If there are no ongoing active orders, start a fresh session clean of past rounds
       setSession({
         qrToken,
-        restaurant: data.restaurant,
-        branch:     data.branch,
-        table:      data.table,
+        restaurant:   data.restaurant,
+        branch:       data.branch,
+        table:        data.table,
         sessionToken: data.sessionToken,
+        freshSession: !orderStillActive,
       });
 
       const proceed = () => {

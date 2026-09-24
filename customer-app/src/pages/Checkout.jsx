@@ -12,6 +12,7 @@ import { useSessionStore } from '../store/sessionStore';
 import { useCartStore, cartItemCount, cartSubtotal } from '../store/cartStore';
 import PoweredBy from '../components/PoweredBy';
 import { getRestaurantLogo } from '../lib/branding';
+import { saveVisitedRestaurant } from '../lib/visitedRestaurants';
 
 export default function Checkout() {
   const navigate    = useNavigate();
@@ -51,6 +52,11 @@ export default function Checkout() {
         useSessionStore.getState().setGuestName(guestName.trim());
       }
       useSessionStore.getState().setActiveOrderId(data.order._id);
+      saveVisitedRestaurant({
+        restaurant,
+        branch,
+        qrToken: session.qrToken,
+      });
       navigate(`/order/${data.order._id}`, { replace: true });
     },
     onError: (err) => {
