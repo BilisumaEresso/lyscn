@@ -307,6 +307,8 @@ export default function Landing() {
               className="w-full flex items-center gap-2 mt-2"
             >
               <input
+                id="landing-manual-code-modal"
+                name="manualCodeModal"
                 type="text"
                 value={manualCode}
                 onChange={(e) => setManualCode(e.target.value)}
@@ -408,6 +410,8 @@ export default function Landing() {
                 {/* Inline Manual Fallback */}
                 <form onSubmit={handleManualSubmit} className="pt-2 flex gap-2">
                   <input
+                    id="landing-manual-code-camera"
+                    name="manualCodeCamera"
                     type="text"
                     value={manualCode}
                     onChange={(e) => setManualCode(e.target.value)}

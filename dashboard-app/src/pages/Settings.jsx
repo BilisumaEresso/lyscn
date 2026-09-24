@@ -274,6 +274,7 @@ export default function Settings() {
                 Description
               </label>
               <textarea
+                id="restaurant-description"
                 rows={3}
                 placeholder="A short description of your restaurant for customers…"
                 className="w-full px-3 py-2 text-sm border border-ink/12 rounded-lg resize-none focus:outline-none focus:border-teal focus:ring-1 focus:ring-teal/15"
@@ -283,11 +284,13 @@ export default function Settings() {
 
             {/* Brand color */}
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-ink-muted flex items-center gap-1.5">
+              <label htmlFor="brand-color-picker" className="text-xs font-medium text-ink-muted flex items-center gap-1.5">
                 <Palette size={12} /> Brand color
               </label>
               <div className="flex flex-wrap items-center gap-3">
                 <input
+                  id="brand-color-picker"
+                  name="brandColorPicker"
                   type="color"
                   value={brandColor}
                   onChange={(e) => handleColorChange(e.target.value)}

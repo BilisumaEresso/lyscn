@@ -7,6 +7,7 @@ import {
   Clock,
   Star,
   ChevronLeft,
+  ChevronRight,
   Receipt,
   Plus,
   Utensils,
@@ -34,9 +35,9 @@ const STEPS = [
 
 const STATUS_INDEX = Object.fromEntries(STEPS.map((s, i) => [s.key, i]));
 
-function StatusStep({ step, currentIndex, stepIndex }) {
-  const isDone    = stepIndex < currentIndex;
-  const isCurrent = stepIndex === currentIndex;
+function StatusStep({ step, currentIndex, stepIndex, isServedRound }) {
+  const isDone = isServedRound ? true : stepIndex < currentIndex;
+  const isCurrent = isServedRound ? false : stepIndex === currentIndex;
 
   return (
     <div className="flex items-start gap-3">
@@ -44,9 +45,14 @@ function StatusStep({ step, currentIndex, stepIndex }) {
         <div
           className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all duration-500"
           style={
-            isDone    ? { background: 'var(--color-primary)', color: 'var(--color-on-primary)' } :
-            isCurrent ? { background: 'color-mix(in srgb, var(--color-primary) 12%, transparent)', border: '2px solid var(--color-primary)' } :
-                        {}
+            isDone
+              ? { background: 'var(--color-primary)', color: 'var(--color-on-primary)' }
+              : isCurrent
+              ? {
+                  background: 'color-mix(in srgb, var(--color-primary) 12%, transparent)',
+                  border: '2px solid var(--color-primary)',
+                }
+              : {}
           }
         >
           {isDone ? (
@@ -59,24 +65,30 @@ function StatusStep({ step, currentIndex, stepIndex }) {
         </div>
         {stepIndex < STEPS.length - 1 && (
           <div
-            className="w-0.5 flex-1 min-h-[20px] mt-1 transition-colors duration-500"
-            style={{ background: isDone ? 'var(--color-primary)' : 'rgba(18,26,44,0.10)' }}
+            className="w-0.5 flex-1 min-h-[22px] mt-1 transition-colors duration-500"
+            style={{
+              background: isDone
+                ? 'var(--color-primary)'
+                : 'rgba(18,26,44,0.10)',
+            }}
           />
         )}
       </div>
       <div className="pb-4 pt-1">
         <p
           className="font-display font-semibold text-sm leading-tight transition-colors duration-300"
-          style={isCurrent ? { color: 'var(--color-primary)' } : {}}
+          style={isCurrent || isDone ? { color: 'var(--color-primary)' } : {}}
         >
-          <span className={clsx(!isCurrent && (isDone ? 'text-ink' : 'text-ink/35'))}>
+          <span className={clsx(!isCurrent && (isDone ? 'text-ink font-semibold' : 'text-ink/35'))}>
             {step.label}
           </span>
         </p>
-        <p className={clsx(
-          'text-xs mt-0.5',
-          isCurrent ? 'text-ink-muted' : isDone ? 'text-ink/50' : 'text-ink/20'
-        )}>
+        <p
+          className={clsx(
+            'text-xs mt-0.5',
+            isCurrent ? 'text-ink-muted' : isDone ? 'text-ink/60' : 'text-ink/20'
+          )}
+        >
           {step.desc}
         </p>
       </div>
@@ -94,8 +106,12 @@ export default function OrderTracking() {
   const [feedbackRating, setFeedbackRating] = useState(0);
   const [feedbackText, setFeedbackText] = useState('');
   const [feedbackDismissed, setFeedbackDismissed] = useState(false);
-  const [selectedRoundId, setSelectedRoundId] = useState(orderId || null);
+  const [selectedRoundId, setSelectedRoundId] = useState(null);
+  const [slideDirection, setSlideDirection] = useState('none'); // 'left' | 'right' | 'none'
   const [logoImgError, setLogoImgError] = useState(false);
+
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
 
   useEffect(() => { setLogoImgError(false); }, [session.restaurant?.logoUrl]);
 
@@ -114,10 +130,14 @@ export default function OrderTracking() {
 
   // ── Fetch multi-round table orders ──────────────────────────────────────────
   const { data: tableData, isLoading } = useQuery({
-    queryKey: ['table-orders', session.sessionToken],
+    queryKey: ['table-orders', session.sessionToken, session.sessionId],
     queryFn: () =>
       api.get('/orders/public/table/orders', {
-        params: { sessionToken: session.sessionToken },
+        params: {
+          sessionToken: session.sessionToken,
+          sessionId: session.sessionId,
+          orderIds: session.orderHistory?.join(','),
+        },
       }).then((r) => r.data),
     refetchInterval: 5_000,
     retry: 2,
@@ -127,17 +147,23 @@ export default function OrderTracking() {
   const rounds = tableData?.rounds ?? [];
   const summary = tableData?.summary ?? {};
 
-  // Auto-select latest or route-specified round
+  // Preserve user-selected round or initialize safely
   useEffect(() => {
-    if (rounds.length > 0) {
-      if (orderId && rounds.some((r) => r.id === orderId)) {
-        setSelectedRoundId(orderId);
-      } else if (!selectedRoundId || !rounds.some((r) => r.id === selectedRoundId)) {
-        // Default to latest round
-        setSelectedRoundId(rounds[rounds.length - 1].id);
+    if (!rounds || rounds.length === 0) return;
+
+    setSelectedRoundId((prev) => {
+      // If user has already selected a valid round present in current rounds, keep it!
+      if (prev && rounds.some((r) => r.id === prev)) {
+        return prev;
       }
-    }
-  }, [rounds, orderId, selectedRoundId]);
+      // If URL has an orderId that exists, select it on first load
+      if (orderId && rounds.some((r) => r.id === orderId)) {
+        return orderId;
+      }
+      // Default to latest round
+      return rounds[rounds.length - 1].id;
+    });
+  }, [rounds, orderId]);
 
   // Active round object
   const currentRound = useMemo(() => {
@@ -146,9 +172,10 @@ export default function OrderTracking() {
   }, [rounds, selectedRoundId]);
 
   const activeStatus = currentRound?.status ?? 'placed';
-  const paymentStatus = currentRound?.paymentStatus ?? summary.allPaid ? 'paid' : 'unpaid';
+  const paymentStatus = currentRound?.paymentStatus || (summary.allPaid ? 'paid' : 'unpaid');
   const currentIndex = STATUS_INDEX[activeStatus] ?? 0;
   const isCancelled = activeStatus === 'cancelled';
+  const isServedRound = activeStatus === 'served';
   const feedbackSubmitted = Number(currentRound?.rating) > 0;
 
   // Feedback mutation
@@ -158,12 +185,47 @@ export default function OrderTracking() {
         rating: feedbackRating,
         feedback: feedbackText.trim() || null,
       }).then((r) => r.data),
-    onSuccess: (result) => {
-      qc.invalidateQueries({ queryKey: ['table-orders', session.sessionToken] });
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['table-orders', session.sessionToken, session.sessionId] });
       toast.success('Thanks for your feedback!');
     },
     onError: (err) => toast.error(err.response?.data?.message || 'Could not save feedback.'),
   });
+
+  // ── Switch round handler with smooth auto-scroll ─────────────────────────────
+  const handleSelectRound = (roundId, dir = 'none') => {
+    setSlideDirection(dir);
+    setSelectedRoundId(roundId);
+    const el = document.getElementById(`round-tab-${roundId}`);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  };
+
+  // ── Touch swiping between rounds ───────────────────────────────────────────
+  const handleTouchStart = (e) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e) => {
+    if (!rounds || rounds.length <= 1) return;
+
+    const diffX = e.changedTouches[0].clientX - touchStartX.current;
+    const diffY = e.changedTouches[0].clientY - touchStartY.current;
+
+    // Minimum horizontal swipe distance of 45px, horizontal dominating vertical scroll
+    if (Math.abs(diffX) > 45 && Math.abs(diffX) > Math.abs(diffY) * 1.3) {
+      const currentIdx = rounds.findIndex((r) => r.id === currentRound?.id);
+      if (currentIdx === -1) return;
+
+      if (diffX < 0 && currentIdx < rounds.length - 1) {
+        // Swiped left -> Next round
+        handleSelectRound(rounds[currentIdx + 1].id, 'left');
+      } else if (diffX > 0 && currentIdx > 0) {
+        // Swiped right -> Previous round
+        handleSelectRound(rounds[currentIdx - 1].id, 'right');
+      }
+    }
+  };
 
   // ── Socket synchronization for all table rounds ─────────────────────────────
   useEffect(() => {
@@ -183,7 +245,7 @@ export default function OrderTracking() {
     joinAllRounds();
 
     const onOrderUpdated = () => {
-      qc.invalidateQueries({ queryKey: ['table-orders', session.sessionToken] });
+      qc.invalidateQueries({ queryKey: ['table-orders', session.sessionToken, session.sessionId] });
     };
 
     socket.on('connect', joinAllRounds);
@@ -197,7 +259,7 @@ export default function OrderTracking() {
       socket.disconnect();
       joinedRooms.current.clear();
     };
-  }, [rounds, qc, session.sessionToken]);
+  }, [rounds, qc, session.sessionToken, session.sessionId]);
 
   return (
     <div className="min-h-screen bg-paper max-w-[560px] mx-auto flex flex-col">
@@ -233,7 +295,7 @@ export default function OrderTracking() {
       </div>
 
       {/* ── Header ───────────────────────────────────────────────────── */}
-      <div className="px-5 pt-5 pb-3">
+      <div className="px-5 pt-4 pb-2">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-display font-bold text-2xl text-ink leading-tight">
@@ -243,10 +305,10 @@ export default function OrderTracking() {
                 ? 'All rounds served! 🎉'
                 : 'Table Orders'}
             </h1>
-            <p className="text-ink-muted text-xs mt-1">
+            <p className="text-ink-muted text-xs mt-0.5">
               {isCancelled
                 ? 'This round was cancelled. Please ask staff.'
-                : 'Live order tracking for your table visit.'}
+                : 'Track each round placed at your table.'}
             </p>
           </div>
 
@@ -269,17 +331,19 @@ export default function OrderTracking() {
       {rounds.length > 0 && (
         <div className="px-4 py-2">
           <div className="text-xs font-semibold text-ink-muted mb-2 px-1 flex items-center justify-between">
-            <span>Rounds ordered ({rounds.length})</span>
-            {currentRound && (
-              <span className="text-[11px] font-normal">
-                Viewing Round #{currentRound.roundNumber}
+            <span className="font-display font-bold text-ink">
+              Rounds ({rounds.length})
+            </span>
+            {rounds.length > 1 && (
+              <span className="text-[11px] text-ink-muted flex items-center gap-1">
+                <span>👈 Swipe between rounds 👉</span>
               </span>
             )}
           </div>
 
           <div
-            className="flex items-center gap-2 overflow-x-auto pb-1"
-            style={{ scrollbarWidth: 'none' }}
+            className="flex items-center gap-2.5 overflow-x-auto pb-1.5"
+            style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
           >
             {rounds.map((round) => {
               const isSelected = round.id === currentRound?.id;
@@ -289,12 +353,14 @@ export default function OrderTracking() {
               return (
                 <button
                   key={round.id}
-                  onClick={() => setSelectedRoundId(round.id)}
+                  id={`round-tab-${round.id}`}
+                  onClick={() => handleSelectRound(round.id)}
+                  aria-label={`Select Round ${round.roundNumber}, status: ${round.status}`}
                   className={clsx(
-                    'shrink-0 px-3.5 py-2.5 rounded-2xl border transition-all text-left flex items-center gap-2.5',
+                    'shrink-0 px-4 py-2.5 rounded-2xl border transition-all text-left flex items-center gap-2.5',
                     isSelected
-                      ? 'shadow-md scale-[1.01]'
-                      : 'bg-white border-ink/8 hover:border-ink/20 opacity-80'
+                      ? 'shadow-lg scale-[1.02]'
+                      : 'bg-white border-ink/8 hover:border-ink/20 opacity-75'
                   )}
                   style={
                     isSelected
@@ -308,7 +374,7 @@ export default function OrderTracking() {
                 >
                   <div
                     className={clsx(
-                      'w-2 h-2 rounded-full',
+                      'w-2.5 h-2.5 rounded-full shrink-0',
                       isServed
                         ? 'bg-emerald-400'
                         : isPrep
@@ -322,8 +388,8 @@ export default function OrderTracking() {
                     </p>
                     <p
                       className={clsx(
-                        'text-[10px] capitalize mt-0.5',
-                        isSelected ? 'text-white/70' : 'text-ink-muted'
+                        'text-[10px] capitalize mt-1 font-medium',
+                        isSelected ? 'text-white/80' : 'text-ink-muted'
                       )}
                     >
                       {round.status} · {formatBirr(round.totalAmount)}
@@ -336,95 +402,177 @@ export default function OrderTracking() {
         </div>
       )}
 
-      {/* ── Status Step Tracker for Selected Round ───────────────────── */}
-      {!isCancelled && currentRound && (
-        <div className="px-5 py-4 mx-4 my-2 rounded-3xl bg-white border border-ink/8 shadow-xs">
-          <div className="flex items-center justify-between mb-4 pb-2 border-b border-ink/6">
-            <span className="font-display font-bold text-sm text-ink flex items-center gap-1.5">
-              <span>Status: Round #{currentRound.roundNumber}</span>
-              {currentRound.guestName && (
-                <span className="text-xs font-normal text-ink-muted">
-                  ({currentRound.guestName})
-                </span>
-              )}
-            </span>
-            <span
-              className="text-xs px-2.5 py-0.5 rounded-full font-semibold capitalize"
-              style={{
-                background:
-                  currentRound.status === 'served'
-                    ? 'rgba(85,230,165,0.15)'
-                    : 'color-mix(in srgb, var(--color-primary) 12%, transparent)',
-                color:
-                  currentRound.status === 'served'
-                    ? '#0F8077'
-                    : 'var(--color-primary)',
-              }}
-            >
-              {currentRound.status}
-            </span>
-          </div>
-
-          <div aria-label="Order status" role="status" aria-live="polite">
-            {STEPS.map((step, idx) => (
-              <StatusStep
-                key={step.key}
-                step={step}
-                stepIndex={idx}
-                currentIndex={currentIndex}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── Itemized List for Selected Round ─────────────────────────── */}
-      {currentRound && currentRound.items?.length > 0 && (
-        <div className="mx-4 my-2 rounded-3xl bg-white border border-ink/8 shadow-xs overflow-hidden">
-          <div className="px-4 py-3 bg-ink/2 border-b border-ink/6 flex items-center justify-between">
-            <span className="font-display font-semibold text-xs text-ink flex items-center gap-1.5">
-              <Receipt size={14} className="text-ink-muted" />
-              <span>Round #{currentRound.roundNumber} Items</span>
-            </span>
-            <span className="text-xs text-ink-muted">
-              {currentRound.createdAt
-                ? new Date(currentRound.createdAt).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })
-                : ''}
-            </span>
-          </div>
-
-          <div className="divide-y divide-ink/4 px-4">
-            {currentRound.items.map((item, idx) => (
-              <div key={idx} className="py-3 flex items-start justify-between gap-3 text-sm">
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-ink leading-tight">
-                    <span className="text-primary font-bold mr-1.5">{item.qty}×</span>
-                    {item.name}
-                  </p>
-                  {item.selectedModifiers?.length > 0 && (
-                    <p className="text-xs text-ink-muted mt-0.5">
-                      {item.selectedModifiers.map((m) => m.optionName).join(', ')}
-                    </p>
+      {/* ── Round Details (Touch Gesture Swipable) ────────────────────── */}
+      <div
+        className="flex-1"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        <div
+          key={currentRound?.id}
+          className={clsx(
+            slideDirection === 'left' && 'anim-slide-left',
+            slideDirection === 'right' && 'anim-slide-right'
+          )}
+        >
+          {/* ── Status Step Tracker for Selected Round ───────────────────── */}
+          {!isCancelled && currentRound && (
+            <div className="px-5 py-4 mx-4 my-2 rounded-3xl bg-white border border-ink/8 shadow-xs">
+              <div className="flex items-center justify-between mb-4 pb-2 border-b border-ink/6">
+                <span className="font-display font-bold text-sm text-ink flex items-center gap-1.5">
+                  <span>Round #{currentRound.roundNumber} Status</span>
+                  {currentRound.guestName && (
+                    <span className="text-xs font-normal text-ink-muted">
+                      ({currentRound.guestName})
+                    </span>
                   )}
-                </div>
-                <span className="font-display font-bold text-ink shrink-0">
-                  <Currency value={item.price * item.qty} />
+                </span>
+                <span
+                  className="text-xs px-2.5 py-1 rounded-full font-bold capitalize border"
+                  style={
+                    isServedRound
+                      ? {
+                          background: 'rgba(85,230,165,0.18)',
+                          color: '#0F8077',
+                          borderColor: 'rgba(85,230,165,0.4)',
+                        }
+                      : {
+                          background: 'color-mix(in srgb, var(--color-primary) 12%, transparent)',
+                          color: 'var(--color-primary)',
+                          borderColor: 'color-mix(in srgb, var(--color-primary) 25%, transparent)',
+                        }
+                  }
+                >
+                  {currentRound.status === 'served' ? 'Served ✓' : currentRound.status}
                 </span>
               </div>
-            ))}
-          </div>
 
-          <div className="px-4 py-2.5 bg-ink/2 border-t border-ink/6 flex items-center justify-between text-xs">
-            <span className="font-semibold text-ink-muted">Round Subtotal</span>
-            <span className="font-display font-bold text-ink text-sm">
-              <Currency value={currentRound.totalAmount} />
-            </span>
-          </div>
+              <div aria-label="Order status" role="status" aria-live="polite">
+                {STEPS.map((step, idx) => (
+                  <StatusStep
+                    key={step.key}
+                    step={step}
+                    stepIndex={idx}
+                    currentIndex={currentIndex}
+                    isServedRound={isServedRound}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Itemized List for Selected Round ─────────────────────────── */}
+          {currentRound && currentRound.items?.length > 0 && (
+            <div className="mx-4 my-2 rounded-3xl bg-white border border-ink/8 shadow-xs overflow-hidden">
+              <div className="px-4 py-3 bg-ink/2 border-b border-ink/6 flex items-center justify-between">
+                <span className="font-display font-semibold text-xs text-ink flex items-center gap-1.5">
+                  <Receipt size={14} className="text-ink-muted" />
+                  <span>Round #{currentRound.roundNumber} Items</span>
+                </span>
+                <span className="text-xs text-ink-muted">
+                  {currentRound.createdAt
+                    ? new Date(currentRound.createdAt).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })
+                    : ''}
+                </span>
+              </div>
+
+              <div className="divide-y divide-ink/4 px-4">
+                {currentRound.items.map((item, idx) => (
+                  <div key={idx} className="py-3 flex items-start justify-between gap-3 text-sm">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-ink leading-tight">
+                        <span className="text-primary font-bold mr-1.5">{item.qty}×</span>
+                        {item.name}
+                      </p>
+                      {item.selectedModifiers?.length > 0 && (
+                        <p className="text-xs text-ink-muted mt-0.5">
+                          {item.selectedModifiers.map((m) => m.optionName).join(', ')}
+                        </p>
+                      )}
+                    </div>
+                    <span className="font-display font-bold text-ink shrink-0">
+                      <Currency value={item.price * item.qty} />
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="px-4 py-2.5 bg-ink/2 border-t border-ink/6 flex items-center justify-between text-xs">
+                <span className="font-semibold text-ink-muted">Round Subtotal</span>
+                <span className="font-display font-bold text-ink text-sm">
+                  <Currency value={currentRound.totalAmount} />
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* ── Feedback for Served Round ─────────────────────────────────── */}
+          {activeStatus === 'served' && !feedbackSubmitted && !feedbackDismissed && (
+            <div className="mx-4 my-2 rounded-3xl border border-ink/8 bg-white p-4 shadow-xs">
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-display font-semibold text-sm text-ink">
+                  How was Round #{currentRound?.roundNumber}?
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setFeedbackDismissed(true)}
+                  className="text-xs text-ink-muted hover:text-ink"
+                >
+                  Skip
+                </button>
+              </div>
+              <div className="flex gap-2 mt-2.5" role="radiogroup" aria-label="Rate this round">
+                {[1, 2, 3, 4, 5].map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setFeedbackRating(value)}
+                    aria-label={`${value} stars`}
+                    className="p-1 rounded-lg hover:scale-110 transition-transform"
+                  >
+                    <Star
+                      size={26}
+                      fill={value <= feedbackRating ? 'var(--color-primary)' : 'transparent'}
+                      style={{
+                        color: value <= feedbackRating ? 'var(--color-primary)' : 'rgba(18,26,44,0.25)',
+                      }}
+                    />
+                  </button>
+                ))}
+              </div>
+              <textarea
+                id="order-feedback-input"
+                name="orderFeedback"
+                value={feedbackText}
+                onChange={(e) => setFeedbackText(e.target.value)}
+                maxLength={1000}
+                rows={2}
+                placeholder="Tell us what you loved (optional)"
+                className="w-full mt-2.5 px-3 py-2 rounded-xl border border-ink/12 bg-paper text-xs resize-none focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => feedbackMutation.mutate()}
+                disabled={!feedbackRating || feedbackMutation.isPending}
+                className="w-full mt-2.5 py-2.5 rounded-xl text-xs font-semibold disabled:opacity-40"
+                style={{ background: 'var(--color-primary)', color: 'var(--color-on-primary)' }}
+              >
+                {feedbackMutation.isPending ? 'Sending…' : 'Submit feedback'}
+              </button>
+            </div>
+          )}
+
+          {activeStatus === 'served' && feedbackSubmitted && (
+            <div className="mx-4 my-2 rounded-2xl bg-emerald-50 border border-emerald-200 px-4 py-3 text-xs text-emerald-700 flex items-center gap-2">
+              <Sparkles size={15} />
+              <span>Thanks for rating Round #{currentRound?.roundNumber} ({currentRound.rating}/5)!</span>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* ── Table Bill & Payment Summary Card ─────────────────────────── */}
       <div className="mx-4 my-2 rounded-3xl bg-white border border-ink/8 shadow-xs p-4">
@@ -447,17 +595,17 @@ export default function OrderTracking() {
           className="p-3 rounded-2xl border flex items-center justify-between text-xs"
           style={{
             backgroundColor:
-              summary.allPaid || paymentStatus === 'paid'
+              paymentStatus === 'paid'
                 ? 'rgba(85,230,165,0.08)'
                 : 'rgba(245,158,11,0.08)',
             borderColor:
-              summary.allPaid || paymentStatus === 'paid'
+              paymentStatus === 'paid'
                 ? 'rgba(85,230,165,0.35)'
                 : 'rgba(245,158,11,0.3)',
           }}
         >
           <div className="flex items-center gap-2">
-            {summary.allPaid || paymentStatus === 'paid' ? (
+            {paymentStatus === 'paid' ? (
               <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
             ) : (
               <Clock size={16} className="text-amber shrink-0" />
@@ -466,17 +614,17 @@ export default function OrderTracking() {
               <p
                 className={clsx(
                   'font-bold',
-                  summary.allPaid || paymentStatus === 'paid'
+                  paymentStatus === 'paid'
                     ? 'text-emerald-700'
                     : 'text-amber'
                 )}
               >
-                {summary.allPaid || paymentStatus === 'paid'
+                {paymentStatus === 'paid'
                   ? 'Paid in full ✓'
                   : 'Unpaid — pay your server'}
               </p>
               <p className="text-[11px] text-ink-muted mt-0.5">
-                {summary.allPaid || paymentStatus === 'paid'
+                {paymentStatus === 'paid'
                   ? 'Receipt confirmed by staff'
                   : 'Your server will bring the bill when you are ready.'}
               </p>
@@ -484,67 +632,6 @@ export default function OrderTracking() {
           </div>
         </div>
       </div>
-
-      {/* ── Feedback for Served Round ─────────────────────────────────── */}
-      {activeStatus === 'served' && !feedbackSubmitted && !feedbackDismissed && (
-        <div className="mx-4 my-2 rounded-3xl border border-ink/8 bg-white p-4 shadow-xs">
-          <div className="flex items-center justify-between gap-3">
-            <p className="font-display font-semibold text-sm text-ink">
-              How was Round #{currentRound?.roundNumber}?
-            </p>
-            <button
-              type="button"
-              onClick={() => setFeedbackDismissed(true)}
-              className="text-xs text-ink-muted hover:text-ink"
-            >
-              Skip
-            </button>
-          </div>
-          <div className="flex gap-2 mt-2.5" role="radiogroup" aria-label="Rate this round">
-            {[1, 2, 3, 4, 5].map((value) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setFeedbackRating(value)}
-                aria-label={`${value} stars`}
-                className="p-1 rounded-lg hover:scale-110 transition-transform"
-              >
-                <Star
-                  size={26}
-                  fill={value <= feedbackRating ? 'var(--color-primary)' : 'transparent'}
-                  style={{
-                    color: value <= feedbackRating ? 'var(--color-primary)' : 'rgba(18,26,44,0.25)',
-                  }}
-                />
-              </button>
-            ))}
-          </div>
-          <textarea
-            value={feedbackText}
-            onChange={(e) => setFeedbackText(e.target.value)}
-            maxLength={1000}
-            rows={2}
-            placeholder="Tell us what you loved (optional)"
-            className="w-full mt-2.5 px-3 py-2 rounded-xl border border-ink/12 bg-paper text-xs resize-none focus:outline-none"
-          />
-          <button
-            type="button"
-            onClick={() => feedbackMutation.mutate()}
-            disabled={!feedbackRating || feedbackMutation.isPending}
-            className="w-full mt-2.5 py-2.5 rounded-xl text-xs font-semibold disabled:opacity-40"
-            style={{ background: 'var(--color-primary)', color: 'var(--color-on-primary)' }}
-          >
-            {feedbackMutation.isPending ? 'Sending…' : 'Submit feedback'}
-          </button>
-        </div>
-      )}
-
-      {activeStatus === 'served' && feedbackSubmitted && (
-        <div className="mx-4 my-2 rounded-2xl bg-emerald-50 border border-emerald-200 px-4 py-3 text-xs text-emerald-700 flex items-center gap-2">
-          <Sparkles size={15} />
-          <span>Thanks for rating Round #{currentRound?.roundNumber} ({currentRound.rating}/5)!</span>
-        </div>
-      )}
 
       {/* ── Action Buttons: Next Round / Back to Menu ──────────────────── */}
       <div className="px-4 pt-4 pb-2 space-y-2.5">

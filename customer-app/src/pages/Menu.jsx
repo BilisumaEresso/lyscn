@@ -798,10 +798,13 @@ export default function Menu() {
         <div className="relative flex items-center">
           <Search size={16} className="absolute left-3.5 text-ink-muted pointer-events-none" />
           <input
-            type="text"
+            id="menu-search-input"
+            name="menuSearch"
+            type="search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search coffee, dishes, drinks…"
+            autoComplete="off"
             className="w-full pl-9 pr-9 py-2.5 rounded-2xl bg-white border border-ink/8 text-sm placeholder:text-ink-muted/70 focus:outline-none focus:border-primary shadow-xs transition-all"
             style={{ '--tw-border-opacity': '1' }}
           />

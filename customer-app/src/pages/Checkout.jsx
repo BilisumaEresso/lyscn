@@ -214,10 +214,12 @@ export default function Checkout() {
           </label>
           <input
             id="guestName"
+            name="guestName"
             type="text"
             value={guestName}
             onChange={(e) => setGuestName(e.target.value)}
             placeholder="e.g. Alex"
+            autoComplete="name"
             maxLength={40}
             className="w-full mt-2 px-4 py-3 rounded-xl border border-ink/12 text-sm bg-paper focus:outline-none"
             style={{ '--focus-color': 'var(--color-primary)' }}

@@ -246,7 +246,7 @@ const getOrderStatus = async (req, res, next) => {
 // ── GET /api/orders/public/table/orders — PUBLIC (multi-round session orders) ──
 const getTableOrders = async (req, res, next) => {
   try {
-    const { sessionToken } = req.query;
+    const { sessionToken, sessionId, orderIds } = req.query;
     if (!sessionToken) {
       return res.status(400).json({
         success: false,
@@ -266,14 +266,30 @@ const getTableOrders = async (req, res, next) => {
       });
     }
 
+    const clientOrderIds = typeof orderIds === 'string' && orderIds.trim()
+      ? orderIds.split(',').filter((id) => id.match(/^[0-9a-fA-F]{24}$/))
+      : [];
+
+    const matchConditions = [];
+    if (table.occupiedSince) {
+      // 10-minute safety buffer before occupiedSince so early orders are never dropped
+      matchConditions.push({ createdAt: { $gte: new Date(table.occupiedSince.getTime() - 10 * 60 * 1000) } });
+    }
+    if (sessionId) {
+      matchConditions.push({ sessionId });
+    }
+    if (clientOrderIds.length > 0) {
+      matchConditions.push({ _id: { $in: clientOrderIds } });
+    }
+
     const query = {
       tableId: table._id,
       restaurantId: table.restaurantId,
       status: { $ne: 'cancelled' },
     };
 
-    if (table.occupiedSince) {
-      query.createdAt = { $gte: table.occupiedSince };
+    if (matchConditions.length > 0) {
+      query.$or = matchConditions;
     }
 
     const orders = await Order.find(query)
