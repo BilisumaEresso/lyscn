@@ -66,11 +66,15 @@ api.interceptors.response.use(
         );
 
         const newToken = data.accessToken;
+        const newRefreshToken = data.refreshToken;
 
         // Patch the persisted Zustand store in localStorage
         const authRaw = JSON.parse(localStorage.getItem('layoscan-auth') || '{}');
         if (authRaw.state) {
           authRaw.state.accessToken = newToken;
+          if (newRefreshToken) {
+            authRaw.state.refreshToken = newRefreshToken;
+          }
           localStorage.setItem('layoscan-auth', JSON.stringify(authRaw));
         }
 

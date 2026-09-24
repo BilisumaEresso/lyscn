@@ -15,6 +15,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Menu     = lazy(() => import('./pages/Menu'));
 const Tables   = lazy(() => import('./pages/Tables'));
 const Orders   = lazy(() => import('./pages/Orders'));
+const Staff    = lazy(() => import('./pages/Staff'));
 const Settings = lazy(() => import('./pages/Settings'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
@@ -81,6 +82,7 @@ export default function App() {
                   <Route path="/menu"     element={<Suspense fallback={<PageSkeleton />}><Menu /></Suspense>} />
                   <Route path="/tables"   element={<Suspense fallback={<PageSkeleton />}><Tables /></Suspense>} />
                   <Route path="/orders"   element={<Suspense fallback={<KanbanSkeleton />}><Orders /></Suspense>} />
+                  <Route path="/staff"    element={<Suspense fallback={<PageSkeleton />}><Staff /></Suspense>} />
                   <Route path="/settings" element={<Suspense fallback={<PageSkeleton />}><Settings /></Suspense>} />
                 </Route>
               </Route>

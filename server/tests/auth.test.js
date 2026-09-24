@@ -10,23 +10,40 @@ describe('Auth API', () => {
   });
 
   describe('POST /api/auth/register', () => {
-    it('should register a new user successfully (201)', async () => {
+    it('should register a new user successfully and create default branch and table (201)', async () => {
       const payload = {
         restaurantName: 'New Rest',
         ownerName: 'Bob',
         email: `bob${Date.now()}@test.com`,
-        password: 'securepassword',
+        password: 'securepassword123',
       };
       const res = await request(app).post('/api/auth/register').send(payload);
       
       expect(res.status).toBe(201);
       expect(res.body.success).toBe(true);
       expect(res.body.user).toBeDefined();
-      expect(res.body.user.email).toBe(payload.email);
+      expect(res.body.user.email).toBe(payload.email.toLowerCase());
       expect(res.body.user.passwordHash).toBeUndefined();
       expect(res.body.restaurant).toBeDefined();
+      expect(res.body.branch).toBeDefined();
+      expect(res.body.branch.name).toBe('Main Branch');
+      expect(res.body.table).toBeDefined();
+      expect(res.body.table.label).toBe('Table 1');
       expect(res.body.accessToken).toBeDefined();
       expect(res.body.refreshToken).toBeDefined();
+    });
+
+    it('should reject registration with password shorter than 8 characters (400)', async () => {
+      const payload = {
+        restaurantName: 'Short Pass Bistro',
+        ownerName: 'Dan',
+        email: `dan${Date.now()}@test.com`,
+        password: 'short',
+      };
+      const res = await request(app).post('/api/auth/register').send(payload);
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.message).toMatch(/at least 8 characters/i);
     });
 
     it('should reject registration with missing fields (400)', async () => {
@@ -102,21 +119,30 @@ describe('Auth API', () => {
     });
   });
 
-  describe('POST /api/auth/refresh', () => {
+  describe('POST /api/auth/refresh & Token Rotation', () => {
     let authData;
 
     beforeAll(async () => {
       authData = await registerAndLogin();
     });
 
-    it('should issue new access token with valid refresh token', async () => {
+    it('should issue new access token and rotate refresh token with valid refresh token', async () => {
       const res = await request(app).post('/api/auth/refresh').send({
         refreshToken: authData.refreshToken,
       });
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.accessToken).toBeDefined();
+      expect(res.body.refreshToken).toBeDefined();
       expect(typeof res.body.accessToken).toBe('string');
+      expect(typeof res.body.refreshToken).toBe('string');
+
+      // Attempting to reuse the old refresh token must trigger reuse detection and fail
+      const reuseRes = await request(app).post('/api/auth/refresh').send({
+        refreshToken: authData.refreshToken,
+      });
+      expect(reuseRes.status).toBe(401);
+      expect(reuseRes.body.success).toBe(false);
     });
 
     it('should reject invalid refresh token (401)', async () => {
@@ -131,6 +157,25 @@ describe('Auth API', () => {
       const res = await request(app).post('/api/auth/refresh').send({});
       expect(res.status).toBe(400);
       expect(res.body.success).toBe(false);
+    });
+  });
+
+  describe('POST /api/auth/logout', () => {
+    it('should revoke the refresh token on logout', async () => {
+      const auth = await registerAndLogin();
+
+      const logoutRes = await request(app).post('/api/auth/logout').send({
+        refreshToken: auth.refreshToken,
+      });
+      expect(logoutRes.status).toBe(200);
+      expect(logoutRes.body.success).toBe(true);
+
+      // Subsequent refresh with logged out token should be rejected
+      const refreshRes = await request(app).post('/api/auth/refresh').send({
+        refreshToken: auth.refreshToken,
+      });
+      expect(refreshRes.status).toBe(401);
+      expect(refreshRes.body.success).toBe(false);
     });
   });
 
@@ -150,7 +195,7 @@ describe('Auth API', () => {
       expect(res.body.success).toBe(true);
       expect(res.body.user).toBeDefined();
       expect(res.body.restaurant).toBeDefined();
-      expect(res.body.user.email).toBe(authData.user.email);
+      expect(res.body.user.email).toBe(authData.user.email.toLowerCase());
     });
 
     it('should reject when not authenticated (401)', async () => {

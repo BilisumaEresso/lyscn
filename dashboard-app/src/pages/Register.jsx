@@ -23,27 +23,17 @@ export default function Register() {
   const onSubmit = async ({ restaurantName, ownerName, email, password }) => {
     setLoading(true);
     try {
-      // 1. Register restaurant + owner
+      // 1. Register restaurant + owner + default branch (created server-side)
       const { data } = await api.post('/auth/register', {
         restaurantName,
         ownerName,
         email,
         password,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
       });
 
       // Persist session immediately so subsequent calls have auth headers
       setSession(data);
-
-      // 2. Auto-create a default "Main Branch" so the user has something to work with
-      try {
-        await api.post('/branches', {
-          name: 'Main Branch',
-          currency: 'ETB',
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-        });
-      } catch (_) {
-        // Non-fatal — user can create branches from the settings page later
-      }
 
       toast.success('Restaurant created — welcome to LayoScan!');
       navigate('/');

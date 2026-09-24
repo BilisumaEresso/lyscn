@@ -2,25 +2,28 @@ import { useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, UtensilsCrossed, QrCode,
-  ClipboardList, Settings, LogOut, X, Download, MapPin
+  ClipboardList, Settings, LogOut, X, Download, MapPin, Users
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useInstallPrompt } from '../../hooks/useInstallPrompt';
 import logo from '../../assets/logo.png';
-
-const NAV_ITEMS = [
-  { to: '/',        icon: LayoutDashboard, label: 'Dashboard', end: true },
-  { to: '/menu',    icon: UtensilsCrossed, label: 'Menu' },
-  { to: '/tables',  icon: QrCode,          label: 'Tables' },
-  { to: '/orders',  icon: ClipboardList,   label: 'Orders' },
-  { to: '/settings',icon: Settings,        label: 'Settings' },
-];
 
 export default function Sidebar({ isOpen, onClose }) {
   const { user, restaurant, logout } = useAuthStore();
   const { canInstall, promptInstall } = useInstallPrompt();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const navItems = [
+    { to: '/',        icon: LayoutDashboard, label: 'Dashboard', end: true },
+    { to: '/menu',    icon: UtensilsCrossed, label: 'Menu' },
+    { to: '/tables',  icon: QrCode,          label: 'Tables' },
+    { to: '/orders',  icon: ClipboardList,   label: 'Orders' },
+    ...(user?.role === 'owner' || user?.role === 'manager'
+      ? [{ to: '/staff', icon: Users, label: 'Staff' }]
+      : []),
+    { to: '/settings',icon: Settings,        label: 'Settings' },
+  ];
 
   // Close mobile drawer on route change
   useEffect(() => {
@@ -86,7 +89,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
       {/* ── Navigation ──────────────────────────────────────────────── */}
       <nav className="flex-1 overflow-y-auto py-3 px-2.5" aria-label="Main navigation">
-        {NAV_ITEMS.map(({ to, icon: Icon, label, end }) => (
+        {navItems.map(({ to, icon: Icon, label, end }) => (
           <NavLink
             key={to}
             to={to}

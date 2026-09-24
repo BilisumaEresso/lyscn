@@ -13,6 +13,7 @@ const orderRoutes = require("./routes/orderRoutes");
 const assistanceRoutes = require("./routes/assistanceRoutes");
 const publicRoutes = require("./routes/publicRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
+const userRoutes = require("./routes/userRoutes");
 const { notFound, errorHandler } = require("./middleware/errorHandler");
 const requestLogger = require("./middleware/requestLogger");
 const { isProduction } = require("./config/env");
@@ -97,6 +98,7 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/assistance", assistanceRoutes);
 app.use("/api/public", publicRoutes);
 app.use("/api/upload", uploadRoutes);
+app.use("/api/users", userRoutes);
 
 // ── Catch-all & error handler (must be last) ──────────────────────────────────
 app.use(notFound);
