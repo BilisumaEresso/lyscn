@@ -398,6 +398,26 @@ export default function Menu() {
     return () => { document.title = 'LayoScan'; };
   }, [restaurant?.name]);
 
+  // Keep restaurant branding/metadata updated if owner changes logo/cover/theme
+  const { data: tableData } = useQuery({
+    queryKey: ['table-resolve', session.qrToken],
+    queryFn: () => api.get(`/public/table/${session.qrToken}`).then((r) => r.data),
+    enabled: !!session.qrToken,
+    staleTime: 30_000,
+  });
+
+  useEffect(() => {
+    if (tableData?.restaurant) {
+      session.setSession({
+        qrToken: session.qrToken,
+        restaurant: tableData.restaurant,
+        branch: tableData.branch || session.branch,
+        table: tableData.table || session.table,
+        sessionToken: tableData.sessionToken || session.sessionToken,
+      });
+    }
+  }, [tableData]);
+
   const { data, isLoading } = useQuery({
     queryKey: ['public-products', restaurantId],
     queryFn: () =>

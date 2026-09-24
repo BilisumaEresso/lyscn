@@ -7,7 +7,7 @@ import {
   Upload,
   Check,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import Button from "../components/ui/Button";
@@ -39,6 +39,8 @@ export default function Settings() {
   const { data, isLoading } = useQuery({
     queryKey: ["restaurant-me"],
     queryFn: () => api.get("/restaurants/me").then((r) => r.data),
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 
   const restaurant = data?.restaurant;
@@ -47,6 +49,8 @@ export default function Settings() {
     queryFn: () => api.get("/branches").then((r) => r.data),
   });
   const branch = branchData?.branches?.[0];
+
+  const hasInitializedRef = useRef(false);
 
   const {
     register,
@@ -71,14 +75,21 @@ export default function Settings() {
     },
   });
 
+  // Explicitly register logoUrl & coverUrl for react-hook-form dirty state tracking
+  useEffect(() => {
+    register("logoUrl");
+    register("coverUrl");
+  }, [register]);
+
   // Watch fields for live preview
   const brandColor = watch("brandColor") || "#4F46E5";
   const logoUrl = watch("logoUrl");
   const coverUrl = watch("coverUrl");
 
-  // Populate form when restaurant data loads
+  // Populate form only on initial data load to prevent window focus from wiping dirty state
   useEffect(() => {
-    if (!restaurant) return;
+    if (!restaurant || hasInitializedRef.current) return;
+    hasInitializedRef.current = true;
     reset({
       name: restaurant.name ?? "",
       description: restaurant.description ?? "",
@@ -100,6 +111,20 @@ export default function Settings() {
       api.patch("/restaurants/me", body).then((r) => r.data),
     onSuccess: (d) => {
       setRestaurant(d.restaurant);
+      reset({
+        name: d.restaurant.name ?? "",
+        description: d.restaurant.description ?? "",
+        brandColor: d.restaurant.brandColor ?? "#4F46E5",
+        logoUrl: d.restaurant.logoUrl ?? "",
+        coverUrl: d.restaurant.coverUrl ?? "",
+        contactPhone: d.restaurant.contactInfo?.phone ?? "",
+        contactEmail: d.restaurant.contactInfo?.email ?? "",
+        contactAddress: d.restaurant.contactInfo?.address ?? "",
+        instagram: d.restaurant.socialLinks?.instagram ?? "",
+        facebook: d.restaurant.socialLinks?.facebook ?? "",
+        tiktok: d.restaurant.socialLinks?.tiktok ?? "",
+        website: d.restaurant.socialLinks?.website ?? "",
+      });
       qc.invalidateQueries({ queryKey: ["restaurant-me"] });
       toast.success("Settings saved successfully");
     },
@@ -111,8 +136,8 @@ export default function Settings() {
       name: form.name,
       description: form.description,
       brandColor: form.brandColor,
-      logoUrl: form.logoUrl || null,
-      coverUrl: form.coverUrl || null,
+      logoUrl: form.logoUrl ? form.logoUrl.trim() : null,
+      coverUrl: form.coverUrl ? form.coverUrl.trim() : null,
       contactInfo: {
         phone: form.contactPhone,
         email: form.contactEmail,
@@ -291,7 +316,7 @@ export default function Settings() {
               label="Restaurant Logo"
               description="Uploaded to Cloudinary. Appears on QR cards, customer header, and bill receipts."
               value={logoUrl}
-              onChange={(url) => setValue("logoUrl", url, { shouldDirty: true })}
+              onChange={(url) => setValue("logoUrl", url, { shouldDirty: true, shouldValidate: true })}
               folder="branding"
               aspectRatio="square"
             />
@@ -299,7 +324,7 @@ export default function Settings() {
               label="Cover Banner Photo"
               description="Uploaded to Cloudinary. High-res banner image displayed at the top of your customer menu."
               value={coverUrl}
-              onChange={(url) => setValue("coverUrl", url, { shouldDirty: true })}
+              onChange={(url) => setValue("coverUrl", url, { shouldDirty: true, shouldValidate: true })}
               folder="branding"
               aspectRatio="banner"
             />

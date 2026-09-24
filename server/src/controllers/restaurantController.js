@@ -25,7 +25,11 @@ const updateMyRestaurant = async (req, res, next) => {
     const updates = {};
     for (const field of ALLOWED) {
       if (req.body[field] !== undefined) {
-        updates[field] = req.body[field];
+        if ((field === 'logoUrl' || field === 'coverUrl') && typeof req.body[field] === 'string') {
+          updates[field] = req.body[field].trim() || null;
+        } else {
+          updates[field] = req.body[field];
+        }
       }
     }
 

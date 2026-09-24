@@ -80,12 +80,24 @@ export default function ImageUploader({
     setIsDragOver(false);
   };
 
+  const handleToggleUrlMode = () => {
+    setShowUrlInput((prev) => {
+      const next = !prev;
+      if (next) {
+        setUrlDraft(value || '');
+      }
+      return next;
+    });
+  };
+
   const handleUrlApply = () => {
-    if (urlDraft.trim()) {
-      onChange(urlDraft.trim());
-      setUrlDraft('');
-      setShowUrlInput(false);
+    const trimmed = urlDraft.trim();
+    onChange(trimmed);
+    setShowUrlInput(false);
+    if (trimmed) {
       toast.success('Image URL set');
+    } else {
+      toast.success('Image removed');
     }
   };
 
@@ -96,14 +108,30 @@ export default function ImageUploader({
           <label className="block text-xs font-semibold uppercase tracking-wider text-ink/70">
             {label}
           </label>
-          <button
-            type="button"
-            onClick={() => setShowUrlInput((v) => !v)}
-            className="text-[11px] text-teal hover:underline flex items-center gap-1 font-medium"
-          >
-            <LinkIcon size={12} />
-            {showUrlInput ? 'Upload file' : 'Paste URL'}
-          </button>
+          <div className="flex items-center gap-3">
+            {value && (
+              <button
+                type="button"
+                onClick={() => {
+                  onChange('');
+                  setUrlDraft('');
+                  toast.success('Image removed');
+                }}
+                className="text-[11px] text-danger hover:underline flex items-center gap-1 font-medium"
+              >
+                <Trash2 size={12} />
+                Remove
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleToggleUrlMode}
+              className="text-[11px] text-teal hover:underline flex items-center gap-1 font-medium"
+            >
+              <LinkIcon size={12} />
+              {showUrlInput ? 'Upload file' : 'Paste URL'}
+            </button>
+          </div>
         </div>
       )}
 
@@ -118,22 +146,40 @@ export default function ImageUploader({
 
       {showUrlInput ? (
         /* Manual URL paste mode */
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={urlDraft}
-            onChange={(e) => setUrlDraft(e.target.value)}
-            placeholder="https://res.cloudinary.com/... or image link"
-            className="flex-1 px-3 py-2 text-xs rounded-xl border border-ink/15 bg-paper focus:outline-none focus:ring-2 focus:ring-teal/30"
-          />
-          <button
-            type="button"
-            onClick={handleUrlApply}
-            disabled={!urlDraft.trim()}
-            className="px-3 py-2 rounded-xl text-xs font-semibold bg-teal text-white hover:opacity-90 disabled:opacity-40"
-          >
-            Apply
-          </button>
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={urlDraft}
+              onChange={(e) => setUrlDraft(e.target.value)}
+              placeholder="https://res.cloudinary.com/... or image link"
+              className="flex-1 px-3 py-2 text-xs rounded-xl border border-ink/15 bg-paper focus:outline-none focus:ring-2 focus:ring-teal/30"
+            />
+            <button
+              type="button"
+              onClick={handleUrlApply}
+              className="px-3 py-2 rounded-xl text-xs font-semibold bg-teal text-white hover:opacity-90 active:scale-95 transition-all"
+            >
+              {urlDraft.trim() ? 'Apply' : 'Clear'}
+            </button>
+          </div>
+          {value && (
+            <div className="flex items-center justify-between text-[11px] text-ink-muted">
+              <span className="truncate max-w-[260px]">Current: {value}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  onChange('');
+                  setUrlDraft('');
+                  setShowUrlInput(false);
+                  toast.success('Image removed');
+                }}
+                className="text-danger hover:underline shrink-0 ml-2"
+              >
+                Remove image
+              </button>
+            </div>
+          )}
         </div>
       ) : value ? (
         /* Preview mode with existing image */

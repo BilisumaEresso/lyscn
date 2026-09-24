@@ -1,16 +1,22 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, UtensilsCrossed, QrCode,
-  ClipboardList, Settings, LogOut, X, Download, MapPin, Users
+  ClipboardList, Settings, LogOut, X, Download, MapPin, Users, AlertTriangle
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { useAuthStore } from '../../store/authStore';
 import { useInstallPrompt } from '../../hooks/useInstallPrompt';
+import api from '../../lib/api';
+import Modal from '../ui/Modal';
+import Button from '../ui/Button';
 import logo from '../../assets/logo.png';
 
 export default function Sidebar({ isOpen, onClose }) {
   const { user, restaurant, logout } = useAuthStore();
   const { canInstall, promptInstall } = useInstallPrompt();
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -33,18 +39,30 @@ export default function Sidebar({ isOpen, onClose }) {
   // Handle ESC key to close mobile drawer
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape' && isOpen && onClose) {
+      if (e.key === 'Escape' && isOpen && onClose && !showLogoutModal) {
         onClose();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, showLogoutModal]);
 
-  const handleLogout = () => {
-    if (onClose) onClose();
-    logout();
-    navigate('/login');
+  const handleConfirmLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      const refreshToken = useAuthStore.getState().refreshToken;
+      if (refreshToken) {
+        // Invalidate refresh token on server
+        await api.post('/auth/logout', { refreshToken }).catch(() => {});
+      }
+    } finally {
+      setIsLoggingOut(false);
+      setShowLogoutModal(false);
+      if (onClose) onClose();
+      logout();
+      navigate('/login');
+      toast.success('Signed out successfully.');
+    }
   };
 
   const navContent = (
@@ -81,7 +99,8 @@ export default function Sidebar({ isOpen, onClose }) {
           <p className="text-white/80 text-sm font-medium truncate">{restaurant.name}</p>
           {restaurant.contactInfo?.address && (
             <p className="text-white/45 text-[11px] mt-1 truncate flex items-center gap-1">
-              <MapPin size={11} /> {restaurant.contactInfo.address}
+              <MapPin size={11} className="shrink-0 text-white/30" />
+              {restaurant.contactInfo.address}
             </p>
           )}
         </div>
@@ -136,7 +155,7 @@ export default function Sidebar({ isOpen, onClose }) {
             }}
           >
             <span className="text-[11px] font-bold">
-              {user?.name?.[0]?.toUpperCase() ?? '?'}
+              {user?.name?.charAt(0)?.toUpperCase() || 'U'}
             </span>
           </div>
           <div className="flex-1 min-w-0">
@@ -158,7 +177,8 @@ export default function Sidebar({ isOpen, onClose }) {
           </button>
         )}
         <button
-          onClick={handleLogout}
+          type="button"
+          onClick={() => setShowLogoutModal(true)}
           className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm
                      text-white/45 hover:text-danger hover:bg-danger/10 transition-colors
                      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger"
@@ -195,6 +215,59 @@ export default function Sidebar({ isOpen, onClose }) {
           </aside>
         </>
       )}
+
+      {/* Custom Confirmation Modal for Sign Out */}
+      <Modal
+        open={showLogoutModal}
+        onClose={() => !isLoggingOut && setShowLogoutModal(false)}
+        title="Sign Out"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <div className="flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-danger/10 text-danger flex items-center justify-center shrink-0">
+              <LogOut size={20} />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-ink">
+                Are you sure you want to sign out?
+              </p>
+              <p className="text-xs text-ink-muted mt-1 leading-relaxed">
+                You are currently signed in as{' '}
+                <span className="font-semibold text-ink">{user?.name || user?.email}</span> (
+                <span className="capitalize">{user?.role}</span>) for{' '}
+                <span className="font-semibold text-ink">{restaurant?.name || 'your venue'}</span>.
+              </p>
+            </div>
+          </div>
+
+          <div className="p-3 rounded-xl bg-ink/3 border border-ink/8 text-xs text-ink-muted leading-relaxed">
+            Signing out will end your current session. You will need your login credentials to access the kitchen, floor, and dashboard again.
+          </div>
+
+          <div className="flex items-center justify-end gap-2.5 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isLoggingOut}
+              onClick={() => setShowLogoutModal(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              size="sm"
+              disabled={isLoggingOut}
+              onClick={handleConfirmLogout}
+              className="bg-danger hover:bg-danger/90 text-white"
+            >
+              {isLoggingOut ? 'Signing out…' : 'Yes, sign out'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </>
   );
 }

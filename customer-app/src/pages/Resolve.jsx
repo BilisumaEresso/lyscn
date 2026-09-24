@@ -20,7 +20,7 @@ export default function Resolve() {
     queryKey: ['table-resolve', qrToken],
     queryFn: () => api.get(`/public/table/${qrToken}`).then((r) => r.data),
     retry: false,
-    staleTime: Infinity,
+    staleTime: 30_000,
   });
 
   useEffect(() => {
