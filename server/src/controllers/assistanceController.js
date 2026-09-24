@@ -45,7 +45,10 @@ const requestAssistance = async (req, res, next) => {
     });
     const populated = await populateAssistance(Assistance.findById(assistance._id));
     const io = req.app.get('io');
-    if (io) io.to(`restaurant:${restaurantId}`).emit('assistance:created', populated);
+    if (io) {
+      io.to(`restaurant:${restaurantId}`).emit('assistance:created', populated);
+      io.to(`table:${tableId}`).emit('assistance:created', populated);
+    }
 
     return res.status(201).json({ success: true, assistance: populated });
   } catch (err) {
@@ -83,6 +86,10 @@ const setAssistanceStatus = (status) => async (req, res, next) => {
     const io = req.app.get('io');
     if (io) {
       io.to(`restaurant:${assistance.restaurantId}`).emit('assistance:updated', assistance);
+      const targetTableId = assistance.tableId?._id || assistance.tableId;
+      if (targetTableId) {
+        io.to(`table:${targetTableId}`).emit('assistance:updated', assistance);
+      }
     }
     return res.json({ success: true, assistance });
   } catch (err) {

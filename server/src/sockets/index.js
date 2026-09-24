@@ -82,6 +82,35 @@ function initSockets(io) {
       }
     });
 
+    // Customer or staff can join a table room to receive table updates and assistance feedback
+    socket.on('join:table', async ({ tableId, sessionToken } = {}) => {
+      if (!tableId || !/^[a-f\d]{24}$/i.test(tableId)) return;
+
+      if (socket.data.restaurantId) {
+        socket.join(`table:${tableId}`);
+        logger.debug({ socketId: socket.id, tableId }, 'Staff socket joined table room');
+        return;
+      }
+
+      if (!sessionToken) {
+        logger.debug({ socketId: socket.id, tableId }, 'Socket denied table room — no sessionToken');
+        return;
+      }
+
+      try {
+        const table = await Table.findById(tableId).select('activeSessionToken').lean();
+        if (!table || table.activeSessionToken !== sessionToken) {
+          logger.debug({ socketId: socket.id, tableId }, 'Socket denied table room — bad session');
+          return;
+        }
+
+        socket.join(`table:${tableId}`);
+        logger.debug({ socketId: socket.id, tableId }, 'Customer socket joined table room');
+      } catch (err) {
+        logger.error({ err, tableId }, 'Socket join:table error');
+      }
+    });
+
     socket.on('disconnect', () => {
       logger.debug({ socketId: socket.id }, 'Socket disconnected');
     });

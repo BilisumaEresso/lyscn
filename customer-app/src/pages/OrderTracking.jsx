@@ -15,13 +15,17 @@ import {
   Sparkles,
   Trash2,
   RotateCcw,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import clsx from 'clsx';
 import api from '../lib/api';
 import socket from '../lib/socket';
 import { applyBrandColor } from '../lib/theme';
 import { useSessionStore } from '../store/sessionStore';
+import { useCustomerNotificationStore } from '../store/customerNotificationStore';
 import AssistanceButton from '../components/AssistanceButton';
+import PushNotificationPrompt from '../components/PushNotificationPrompt';
 import Currency, { formatBirr } from '../components/Currency';
 import PoweredBy from '../components/PoweredBy';
 import { getRestaurantLogo } from '../lib/branding';
@@ -111,6 +115,8 @@ export default function OrderTracking() {
   const [selectedRoundId, setSelectedRoundId] = useState(null);
   const [slideDirection, setSlideDirection] = useState('none'); // 'left' | 'right' | 'none'
   const [logoImgError, setLogoImgError] = useState(false);
+
+  const { soundEnabled, setSoundEnabled } = useCustomerNotificationStore();
 
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
@@ -258,7 +264,6 @@ export default function OrderTracking() {
       socket.off('connect', joinAllRounds);
       socket.off('reconnect', joinAllRounds);
       socket.off('order:updated', onOrderUpdated);
-      socket.disconnect();
       joinedRooms.current.clear();
     };
   }, [rounds, qc, session.sessionToken, session.sessionId]);
@@ -289,6 +294,19 @@ export default function OrderTracking() {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => setSoundEnabled(!soundEnabled)}
+            aria-label={soundEnabled ? 'Mute notification chimes' : 'Enable notification chimes'}
+            title={soundEnabled ? 'Chimes are ON' : 'Chimes are MUTED'}
+            className="w-8 h-8 rounded-full flex items-center justify-center bg-ink/6 hover:bg-ink/10 text-ink transition-colors"
+          >
+            {soundEnabled ? (
+              <Volume2 size={15} style={{ color: 'var(--color-primary)' }} />
+            ) : (
+              <VolumeX size={15} className="text-ink-muted" />
+            )}
+          </button>
           <span className="text-xs px-2.5 py-1 rounded-full bg-ink/6 font-semibold text-ink">
             {tableData?.table?.label ?? session.table?.label ?? 'Table'}
           </span>
@@ -327,6 +345,11 @@ export default function OrderTracking() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* ── Push Notification Opt-in Prompt ─────────────────────────── */}
+      <div className="px-4 pt-1">
+        <PushNotificationPrompt />
       </div>
 
       {/* ── Multi-Round Selector (When multiple rounds exist) ─────────── */}

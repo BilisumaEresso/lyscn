@@ -378,6 +378,10 @@ const submitOrderFeedback = async (req, res, next) => {
     if (io) {
       io.to(`restaurant:${order.restaurantId}`).emit('order:updated', populatedOrder);
       io.to(`order:${order._id}`).emit('order:updated', populatedOrder);
+      const targetTableId = order.tableId?._id || order.tableId;
+      if (targetTableId) {
+        io.to(`table:${targetTableId}`).emit('order:updated', populatedOrder);
+      }
     }
     return res.json({
       success: true,
@@ -413,11 +417,15 @@ const updateOrderStatus = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Order not found.' });
     }
 
-    // ── Realtime: broadcast to restaurant room and the specific order room ────
+    // ── Realtime: broadcast to restaurant room, order room, and table room ───
     const io = req.app.get('io');
     if (io) {
       io.to(`restaurant:${order.restaurantId}`).emit('order:updated', order);
       io.to(`order:${order._id}`).emit('order:updated', order);
+      const targetTableId = order.tableId?._id || order.tableId;
+      if (targetTableId) {
+        io.to(`table:${targetTableId}`).emit('order:updated', order);
+      }
     }
 
     if (order.status === 'served' && order.paymentStatus === 'paid') {
@@ -456,11 +464,15 @@ const updateOrderPayment = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Order not found.' });
     }
 
-    // ── Realtime: broadcast to restaurant room and the specific order room ────
+    // ── Realtime: broadcast to restaurant room, order room, and table room ───
     const io = req.app.get('io');
     if (io) {
       io.to(`restaurant:${order.restaurantId}`).emit('order:updated', order);
       io.to(`order:${order._id}`).emit('order:updated', order);
+      const targetTableId = order.tableId?._id || order.tableId;
+      if (targetTableId) {
+        io.to(`table:${targetTableId}`).emit('order:updated', order);
+      }
     }
 
     if (order.status === 'served' && order.paymentStatus === 'paid') {

@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import { useSessionStore } from './store/sessionStore';
 import ErrorBoundary from './components/ErrorBoundary';
+import { useCustomerNotifications } from './hooks/useCustomerNotifications';
+import CustomerNotificationPill from './components/CustomerNotificationPill';
 
 // ── Code-split pages (loaded on demand) ──────────────────────────────────────
 const Resolve       = lazy(() => import('./pages/Resolve'));
@@ -14,6 +16,11 @@ const OrderTracking = lazy(() => import('./pages/OrderTracking'));
 const Landing       = lazy(() => import('./pages/Landing'));
 const NoSession     = lazy(() => import('./pages/NoSession'));
 const NotFound      = lazy(() => import('./pages/NotFound'));
+
+function CustomerNotificationCoordinator() {
+  useCustomerNotifications();
+  return <CustomerNotificationPill />;
+}
 
 // ── Skeleton fallbacks ────────────────────────────────────────────────────────
 function PageSkeleton() {
@@ -79,6 +86,7 @@ export default function App() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
+          <CustomerNotificationCoordinator />
           <Suspense fallback={<PageSkeleton />}>
             <Routes>
               {/* Landing entry point */}

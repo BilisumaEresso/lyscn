@@ -508,6 +508,14 @@ function TableOrdersFAB({ tableOrders, onClick, hasCart }) {
   const latestRound = tableOrders.rounds[tableOrders.rounds.length - 1];
   const totalAmount = tableOrders.summary?.totalAmount ?? 0;
   const isAllServed = tableOrders.summary?.allServed;
+  const isReady = latestRound?.status === 'ready';
+  const isPreparing = latestRound?.status === 'preparing';
+  const isAccepted = latestRound?.status === 'accepted';
+
+  let statusText = isAllServed ? 'All Served' : latestRound?.status;
+  if (isReady) statusText = 'Ready! Waiter delivering 🍽️';
+  else if (isPreparing) statusText = 'Cooking in Kitchen 🍳';
+  else if (isAccepted) statusText = 'Kitchen accepted ✓';
 
   return (
     <div
@@ -520,9 +528,15 @@ function TableOrdersFAB({ tableOrders, onClick, hasCart }) {
       <button
         onClick={onClick}
         aria-label={`View table orders, ${roundCount} rounds`}
-        className="w-full rounded-2xl px-4 py-3.5 flex items-center justify-between shadow-2xl active:scale-[0.98] transition-transform text-white border border-white/15"
+        className={clsx(
+          'w-full rounded-2xl px-4 py-3.5 flex items-center justify-between shadow-2xl active:scale-[0.98] transition-all text-white border',
+          isReady ? 'border-emerald-400/40 ring-2 ring-emerald-400/30' : 'border-white/15'
+        )}
         style={{
-          background: 'linear-gradient(135deg, #121A2C 0%, #1E293B 100%)',
+          background: isReady
+            ? 'linear-gradient(135deg, #064E3B 0%, #0D9488 100%)'
+            : 'linear-gradient(135deg, #121A2C 0%, #1E293B 100%)',
+          boxShadow: isReady ? '0 12px 32px -4px rgba(16, 185, 129, 0.45)' : undefined,
         }}
       >
         <div className="flex items-center gap-3">
@@ -530,18 +544,32 @@ function TableOrdersFAB({ tableOrders, onClick, hasCart }) {
             <div
               className={clsx(
                 'w-3 h-3 rounded-full',
-                !isAllServed ? 'bg-leaf animate-pulse' : 'bg-emerald-400'
+                isReady
+                  ? 'bg-emerald-300 animate-bounce'
+                  : !isAllServed
+                  ? 'bg-leaf animate-pulse'
+                  : 'bg-emerald-400'
               )}
             />
-            {!isAllServed && (
-              <span className="absolute w-5 h-5 rounded-full bg-leaf/30 animate-ping" />
+            {(!isAllServed || isReady) && (
+              <span
+                className={clsx(
+                  'absolute w-5 h-5 rounded-full animate-ping',
+                  isReady ? 'bg-emerald-400/50' : 'bg-leaf/30'
+                )}
+              />
             )}
           </div>
           <div className="text-left">
             <p className="font-display font-bold text-sm leading-tight flex items-center gap-1.5">
-              <span>{roundCount === 1 ? 'Round 1 Active' : `Table Orders (${roundCount} Rounds)`}</span>
-              <span className="text-[11px] font-normal text-white/70">
-                · {isAllServed ? 'All Served' : latestRound.status}
+              <span>{roundCount === 1 ? 'Round 1' : `Table Orders (${roundCount} Rounds)`}</span>
+              <span
+                className={clsx(
+                  'text-[11px] font-medium',
+                  isReady ? 'text-emerald-200 font-bold' : 'text-white/70'
+                )}
+              >
+                · {statusText}
               </span>
             </p>
             <p className="text-[11px] text-white/60 mt-0.5">
@@ -550,7 +578,12 @@ function TableOrdersFAB({ tableOrders, onClick, hasCart }) {
           </div>
         </div>
 
-        <div className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-xl bg-white/10 text-white">
+        <div
+          className={clsx(
+            'flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-xl transition-colors',
+            isReady ? 'bg-white text-emerald-950 font-bold' : 'bg-white/10 text-white'
+          )}
+        >
           <span>Track</span>
           <ChevronRight size={14} />
         </div>
