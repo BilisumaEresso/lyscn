@@ -84,9 +84,16 @@ export default function CustomerNotificationPill() {
 
         {/* Content Body */}
         <div className="flex-1 min-w-0 pr-1">
+          {/* SMS Notification Header */}
+          <div className="flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-wider text-teal mb-0.5">
+            <span>💬 LAYOSCAN ALERTS</span>
+            <span className="text-white/40">·</span>
+            <span className="text-white/60">NOW</span>
+          </div>
+
           <div className="flex items-center gap-1.5 mb-0.5">
             {activeAlert.roundNumber && (
-              <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded-md bg-white/20 text-white">
+              <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded-md bg-white/20 text-white shrink-0">
                 Round {activeAlert.roundNumber}
               </span>
             )}
@@ -97,8 +104,8 @@ export default function CustomerNotificationPill() {
           <p className="text-xs text-white/80 line-clamp-2 leading-relaxed">
             {activeAlert.message}
           </p>
-          <span className="inline-block text-[11px] font-medium text-teal hover:underline mt-1">
-            Tap to view orders →
+          <span className="inline-block text-[11px] font-semibold text-teal hover:underline mt-1">
+            Tap to view order status →
           </span>
         </div>
 

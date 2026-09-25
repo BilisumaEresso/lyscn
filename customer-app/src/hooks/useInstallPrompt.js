@@ -1,11 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 
 /**
- * Reusable hook to manage custom PWA install prompt UX.
- *
- * - Listens for `beforeinstallprompt`, captures and suppresses the default banner.
- * - Detects standalone display mode (already installed).
- * - Exposes `canInstall`, `isInstalled`, and `promptInstall()`.
+ * useInstallPrompt — PWA Install Hook for Customer App.
+ * Captures `beforeinstallprompt`, tracks standalone display mode,
+ * detects iOS Safari, and exposes `canInstall`, `isInstalled`, `promptInstall()`, and `isIOS`.
  */
 export function useInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -17,11 +15,15 @@ export function useInstallPrompt() {
     );
   });
 
+  const isIOS =
+    typeof navigator !== 'undefined' &&
+    (/iPhone|iPad|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const handleBeforeInstallPrompt = (e) => {
-      // Prevent browser's default banner
       e.preventDefault();
       setDeferredPrompt(e);
     };
@@ -65,7 +67,7 @@ export function useInstallPrompt() {
 
   const canInstall = !isInstalled && deferredPrompt !== null;
 
-  return { canInstall, isInstalled, promptInstall };
+  return { canInstall, isInstalled, promptInstall, isIOS };
 }
 
 export default useInstallPrompt;

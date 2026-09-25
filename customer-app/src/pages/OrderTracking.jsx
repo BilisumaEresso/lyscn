@@ -25,7 +25,8 @@ import { applyBrandColor } from '../lib/theme';
 import { useSessionStore } from '../store/sessionStore';
 import { useCustomerNotificationStore } from '../store/customerNotificationStore';
 import AssistanceButton from '../components/AssistanceButton';
-import PushNotificationPrompt from '../components/PushNotificationPrompt';
+import PermissionsPrompt from '../components/PermissionsPrompt';
+import InstallAppCTA from '../components/InstallAppCTA';
 import StrictLocationGate from '../components/StrictLocationGate';
 import Currency, { formatBirr } from '../components/Currency';
 import PoweredBy from '../components/PoweredBy';
@@ -365,9 +366,12 @@ export default function OrderTracking() {
         </div>
       </div>
 
-      {/* ── Push Notification Opt-in Prompt ─────────────────────────── */}
-      <div className="px-4 pt-1">
-        <PushNotificationPrompt />
+      {/* ── Assertive Device Permissions Prompt (Notifications & Sound) ── */}
+      <PermissionsPrompt variant="tracking" />
+
+      {/* ── Customer App Installation CTA Card ──────────────────────── */}
+      <div className="px-4 pt-1 pb-2">
+        <InstallAppCTA variant="card" />
       </div>
 
       {/* ── Finished Rounds Settled Notice ───────────────────────────── */}

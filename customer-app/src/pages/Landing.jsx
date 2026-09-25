@@ -9,6 +9,7 @@ import { applyBrandColor } from "../lib/theme";
 import { useSessionStore } from "../store/sessionStore";
 import { getRestaurantLogo } from "../lib/branding";
 import PoweredBy from "../components/PoweredBy";
+import InstallAppCTA from "../components/InstallAppCTA";
 import { getVisitedRestaurants, clearVisitedRestaurants } from "../lib/visitedRestaurants";
 
 /**
@@ -334,36 +335,10 @@ export default function Landing() {
           </div>
         )}
 
-        {showInstallBanner && (
-          <div className="mt-4 w-full rounded-2xl border border-ink/10 bg-white/80 p-3 shadow-sm backdrop-blur-sm">
-            <div className="flex items-start gap-3">
-              <div className="flex-1 text-left">
-                <p className="text-xs font-semibold text-ink">
-                  Add LayoScan to your home screen for faster ordering next
-                  time.
-                </p>
-              </div>
-              <button
-                type="button"
-                aria-label="Dismiss install prompt"
-                onClick={handleDismissInstallBanner}
-                className="text-ink-muted hover:text-ink"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <button
-              type="button"
-              onClick={async () => {
-                const installed = await promptInstall();
-                if (installed) handleDismissInstallBanner();
-              }}
-              className="mt-2 w-full rounded-xl bg-ink text-white px-3 py-2 text-xs font-semibold"
-            >
-              Install app
-            </button>
-          </div>
-        )}
+        {/* ── Install App CTA Banner ─────────────────────────────────── */}
+        <div className="mt-4 w-full">
+          <InstallAppCTA variant="banner" />
+        </div>
 
         {/* Manual Code Fallback Toggle */}
         <div className="mt-6">

@@ -30,6 +30,7 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,png,jpg,jpeg,ico,json}"],
+        importScripts: ["/sw-notifications.js"],
         // Keep API runtime caching intentionally light: order/table/menu data must never be served stale.
         runtimeCaching: [
           {

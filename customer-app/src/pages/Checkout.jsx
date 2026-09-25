@@ -11,6 +11,7 @@ import { applyBrandColor } from '../lib/theme';
 import { useSessionStore } from '../store/sessionStore';
 import { useCartStore, cartItemCount, cartSubtotal } from '../store/cartStore';
 import StrictLocationGate from '../components/StrictLocationGate';
+import PermissionsPrompt from '../components/PermissionsPrompt';
 import PoweredBy from '../components/PoweredBy';
 import { getRestaurantLogo } from '../lib/branding';
 import { saveVisitedRestaurant } from '../lib/visitedRestaurants';
@@ -239,6 +240,11 @@ export default function Checkout() {
             onFocus={(e) => { e.target.style.borderColor = 'var(--color-primary)'; e.target.style.boxShadow = '0 0 0 3px color-mix(in srgb, var(--color-primary) 15%, transparent)'; }}
             onBlur={(e) => { e.target.style.borderColor = ''; e.target.style.boxShadow = ''; }}
           />
+        </div>
+
+        {/* Device Notification & Sound Permissions Prompt */}
+        <div className="-mx-4">
+          <PermissionsPrompt variant="checkout" />
         </div>
 
         {/* Payment notice */}

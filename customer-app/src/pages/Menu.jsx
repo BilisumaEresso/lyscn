@@ -24,6 +24,8 @@ import { useSessionStore } from '../store/sessionStore';
 import { useCartStore, cartItemCount, cartSubtotal } from '../store/cartStore';
 import AssistanceButton from '../components/AssistanceButton';
 import StrictLocationGate from '../components/StrictLocationGate';
+import InstallAppCTA from '../components/InstallAppCTA';
+import PermissionsPrompt from '../components/PermissionsPrompt';
 import Currency, { formatBirr } from '../components/Currency';
 import CulinaryPlaceholder from '../components/menu/CulinaryPlaceholder';
 import PoweredBy from '../components/PoweredBy';
@@ -827,6 +829,14 @@ export default function Menu() {
           </div>
         </div>
       </div>
+
+      {/* ── High-visibility App Install Banner ──────────────────────────── */}
+      <div className="px-4 pt-3">
+        <InstallAppCTA variant="banner" />
+      </div>
+
+      {/* ── Device Notification & Sound Permissions Prompt ─────────────── */}
+      <PermissionsPrompt variant="menu" />
 
       {/* ── Search & Filter Bar ───────────────────────────────────────── */}
       <div className="px-4 pt-3 pb-1 bg-paper">

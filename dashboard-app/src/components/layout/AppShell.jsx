@@ -4,6 +4,7 @@ import { Menu, MapPin } from 'lucide-react';
 import Sidebar from './Sidebar';
 import BottomTabBar from './BottomTabBar';
 import NotificationCenter from './NotificationCenter';
+import MandatoryInstallPrompt from './MandatoryInstallPrompt';
 import { useAuthStore } from '../../store/authStore';
 import { useRealtimeNotifications } from '../../hooks/useRealtimeNotifications';
 import { applyBrandColor } from '../../lib/theme';
@@ -40,8 +41,12 @@ export default function AppShell() {
   const mobileTitle = PATH_LABELS[location.pathname] || '';
 
   return (
-    <div className="flex flex-col lg:flex-row h-screen overflow-hidden bg-paper">
-      {/* Mobile & Tablet Top Navbar (< 1024px) */}
+    <div className="flex flex-col h-screen overflow-hidden bg-paper">
+      {/* High-priority Frequent Mandatory Install Prompt */}
+      <MandatoryInstallPrompt />
+
+      <div className="flex flex-col lg:flex-row flex-1 overflow-hidden min-h-0">
+        {/* Mobile & Tablet Top Navbar (< 1024px) */}
       <header className="lg:hidden bg-ink text-white px-4 py-2.5 border-b border-white/10 flex items-center justify-between sticky top-0 z-30 shrink-0 shadow-md">
         <div className="flex items-center gap-2.5 min-w-0">
           <button
@@ -93,6 +98,7 @@ export default function AppShell() {
 
       {/* Mobile/Tablet Bottom Tab Bar */}
       <BottomTabBar />
+      </div>
     </div>
   );
 }

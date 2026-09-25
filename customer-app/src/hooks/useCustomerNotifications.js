@@ -33,28 +33,69 @@ export function useCustomerNotifications() {
     initCustomerAudioUnlock();
   }, []);
 
-  // Background Web Push Notification helper
-  const sendBackgroundNotification = (title, body) => {
+  // Background Panel Notification dispatcher (SMS-like alerts on mobile notification shade & desktop)
+  const sendBackgroundNotification = (title, body, orderId = null) => {
     if (
-      typeof window !== 'undefined' &&
-      'Notification' in window &&
-      Notification.permission === 'granted' &&
-      document.visibilityState === 'hidden'
+      typeof window === 'undefined' ||
+      !('Notification' in window) ||
+      Notification.permission !== 'granted'
     ) {
-      try {
-        const n = new Notification(title, {
-          body,
-          icon: restaurant?.logoUrl || '/assets/logo.png',
-          badge: '/assets/logo.png',
-          tag: 'layoscan-order-status',
+      return;
+    }
+
+    // Only dispatch background system alert if user is away from the page or screen is off/locked
+    if (document.visibilityState !== 'hidden') {
+      return;
+    }
+
+    const targetUrl = orderId ? `/order/${orderId}` : '/orders';
+    const venueName = restaurant?.name || 'LayoScan';
+    const tableLabel = table?.label ? ` · Table ${table.label}` : '';
+
+    // SMS-style presentation: Sender heading + concise body message
+    const smsTitle = `💬 ${venueName}${tableLabel}`;
+    const smsBody = `${title}\n${body}`;
+
+    const notificationOptions = {
+      body: smsBody,
+      icon: restaurant?.logoUrl || '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
+      tag: orderId ? `layoscan-order-${orderId}` : 'layoscan-order-status',
+      renotify: true,
+      requireInteraction: true, // Keep notification pinned on panel until dismissed or opened
+      vibrate: [300, 100, 300, 100, 300], // SMS vibration cadence
+      data: {
+        url: targetUrl,
+        orderId,
+        timestamp: Date.now(),
+      },
+    };
+
+    // Prefer Service Worker registration (delivers reliably on mobile notification panel / lock screen)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready
+        .then((reg) => {
+          return reg.showNotification(smsTitle, notificationOptions);
+        })
+        .catch((err) => {
+          console.debug('[Push] SW showNotification failed, trying fallback:', err);
+          tryWindowNotification(smsTitle, notificationOptions, targetUrl);
         });
-        n.onclick = () => {
-          window.focus();
-          n.close();
-        };
-      } catch (err) {
-        console.debug('[Push] Notification dispatch failed:', err);
-      }
+    } else {
+      tryWindowNotification(smsTitle, notificationOptions, targetUrl);
+    }
+  };
+
+  const tryWindowNotification = (title, options, targetUrl) => {
+    try {
+      const n = new Notification(title, options);
+      n.onclick = () => {
+        window.focus();
+        if (targetUrl) window.location.pathname = targetUrl;
+        n.close();
+      };
+    } catch (err) {
+      console.debug('[Push] Fallback Notification failed:', err);
     }
   };
 
@@ -127,7 +168,7 @@ export function useCustomerNotifications() {
               status: 'accepted',
               icon: 'chef',
             });
-            sendBackgroundNotification(`🍳 ${title}`, message);
+            sendBackgroundNotification(`🍳 ${title}`, message, order._id);
             break;
           }
 
@@ -144,7 +185,7 @@ export function useCustomerNotifications() {
               status: 'preparing',
               icon: 'flame',
             });
-            sendBackgroundNotification(`🔥 ${title}`, message);
+            sendBackgroundNotification(`🔥 ${title}`, message, order._id);
             break;
           }
 
@@ -161,7 +202,7 @@ export function useCustomerNotifications() {
               status: 'ready',
               icon: 'utensils',
             });
-            sendBackgroundNotification(title, message);
+            sendBackgroundNotification(title, message, order._id);
             break;
           }
 
@@ -178,7 +219,7 @@ export function useCustomerNotifications() {
               status: 'served',
               icon: 'check',
             });
-            sendBackgroundNotification(`😋 ${title}`, message);
+            sendBackgroundNotification(`😋 ${title}`, message, order._id);
             break;
           }
 
@@ -195,7 +236,7 @@ export function useCustomerNotifications() {
               status: 'cancelled',
               icon: 'alert',
             });
-            sendBackgroundNotification(`⚠️ ${title}`, message);
+            sendBackgroundNotification(`⚠️ ${title}`, message, order._id);
             break;
           }
 
@@ -218,7 +259,7 @@ export function useCustomerNotifications() {
           status: 'paid',
           icon: 'receipt',
         });
-        sendBackgroundNotification(`💳 ${title}`, message);
+        sendBackgroundNotification(`💳 ${title}`, message, order._id);
       }
     };
 
@@ -245,7 +286,7 @@ export function useCustomerNotifications() {
           status: 'acknowledged',
           timestamp: Date.now(),
         });
-        sendBackgroundNotification(`🏃‍♂️ ${title}`, message);
+        sendBackgroundNotification(`🏃‍♂️ ${title}`, message, null);
       } else if (assistance.status === 'resolved') {
         setAssistanceState(null);
       }
