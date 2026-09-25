@@ -19,7 +19,7 @@ function normalizePhone(phone) {
   if (!phone || typeof phone !== 'string') return '';
   
   // Remove all non-digits except a leading +
-  let cleaned = phone.trim().replace(/[\s\-\(\)\.]/g, '');
+  let cleaned = phone.trim().replace(/[\s\-.()]/g, '');
 
   // If starts with +251 or 251 (Ethiopia country code)
   if (cleaned.startsWith('+251')) {

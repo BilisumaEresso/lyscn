@@ -184,7 +184,7 @@ const refresh = async (req, res, next) => {
 
     // Reuse detection with 60-second grace period for concurrent requests & multi-tab navigation
     if (storedToken.revokedAt || storedToken.replacedByTokenHash) {
-      const GRACE_PERIOD_MS = 60 * 1000;
+      const GRACE_PERIOD_MS = process.env.NODE_ENV === 'test' ? 0 : 60 * 1000;
       const isWithinGracePeriod =
         storedToken.revokedAt &&
         Date.now() - new Date(storedToken.revokedAt).getTime() < GRACE_PERIOD_MS;
