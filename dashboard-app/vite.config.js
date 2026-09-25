@@ -29,6 +29,7 @@ export default defineConfig({
         ],
       },
       workbox: {
+        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024, // 8 MiB to support high-res print template assets
         globPatterns: ["**/*.{js,css,html,svg,png,jpg,jpeg,ico,json}"],
         // Keep API runtime caching intentionally light: order/table/menu data must never be served stale.
         runtimeCaching: [

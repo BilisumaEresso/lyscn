@@ -19,6 +19,11 @@ const restaurantSchema = new mongoose.Schema(
     logoUrl:  { type: String, default: null },
     coverUrl: { type: String, default: null },
     brandColor: { type: String, default: '#4F46E5' },
+    qrCardTemplate: {
+      type: String,
+      enum: ['cafe_artisan', 'fast_casual', 'fresh_mart', 'luxury_hotel', 'cultural_heritage', 'liquor_bar'],
+      default: 'cafe_artisan',
+    },
 
     description: { type: String },
     socialLinks: {

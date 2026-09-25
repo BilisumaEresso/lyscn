@@ -1,12 +1,14 @@
 import QRCodeStyling from 'qr-code-styling';
 import JSZip from 'jszip';
-import { loadImage, sanitizeFilename, formatTableCode, saveAs } from './canvasHelpers';
+import { loadImage, sanitizeFilename, formatTableCode, saveAs, getThemedQRIconDataUrl } from './canvasHelpers';
 import logoImg from '../assets/logo.png';
 import cafeLogoPlaceholder from '../assets/cafe_logo_placeholder.png';
 import cafeLatteHeroImg from '../assets/templates/cafe_latte_hero.jpg';
 import greenMartHeroImg from '../assets/templates/green_mart_harvest_hero.jpg';
 import skyViewSuiteHeroImg from '../assets/templates/skyview_hotel_suite_hero.jpg';
 import enatFeastHeroImg from '../assets/templates/enat_feast_hero.jpg';
+import liquorHeroImg from '../assets/templates/liquor_bar_hero.jpg';
+import liquorBgImg from '../assets/templates/liquor_bg.jpg';
 
 // Import Templates
 import {
@@ -29,6 +31,10 @@ import {
   renderCulturalHeritagePortrait,
   renderCulturalHeritageLandscape,
 } from './templates/culturalHeritage';
+import {
+  renderLiquorBarPortrait,
+  renderLiquorBarLandscape,
+} from './templates/liquorBar';
 
 const CUSTOMER_URL = import.meta.env.VITE_CUSTOMER_APP_URL || 'https://layoscancustomer.vercel.app';
 
@@ -36,10 +42,12 @@ const CUSTOMER_URL = import.meta.env.VITE_CUSTOMER_APP_URL || 'https://layoscanc
 export const QR_TEMPLATES = [
   {
     id: 'cafe_artisan',
-    name: 'Elili Cafe',
+    name: 'Artisan Linen',
     icon: '☕',
-    category: 'Artisanal Cafe & Bakery',
-    description: 'Warm linen stationery with botanical leaves & latte art hero',
+    category: 'Cafe & Bakery',
+    sampleName: 'Elili Cafe',
+    sampleTagline: 'GOOD FOOD • GREAT COFFEE • BETTER DAYS',
+    description: 'Warm textured linen parchment with delicate botanical sprigs and latte art',
     dotColor: '#1B382B',
     cornerColor: '#1B382B',
     accentColor: '#1B382B',
@@ -52,10 +60,12 @@ export const QR_TEMPLATES = [
   },
   {
     id: 'fast_casual',
-    name: 'GoodBite',
+    name: 'Bold Street',
     icon: '🍔',
-    category: 'Burgers, Pizza & Street Food',
-    description: 'Matte dark mode with radiant amber-orange waves & food doodles',
+    category: 'Fast Casual & Street Food',
+    sampleName: 'GoodBite',
+    sampleTagline: 'BURGERS • PIZZA • STREET FOOD',
+    description: 'Matte dark charcoal mode with radiant amber-gold ribbon waves and street energy',
     dotColor: '#FFFFFF',
     cornerColor: '#FFFFFF',
     accentColor: '#FFA800',
@@ -68,10 +78,12 @@ export const QR_TEMPLATES = [
   },
   {
     id: 'fresh_mart',
-    name: 'GreenMart',
+    name: 'Fresh Emerald',
     icon: '🥗',
-    category: 'Fresh Market, Grocery & Deli',
-    description: 'Lush emerald gradient with fresh harvest imagery & sprout logo',
+    category: 'Market & Deli',
+    sampleName: 'GreenMart',
+    sampleTagline: 'GROCERY • BAR • DAILY NEEDS',
+    description: 'Lush deep emerald gradient with fresh harvest produce and botanical vitality',
     dotColor: '#0B3B24',
     cornerColor: '#0B3B24',
     accentColor: '#86EFAC',
@@ -84,10 +96,12 @@ export const QR_TEMPLATES = [
   },
   {
     id: 'luxury_hotel',
-    name: 'SkyView Hotel',
+    name: 'Midnight Gold',
     icon: '🏨',
-    category: 'Luxury Hotel, Stay & Fine Dining',
-    description: 'Midnight navy with architectural gold crown & suite photography',
+    category: 'Hotel & Fine Dining',
+    sampleName: 'SkyView Hotel',
+    sampleTagline: 'STAY • DINE • RELAX',
+    description: 'Midnight navy with architectural gold framing and refined hospitality',
     dotColor: '#0C192E',
     cornerColor: '#0C192E',
     accentColor: '#E5C583',
@@ -100,19 +114,40 @@ export const QR_TEMPLATES = [
   },
   {
     id: 'cultural_heritage',
-    name: 'Enat',
+    name: 'Habesha Heritage',
     icon: '🍲',
-    category: 'Cultural Heritage & Traditional Dining',
-    description: 'Ethiopian Tibeb woven border with parchment & traditional Mesob feast',
-    dotColor: '#7A1D16',
-    cornerColor: '#7A1D16',
-    accentColor: '#7A1D16',
-    badgeBg: '#7A1D16',
+    category: 'Cultural Dining',
+    sampleName: 'Enat',
+    sampleTagline: 'TRADITIONAL FOOD & DRINK',
+    description: 'Aged Brana parchment with authentic royal Tibeb woven border and Mesob feast',
+    dotColor: '#781812',
+    cornerColor: '#781812',
+    accentColor: '#781812',
+    badgeBg: '#781812',
     badgeText: '#FFFFFF',
     backgroundColor: '#FFFFFF',
     defaultHero: enatFeastHeroImg,
     renderPortrait: renderCulturalHeritagePortrait,
     renderLandscape: renderCulturalHeritageLandscape,
+  },
+  {
+    id: 'liquor_bar',
+    name: 'Velvet Lounge',
+    icon: '🍸',
+    category: 'Bar, Lounge & Club',
+    sampleName: 'Bar House',
+    sampleTagline: 'GOOD DRINKS • GREAT VIBES • ALWAYS',
+    description: 'Luxurious dark velvet ambiance with amber bokeh, gold brackets, and craft cocktails',
+    dotColor: '#120F0D',
+    cornerColor: '#120F0D',
+    accentColor: '#E5C583',
+    badgeBg: '#E5C583',
+    badgeText: '#0D0B08',
+    backgroundColor: '#FFFDF7',
+    defaultHero: liquorHeroImg,
+    defaultBg: liquorBgImg,
+    renderPortrait: renderLiquorBarPortrait,
+    renderLandscape: renderLiquorBarLandscape,
   },
 ];
 
@@ -179,11 +214,12 @@ export async function renderPrintCardCanvas({
   const template = getTemplateById(templateId);
   const qrUrl = `${CUSTOMER_URL}/t/${table.qrToken}`;
 
-  // 1. Generate QR Code
+  // 1. Generate QR Code with custom restaurant logo OR archetype-themed center icon
+  const fallbackLogo = getThemedQRIconDataUrl(templateId);
   const qrStyling = createStyledQR({
     url: qrUrl,
     brandColor: restaurant?.brandColor || template.accentColor,
-    logoUrl: restaurant?.logoUrl,
+    logoUrl: restaurant?.logoUrl || fallbackLogo,
     size: 600,
     dotColor: template.dotColor,
     cornerColor: template.cornerColor,
@@ -208,6 +244,7 @@ export async function renderPrintCardCanvas({
   }
 
   const heroImage = await loadImage(template.defaultHero);
+  const bgImage = await loadImage(template.defaultBg);
 
   // 3. Create Canvas
   const isLandscape = orientation === 'landscape';
@@ -227,6 +264,7 @@ export async function renderPrintCardCanvas({
     qrImage,
     logoImage,
     heroImage,
+    bgImage,
     width,
     height,
   });

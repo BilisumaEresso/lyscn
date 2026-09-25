@@ -39,11 +39,16 @@ function ArchetypeMiniature({ template }) {
       )}
       {template.id === 'cultural_heritage' && (
         <div
-          className="w-full h-4 rounded-t-lg flex items-center justify-center border-b border-[#7A1D16]/20"
+          className="w-full h-4 rounded-t-lg flex items-center justify-center border-b border-[#781812]/20"
           style={{
-            background: 'repeating-linear-gradient(45deg, #7A1D16, #7A1D16 3px, #D97706 3px, #D97706 6px)',
+            background: 'repeating-linear-gradient(45deg, #781812, #781812 3px, #D97706 3px, #D97706 6px)',
           }}
         />
+      )}
+      {template.id === 'liquor_bar' && (
+        <div className="w-full h-5 rounded-t-lg bg-[#0D0B08] border-b border-[#E5C583]/40 flex items-center justify-center">
+          <div className="w-3 h-1 rounded-full bg-[#E5C583]" />
+        </div>
       )}
 
       {/* Middle QR Code Miniature Mockup */}

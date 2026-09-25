@@ -1,5 +1,7 @@
 import {
   drawPillBadge,
+  drawThemedCodeBadge,
+  drawImageCover,
   drawStepFlowNodes,
   drawLayoScanFooter,
   drawBotanicalSprig,
@@ -8,7 +10,7 @@ import {
 
 /**
  * ─────────────────────────────────────────────────────────────────────────────
- * TEMPLATE 3: GREENMART (Fresh Market, Grocery & Healthy Deli)
+ * TEMPLATE 3: FRESH EMERALD (Fresh Market, Grocery & Organic Deli)
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -81,19 +83,29 @@ export async function renderFreshMartPortrait(ctx, {
   ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, width, height);
 
+  // Subtle organic texture
+  ctx.save();
+  ctx.fillStyle = 'rgba(134, 239, 172, 0.025)';
+  for (let y = 14; y < height; y += 38) {
+    for (let x = 14; x < width; x += 38) {
+      ctx.fillRect(x + ((y * 5) % 13), y, 2.5, 2.5);
+    }
+  }
+  ctx.restore();
+
   // 2. Corner Foliage Sprigs
-  drawBotanicalSprig(ctx, 60, 60, 1.15, -0.15, 'rgba(134, 239, 172, 0.25)');
-  drawBotanicalSprig(ctx, width - 60, 60, 1.15, Math.PI / 2 + 0.15, 'rgba(134, 239, 172, 0.25)');
+  drawBotanicalSprig(ctx, 60, 60, 1.15, -0.15, 'rgba(134, 239, 172, 0.3)');
+  drawBotanicalSprig(ctx, width - 60, 60, 1.15, Math.PI / 2 + 0.15, 'rgba(134, 239, 172, 0.3)');
 
   // 3. Header: Sprout Emblem or Custom Brand Logo
-  const headerCenterY = 145;
+  const headerCenterY = 148;
   if (logoImage) {
-    const logoSize = 110;
+    const logoSize = 105;
     ctx.save();
     ctx.beginPath();
-    ctx.arc(width / 2, headerCenterY, logoSize / 2 + 5, 0, Math.PI * 2);
+    ctx.arc(width / 2, headerCenterY, logoSize / 2 + 4, 0, Math.PI * 2);
     ctx.fillStyle = deepEmerald;
-    ctx.shadowColor = 'rgba(134, 239, 172, 0.25)';
+    ctx.shadowColor = 'rgba(134, 239, 172, 0.3)';
     ctx.shadowBlur = 18;
     ctx.fill();
     ctx.lineWidth = 2.4;
@@ -106,34 +118,35 @@ export async function renderFreshMartPortrait(ctx, {
     ctx.drawImage(logoImage, width / 2 - logoSize / 2, headerCenterY - logoSize / 2, logoSize, logoSize);
     ctx.restore();
   } else {
-    drawSproutLeavesLogo(ctx, width / 2, headerCenterY, 110, mintAccent);
+    drawSproutLeavesLogo(ctx, width / 2, headerCenterY, 105, mintAccent);
   }
 
-  // 4. Restaurant Title: Clean Modern Sans
+  // 4. Restaurant Title: Clean Modern Sans (generous spacing below emblem)
   const restName = restaurant?.name || 'GreenMart';
   ctx.save();
   ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = '800 58px "Space Grotesk", Inter, sans-serif';
-  ctx.fillText(restName, width / 2, 246, width - 240);
+  ctx.font = '800 54px "Space Grotesk", Inter, sans-serif';
+  ctx.fillText(restName, width / 2, 245, width - 200);
 
-  // Tagline: 3-dot categories
+  // Tagline: 3-dot categories (cleanly spaced)
   const tagline = (restaurant?.description || 'GROCERY • BAR • DAILY NEEDS').toUpperCase();
   ctx.fillStyle = textMuted;
-  ctx.font = '700 20px "Space Grotesk", Inter, sans-serif';
-  ctx.fillText(tagline, width / 2, 284, width - 260);
+  ctx.font = '700 21px "Space Grotesk", Inter, sans-serif';
+  ctx.fillText(tagline, width / 2, 292, width - 220);
   ctx.restore();
 
-  // 5. QR Code Card Container (Crisp white with emerald drop shadow)
-  const qrBoxSize = 610;
+  // 5. QR Code Card Container (balanced 510px size gives vertical air)
+  const qrBoxSize = 510;
   const qrBoxX = width / 2 - qrBoxSize / 2;
-  const qrBoxY = 325;
-  const qrBoxRadius = 38;
+  const qrBoxY = 345;
+  const qrBoxRadius = 32;
 
   ctx.save();
-  ctx.shadowColor = 'rgba(11, 59, 36, 0.35)';
+  ctx.shadowColor = 'rgba(11, 59, 36, 0.4)';
   ctx.shadowBlur = 30;
-  ctx.shadowOffsetY = 10;
+  ctx.shadowOffsetY = 8;
 
   ctx.beginPath();
   ctx.roundRect(qrBoxX, qrBoxY, qrBoxSize, qrBoxSize, qrBoxRadius);
@@ -141,22 +154,22 @@ export async function renderFreshMartPortrait(ctx, {
   ctx.fill();
 
   ctx.lineWidth = 2.4;
-  ctx.strokeStyle = 'rgba(134, 239, 172, 0.4)';
+  ctx.strokeStyle = 'rgba(134, 239, 172, 0.45)';
   ctx.stroke();
   ctx.restore();
 
-  // Draw QR Image
+  // Draw QR Image inside container
   if (qrImage) {
-    const qrInnerSize = 530;
+    const qrInnerSize = 440;
     const qrInnerX = width / 2 - qrInnerSize / 2;
     const qrInnerY = qrBoxY + (qrBoxSize - qrInnerSize) / 2;
     ctx.drawImage(qrImage, qrInnerX, qrInnerY, qrInnerSize, qrInnerSize);
   }
 
   // 6. Table Pill Badge: Soft Pistachio Mint Green
-  const pillW = 380;
-  const pillH = 76;
-  const pillY = qrBoxY + qrBoxSize + 36; // ~971
+  const pillW = 360;
+  const pillH = 64;
+  const pillY = qrBoxY + qrBoxSize + 40; // ~895
   drawPillBadge(ctx, {
     x: width / 2 - pillW / 2,
     y: pillY,
@@ -165,82 +178,77 @@ export async function renderFreshMartPortrait(ctx, {
     bgColor: mintAccent,
     text: tableLabel,
     textColor: deepEmerald,
-    font: '800 42px "Space Grotesk", Inter, sans-serif',
+    font: '800 38px "Space Grotesk", Inter, sans-serif',
   });
 
-  // 7. 3-Step Instruction Flow Node Row
-  const stepsY = pillY + pillH + 68; // ~1115
+  // 7. Prominent Table CODE Capsule Badge (Directly below table badge - crisp mint green!)
+  const codeY = pillY + pillH + 34; // ~993
+  drawThemedCodeBadge(ctx, {
+    cx: width / 2,
+    cy: codeY,
+    code: tableCodeFormatted,
+    bgColor: '#041B10',
+    borderColor: mintAccent,
+    borderWidth: 1.8,
+    textColor: mintAccent,
+    labelColor: textMuted,
+    width: 460,
+    height: 50,
+    radius: 14,
+    shadow: true,
+    shadowColor: 'rgba(134, 239, 172, 0.25)',
+  });
+
+  // 8. 3-Step Instruction Flow Node Row (generous spacing below code badge)
+  const stepsY = codeY + 70; // ~1063
   drawStepFlowNodes(ctx, {
     cx: width / 2,
     cy: stepsY,
     color: mintAccent,
     textColor: textMuted,
-    circleRadius: 36,
-    spacing: 215,
+    circleRadius: 28,
+    spacing: 210,
     orderIconType: 'cart',
     labels: ['Scan', 'View Menu', 'Order'],
   });
 
-  // 8. Script Catchphrase: "Fresh Choices Every Day"
-  const scriptY = stepsY + 98; // ~1213
+  // 9. Script Catchphrase: "Fresh Choices Every Day" (ample breathing space below step labels!)
+  const scriptY = stepsY + 98; // ~1161 (label ends at 1103, so 58px of clear space!)
   ctx.save();
   ctx.translate(width / 2, scriptY);
   ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'italic 700 40px "Caveat", "Brush Script MT", cursive, sans-serif';
+  ctx.font = 'italic 700 44px "Caveat", "Brush Script MT", cursive, sans-serif';
   ctx.fillText('Fresh Choices Every Day', 0, 0);
   ctx.restore();
 
-  // 9. Bottom Hero Harvest Photograph (Feathered seamlessly into dark background)
+  // 10. Bottom Hero Harvest Photograph (Undistorted via drawImageCover + feathered seamlessly)
   if (heroImage) {
-    const heroH = 430;
-    const heroY = height - heroH - 60;
+    const heroH = 390;
+    const heroY = height - heroH - 85;
 
     ctx.save();
-    // Rounded container with soft upward fade
-    ctx.beginPath();
-    ctx.roundRect(40, heroY, width - 80, heroH, 32);
-    ctx.clip();
+    // Rounded frame with drawImageCover
+    drawImageCover(ctx, heroImage, 40, heroY, width - 80, heroH, 30);
 
-    ctx.drawImage(heroImage, 40, heroY, width - 80, heroH);
-
-    // Dark gradient feather overlay on top of photo to blend seamlessly
-    const topFeather = ctx.createLinearGradient(0, heroY, 0, heroY + 120);
+    // Dark gradient feather overlay on top of photo to blend seamlessly into background
+    const topFeather = ctx.createLinearGradient(0, heroY, 0, heroY + 140);
     topFeather.addColorStop(0, deepEmerald);
     topFeather.addColorStop(1, 'rgba(11, 59, 36, 0)');
     ctx.fillStyle = topFeather;
-    ctx.fillRect(40, heroY, width - 80, 120);
+    ctx.beginPath();
+    ctx.roundRect(40, heroY, width - 80, 140, [30, 30, 0, 0]);
+    ctx.fill();
 
     ctx.restore();
   }
 
-  // 10. Manual Table Code Fallback Pill
-  const codeBoxW = 440;
-  const codeBoxH = 50;
-  const codeBoxX = width / 2 - codeBoxW / 2;
-  const codeBoxY = height - 150;
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.roundRect(codeBoxX, codeBoxY, codeBoxW, codeBoxH, 16);
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
-  ctx.fill();
-  ctx.lineWidth = 1.4;
-  ctx.strokeStyle = 'rgba(134, 239, 172, 0.4)';
-  ctx.stroke();
-
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = '700 18px "Space Grotesk", monospace';
-  ctx.fillText(`CODE: ${tableCodeFormatted}`, width / 2, codeBoxY + codeBoxH / 2);
-  ctx.restore();
-
-  // 11. "Powered by LayoScan" Footer Badge
+  // 11. "Powered by LayoScan" Footer Badge (Cleanly anchored, zero collision!)
   await drawLayoScanFooter(ctx, {
     cx: width / 2,
-    cy: height - 70,
-    badgeW: 380,
+    cy: height - 60,
+    badgeW: 390,
     badgeH: 56,
     theme: 'light',
     accentColor: deepEmerald,
@@ -281,11 +289,12 @@ export async function renderFreshMartLandscape(ctx, {
   const leftCenterX = 480;
 
   // Header Logo or Sprout Emblem
+  const headerCenterY = 125;
   if (logoImage) {
-    const logoSize = 100;
+    const logoSize = 96;
     ctx.save();
     ctx.beginPath();
-    ctx.arc(leftCenterX, 115, logoSize / 2 + 4, 0, Math.PI * 2);
+    ctx.arc(leftCenterX, headerCenterY, logoSize / 2 + 4, 0, Math.PI * 2);
     ctx.fillStyle = deepEmerald;
     ctx.shadowColor = 'rgba(134, 239, 172, 0.25)';
     ctx.shadowBlur = 16;
@@ -295,150 +304,200 @@ export async function renderFreshMartLandscape(ctx, {
     ctx.stroke();
 
     ctx.beginPath();
-    ctx.arc(leftCenterX, 115, logoSize / 2, 0, Math.PI * 2);
+    ctx.arc(leftCenterX, headerCenterY, logoSize / 2, 0, Math.PI * 2);
     ctx.clip();
-    ctx.drawImage(logoImage, leftCenterX - logoSize / 2, 115 - logoSize / 2, logoSize, logoSize);
+    ctx.drawImage(logoImage, leftCenterX - logoSize / 2, headerCenterY - logoSize / 2, logoSize, logoSize);
     ctx.restore();
   } else {
-    drawSproutLeavesLogo(ctx, leftCenterX, 115, 100, mintAccent);
+    drawSproutLeavesLogo(ctx, leftCenterX, headerCenterY, 96, mintAccent);
   }
 
-  // Restaurant Name
+  // Restaurant Name (ample spacing below emblem)
   const restName = restaurant?.name || 'GreenMart';
   ctx.save();
   ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = '800 52px "Space Grotesk", Inter, sans-serif';
-  ctx.fillText(restName, leftCenterX, 205, 860);
+  ctx.font = '800 50px "Space Grotesk", Inter, sans-serif';
+  ctx.fillText(restName, leftCenterX, 218, 860);
 
-  // Tagline
+  // Tagline (cleanly spaced)
   const tagline = (restaurant?.description || 'GROCERY • BAR • DAILY NEEDS').toUpperCase();
   ctx.fillStyle = textMuted;
-  ctx.font = '700 18px "Space Grotesk", Inter, sans-serif';
-  ctx.fillText(tagline, leftCenterX, 242, 860);
+  ctx.font = '700 19px "Space Grotesk", Inter, sans-serif';
+  ctx.fillText(tagline, leftCenterX, 262, 860);
   ctx.restore();
 
   // Table Pill Badge
   const pillW = 340;
-  const pillH = 70;
+  const pillH = 62;
+  const pillY = 304;
   drawPillBadge(ctx, {
     x: leftCenterX - pillW / 2,
-    y: 285,
+    y: pillY,
     width: pillW,
     height: pillH,
     bgColor: mintAccent,
     text: tableLabel,
     textColor: deepEmerald,
-    font: '800 38px "Space Grotesk", Inter, sans-serif',
+    font: '800 36px "Space Grotesk", Inter, sans-serif',
   });
 
-  // 3-Step Flow Nodes
+  // Prominent Table CODE Capsule Badge on Left (Under Table 1 Badge)
+  const codeY = pillY + pillH + 30; // ~396
+  drawThemedCodeBadge(ctx, {
+    cx: leftCenterX,
+    cy: codeY,
+    code: tableCodeFormatted,
+    bgColor: '#041B10',
+    borderColor: mintAccent,
+    borderWidth: 1.8,
+    textColor: mintAccent,
+    labelColor: textMuted,
+    width: 440,
+    height: 48,
+    radius: 14,
+    shadow: true,
+    shadowColor: 'rgba(134, 239, 172, 0.25)',
+  });
+
+  // 3-Step Flow Nodes (generous spacing below code badge)
+  const stepsY = codeY + 68; // ~464
   drawStepFlowNodes(ctx, {
     cx: leftCenterX,
-    cy: 430,
+    cy: stepsY,
     color: mintAccent,
     textColor: textMuted,
-    circleRadius: 34,
-    spacing: 190,
+    circleRadius: 26,
+    spacing: 180,
     orderIconType: 'cart',
     labels: ['Scan', 'View Menu', 'Order'],
   });
 
-  // Catchphrase
+  // Script Catchphrase (ample breathing space below step labels - zero overlap!)
+  const scriptY = stepsY + 92; // ~556 (step labels end at 502, 54px clear space!)
   ctx.save();
   ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
   ctx.fillStyle = '#FFFFFF';
   ctx.font = 'italic 700 42px "Caveat", "Brush Script MT", cursive, sans-serif';
-  ctx.fillText('Fresh Choices Every Day', leftCenterX, 555);
+  ctx.fillText('Fresh Choices Every Day', leftCenterX, scriptY);
   ctx.restore();
 
-  // Bottom Hero Image on Left
+  // Bottom Hero Image on Left if available
   if (heroImage) {
-    const heroW = 440;
-    const heroH = 340;
-    const hx = leftCenterX - heroW / 2;
-    const hy = height - heroH - 90;
-
+    const heroSize = 350;
+    const hx = 580;
+    const hy = height - heroSize - 70;
     ctx.save();
     ctx.beginPath();
-    ctx.roundRect(hx, hy, heroW, heroH, 24);
-    ctx.clip();
-    ctx.drawImage(heroImage, hx, hy, heroW, heroH);
+    ctx.arc(hx + heroSize / 2, hy + heroSize / 2, heroSize / 2, 0, Math.PI * 2);
+    ctx.fillStyle = '#041B10';
+    ctx.shadowColor = 'rgba(134, 239, 172, 0.3)';
+    ctx.shadowBlur = 24;
+    ctx.shadowOffsetY = 6;
+    ctx.fill();
 
-    const fade = ctx.createLinearGradient(0, hy, 0, hy + 90);
-    fade.addColorStop(0, deepEmerald);
-    fade.addColorStop(1, 'rgba(11, 59, 36, 0)');
-    ctx.fillStyle = fade;
-    ctx.fillRect(hx, hy, heroW, 90);
+    // Photo clipped to circle with object-fit cover
+    drawImageCover(ctx, heroImage, hx, hy, heroSize, heroSize, heroSize / 2);
+
+    ctx.beginPath();
+    ctx.arc(hx + heroSize / 2, hy + heroSize / 2, heroSize / 2, 0, Math.PI * 2);
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = mintAccent;
+    ctx.stroke();
     ctx.restore();
   }
 
   // Left Footer
   await drawLayoScanFooter(ctx, {
     cx: 320,
-    cy: height - 60,
+    cy: height - 55,
     badgeW: 360,
     badgeH: 52,
-    theme: 'light',
-    accentColor: deepEmerald,
+    theme: 'dark',
+    accentColor: mintAccent,
   });
 
   // 4. Right Section: Large QR Code Presentation (x: 980 -> 1800)
   const rightCenterX = 1380;
-  const qrBoxSize = 650;
+  const qrBoxSize = 560;
   const qrBoxX = rightCenterX - qrBoxSize / 2;
-  const qrBoxY = 120;
-  const qrBoxRadius = 38;
+  const qrBoxY = 110;
+  const qrBoxRadius = 36;
 
   ctx.save();
   ctx.shadowColor = 'rgba(11, 59, 36, 0.4)';
-  ctx.shadowBlur = 32;
-  ctx.shadowOffsetY = 12;
+  ctx.shadowBlur = 30;
+  ctx.shadowOffsetY = 10;
 
   ctx.beginPath();
   ctx.roundRect(qrBoxX, qrBoxY, qrBoxSize, qrBoxSize, qrBoxRadius);
   ctx.fillStyle = '#FFFFFF';
   ctx.fill();
   ctx.lineWidth = 2.4;
-  ctx.strokeStyle = 'rgba(134, 239, 172, 0.4)';
+  ctx.strokeStyle = 'rgba(134, 239, 172, 0.45)';
   ctx.stroke();
   ctx.restore();
 
   if (qrImage) {
-    const qrInnerSize = 570;
+    const qrInnerSize = 490;
     const qrInnerX = rightCenterX - qrInnerSize / 2;
     const qrInnerY = qrBoxY + (qrBoxSize - qrInnerSize) / 2;
     ctx.drawImage(qrImage, qrInnerX, qrInnerY, qrInnerSize, qrInnerSize);
   }
 
-  // Under QR: Manual Table Code box & hint
-  const codeBoxW = 540;
-  const codeBoxH = 90;
+  // Scan Callout below QR
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = mintAccent;
+  ctx.font = '700 22px "Space Grotesk", Inter, sans-serif';
+  ctx.fillText('POINT CAMERA TO SCAN OR ORDER', rightCenterX, qrBoxY + qrBoxSize + 36);
+  ctx.restore();
+
+  // Under QR: Prominent Manual Table Code Box
+  const codeBoxW = 560;
+  const codeBoxH = 92;
   const codeBoxX = rightCenterX - codeBoxW / 2;
-  const codeBoxY = qrBoxY + qrBoxSize + 40;
+  const codeBoxY = qrBoxY + qrBoxSize + 60; // ~730
 
   ctx.save();
   ctx.beginPath();
   ctx.roundRect(codeBoxX, codeBoxY, codeBoxW, codeBoxH, 20);
   ctx.fillStyle = '#FFFFFF';
   ctx.fill();
-  ctx.lineWidth = 1.8;
-  ctx.setLineDash([8, 6]);
+  ctx.lineWidth = 2.0;
   ctx.strokeStyle = 'rgba(134, 239, 172, 0.5)';
   ctx.stroke();
-  ctx.setLineDash([]);
 
   ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
   ctx.fillStyle = '#065F46';
-  ctx.font = '600 18px "Space Grotesk", Inter, sans-serif';
-  ctx.fillText('ENTER TABLE CODE MANUALLY:', rightCenterX, codeBoxY + 32);
+  ctx.font = '700 17px "Space Grotesk", Inter, sans-serif';
+  ctx.fillText('ENTER TABLE CODE MANUALLY:', rightCenterX, codeBoxY + 30);
 
   ctx.fillStyle = deepEmerald;
-  ctx.font = '700 28px "Space Grotesk", monospace';
-  ctx.fillText(tableCodeFormatted, rightCenterX, codeBoxY + 68);
-
-  ctx.fillStyle = '#A7F3D0';
-  ctx.font = '500 19px Inter, sans-serif';
-  ctx.fillText('layoscancustomer.vercel.app', rightCenterX, codeBoxY + codeBoxH + 32);
+  ctx.font = '800 32px "Space Grotesk", monospace';
+  ctx.fillText(tableCodeFormatted, rightCenterX, codeBoxY + 65);
   ctx.restore();
+
+  // Web address link
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = textMuted;
+  ctx.font = '600 20px Inter, sans-serif';
+  ctx.fillText('🌐 layoscancustomer.vercel.app', rightCenterX, codeBoxY + codeBoxH + 34);
+  ctx.restore();
+
+  // Right Footer (matching left side)
+  await drawLayoScanFooter(ctx, {
+    cx: rightCenterX,
+    cy: height - 55,
+    badgeW: 360,
+    badgeH: 52,
+    theme: 'dark',
+    accentColor: mintAccent,
+  });
 }

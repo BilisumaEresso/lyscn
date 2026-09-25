@@ -24,6 +24,7 @@ export default function QRTemplateSelector({
       { id: 'mart', label: '🥗 Market' },
       { id: 'hotel', label: '🏨 Hotel' },
       { id: 'heritage', label: '🍲 Cultural' },
+      { id: 'bar', label: '🍸 Bar & Club' },
     ];
   }, []);
 
@@ -34,6 +35,7 @@ export default function QRTemplateSelector({
     if (activeCategory === 'mart') return QR_TEMPLATES.filter((t) => t.id === 'fresh_mart');
     if (activeCategory === 'hotel') return QR_TEMPLATES.filter((t) => t.id === 'luxury_hotel');
     if (activeCategory === 'heritage') return QR_TEMPLATES.filter((t) => t.id === 'cultural_heritage');
+    if (activeCategory === 'bar') return QR_TEMPLATES.filter((t) => t.id === 'liquor_bar');
     return QR_TEMPLATES;
   }, [activeCategory]);
 

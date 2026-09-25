@@ -19,7 +19,7 @@ const updateMyRestaurant = async (req, res, next) => {
     // Whitelist updatable fields — slug and subscriptionPlan not changeable here
     const ALLOWED = [
       'name', 'logoUrl', 'coverUrl', 'brandColor',
-      'description', 'socialLinks', 'contactInfo',
+      'description', 'socialLinks', 'contactInfo', 'qrCardTemplate',
     ];
 
     const updates = {};
