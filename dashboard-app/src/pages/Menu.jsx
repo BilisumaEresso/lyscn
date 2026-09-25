@@ -1151,7 +1151,7 @@ export default function Menu() {
     <div className="flex flex-col md:flex-row h-full bg-paper" style={{ height: 'calc(100vh - 0px)' }}>
       {/* ── Left: Categories (full width on mobile, sidebar on tablet & desktop) ────── */}
       <div className={`w-full md:w-60 lg:w-64 shrink-0 border-r border-ink/8 flex-col bg-white ${mobileCategoryList ? 'flex' : 'hidden'} md:flex`}>
-        <div className="px-4 py-5 border-b border-ink/8">
+        <div className="px-4 py-5 lg:pt-14 border-b border-ink/8">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h1 className="font-display font-semibold text-xl text-ink">Menu</h1>
@@ -1217,7 +1217,7 @@ export default function Menu() {
             </div>
           </div>
         ) : (
-          <div className="px-4 sm:px-6 lg:px-8 py-5 lg:py-7 max-w-[1200px]">
+          <div className="px-4 sm:px-6 lg:px-8 py-5 lg:pt-14 lg:pb-7 max-w-[1200px]">
             <div className="flex items-start justify-between gap-4 mb-5">
               <div className="min-w-0">
                 <button
@@ -1373,7 +1373,7 @@ export default function Menu() {
       />
 
       {/* FAB: primary add action on mobile/tablet */}
-      <div className="lg:hidden fixed right-6 z-40" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)' }}>
+      <div className="lg:hidden fixed right-6 z-40" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 76px)' }}>
         {/* On mobile: if category list is active, FAB adds category. If products view is active, FAB adds product.
             On tablet (md): if category is selected, FAB adds product; else adds category */}
         {selectedCat ? (

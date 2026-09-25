@@ -59,7 +59,7 @@ export default function Dashboard() {
   const recentOrders = [...allOrders].slice(0, 5);
 
   return (
-    <div className="max-w-[1200px] mx-auto px-4 py-5 md:px-6 md:py-6 lg:px-8 lg:py-8">
+    <div className="max-w-[1200px] mx-auto px-4 py-5 md:px-6 md:py-6 lg:px-8 lg:pt-14 lg:pb-8">
       {/* Header */}
       <div className="mb-6 md:mb-8">
         <h1 className="font-display font-bold text-2xl text-ink">

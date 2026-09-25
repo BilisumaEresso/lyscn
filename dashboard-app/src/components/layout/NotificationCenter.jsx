@@ -144,20 +144,6 @@ export default function NotificationCenter() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isDrawerOpen, setDrawerOpen]);
 
-  // Close on outside click
-  useEffect(() => {
-    const handleOutsideClick = (e) => {
-      if (isDrawerOpen && panelRef.current && !panelRef.current.contains(e.target)) {
-        // Prevent closing if clicked on a trigger button
-        if (!e.target.closest('[data-notification-trigger]')) {
-          setDrawerOpen(false);
-        }
-      }
-    };
-    document.addEventListener('mousedown', handleOutsideClick);
-    return () => document.removeEventListener('mousedown', handleOutsideClick);
-  }, [isDrawerOpen, setDrawerOpen]);
-
   return (
     <>
       {/* ── Trigger Controls: Sound Toggle + Bell Icon ──────────────────── */}
@@ -207,11 +193,15 @@ export default function NotificationCenter() {
 
       {/* ── Slide-Over Notification Drawer ──────────────────────────────── */}
       {isDrawerOpen && (
-        <div className="fixed inset-0 z-50 overflow-hidden bg-ink/30 backdrop-blur-xs transition-opacity animate-fade-in">
-          <div className="absolute inset-y-0 right-0 max-w-full flex pl-10">
+        <div
+          className="fixed inset-0 z-50 overflow-hidden bg-ink/30 backdrop-blur-xs transition-opacity animate-fade-in"
+          onClick={() => setDrawerOpen(false)}
+        >
+          <div className="absolute inset-y-0 right-0 max-w-full flex pl-10" onClick={(e) => e.stopPropagation()}>
             <div
               ref={panelRef}
-              className="w-screen max-w-md bg-white shadow-2xl flex flex-col h-full border-l border-ink/10 animate-slide-left"
+              onClick={(e) => e.stopPropagation()}
+              className="w-screen max-w-md bg-white shadow-2xl flex flex-col h-full border-l border-ink/10 animate-slide-left pointer-events-auto"
             >
               {/* Header */}
               <div className="px-5 py-4 border-b border-ink/8 flex items-center justify-between bg-paper/60">
@@ -261,7 +251,10 @@ export default function NotificationCenter() {
                       Live Table Calls ({activeAssistance.length})
                     </span>
                     <button
-                      onClick={() => navigate('/tables')}
+                      onClick={() => {
+                        setDrawerOpen(false);
+                        navigate('/tables');
+                      }}
                       className="text-[11px] text-rose-700 font-semibold hover:underline"
                     >
                       View on Tables →
@@ -288,7 +281,10 @@ export default function NotificationCenter() {
                           {req.status === 'pending' && (
                             <button
                               type="button"
-                              onClick={() => assistanceMutation.mutate({ id: req._id, status: 'acknowledged' })}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                assistanceMutation.mutate({ id: req._id, status: 'acknowledged' });
+                              }}
                               className="px-2 py-1 text-[11px] font-semibold text-teal bg-teal/10 hover:bg-teal/20 rounded-md transition-colors"
                             >
                               Ack
@@ -296,7 +292,10 @@ export default function NotificationCenter() {
                           )}
                           <button
                             type="button"
-                            onClick={() => assistanceMutation.mutate({ id: req._id, status: 'resolved' })}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              assistanceMutation.mutate({ id: req._id, status: 'resolved' });
+                            }}
                             className="px-2 py-1 text-[11px] font-semibold text-ink-muted hover:text-ink bg-ink/5 rounded-md transition-colors flex items-center gap-0.5"
                           >
                             <Check size={11} /> Done
@@ -350,11 +349,24 @@ export default function NotificationCenter() {
                     return (
                       <div
                         key={notif.id}
+                        role="button"
+                        tabIndex={0}
                         onClick={() => {
-                          if (!notif.read) markAsRead(notif.id);
+                          markAsRead(notif.id);
+                          setDrawerOpen(false);
+                          if (notif.category === 'orders' || notif.type?.startsWith('order_')) {
+                            navigate('/orders');
+                          } else if (
+                            notif.category === 'tables' ||
+                            notif.category === 'assistance' ||
+                            notif.type?.startsWith('table_') ||
+                            notif.type?.startsWith('assistance_')
+                          ) {
+                            navigate('/tables');
+                          }
                         }}
-                        className={`p-4 transition-colors relative group hover:bg-paper/60 ${
-                          notif.read ? 'bg-white opacity-85' : 'bg-teal/2'
+                        className={`p-4 transition-all relative group cursor-pointer hover:bg-paper/80 active:bg-ink/5 ${
+                          notif.read ? 'bg-white opacity-85' : 'bg-teal/5'
                         }`}
                       >
                         <div className="flex items-start gap-3">
@@ -383,7 +395,7 @@ export default function NotificationCenter() {
 
                             {/* Action Row */}
                             <div className="flex items-center justify-between mt-2.5 pt-1">
-                              {notif.category === 'orders' ? (
+                              {notif.category === 'orders' || notif.type?.startsWith('order_') ? (
                                 <button
                                   type="button"
                                   onClick={(e) => {
@@ -396,7 +408,7 @@ export default function NotificationCenter() {
                                 >
                                   Go to Orders →
                                 </button>
-                              ) : notif.category === 'tables' || notif.category === 'assistance' ? (
+                              ) : notif.category === 'tables' || notif.category === 'assistance' || notif.type?.startsWith('table_') || notif.type?.startsWith('assistance_') ? (
                                 <button
                                   type="button"
                                   onClick={(e) => {

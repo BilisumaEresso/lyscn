@@ -149,7 +149,7 @@ export default function Staff() {
   };
 
   return (
-    <div className="px-6 py-6 max-w-6xl mx-auto space-y-6">
+    <div className="px-6 py-6 lg:pt-14 max-w-6xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-ink/8">
         <div>

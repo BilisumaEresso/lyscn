@@ -1231,7 +1231,7 @@ export default function Tables() {
   };
 
   return (
-    <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-7 relative pb-32">
+    <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-7 lg:pt-14 relative pb-32">
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
         <div>
@@ -1404,7 +1404,7 @@ export default function Tables() {
           style={{
             width: '56px',
             height: '56px',
-            bottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)',
+            bottom: 'calc(env(safe-area-inset-bottom, 0px) + 76px)',
             background: 'var(--color-primary)'
           }}
         >
@@ -1455,7 +1455,7 @@ export default function Tables() {
 
       {/* Bulk Action Bar */}
       {selectedIds.size > 0 && (
-        <div className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+1.25rem)] lg:bottom-4 left-3 right-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-40 bg-ink text-white rounded-2xl px-3 sm:px-6 py-3.5 shadow-2xl flex flex-wrap items-center justify-center gap-2 sm:gap-4 animate-in fade-in slide-in-from-bottom-4 duration-200">
+        <div className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+76px)] lg:bottom-4 left-3 right-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-40 bg-ink text-white rounded-2xl px-3 sm:px-6 py-3.5 shadow-2xl flex flex-wrap items-center justify-center gap-2 sm:gap-4 animate-in fade-in slide-in-from-bottom-4 duration-200">
           <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-white/15">
             {selectedIds.size} selected
           </span>

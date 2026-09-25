@@ -29,6 +29,13 @@ function capitalize(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
 }
 
+function isLongUnpaid(order, now = Date.now()) {
+  if (!order || order.paymentStatus !== 'unpaid' || order.status === 'cancelled') return false;
+  const elapsed = getElapsedMinutes(order.createdAt, now);
+  // Served and unpaid for 15+ minutes, or any order unpaid for 30+ minutes
+  return (order.status === 'served' && elapsed >= 15) || elapsed >= 30;
+}
+
 const STATUS_FLOW = ['placed', 'accepted', 'preparing', 'ready', 'served'];
 const NEXT_STATUS = { placed: 'accepted', accepted: 'preparing', preparing: 'ready', ready: 'served' };
 const NEXT_LABEL  = { placed: 'Accept order →', accepted: 'Start preparing →', preparing: 'Mark ready →', ready: 'Mark served →' };
@@ -90,12 +97,13 @@ function RatingBadge({ rating }) {
 // ── Redesigned Order Card Component ──────────────────────────────────────────
 function OrderCard({ order, highlighted, isShaking, now, index, tableOrderCount = 1 }) {
   const qc = useQueryClient();
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
 
   const nextStatus = NEXT_STATUS[order.status];
   const config = STATUS_CONFIG[order.status] || STATUS_CONFIG.placed;
   const elapsedMins = getElapsedMinutes(order.createdAt, now);
+  const longUnpaid = isLongUnpaid(order, now);
 
   // Operational Time Escalation styling
   let elapsedBadgeStyle = 'bg-slate-100 text-slate-600 border-slate-200';
@@ -215,8 +223,13 @@ function OrderCard({ order, highlighted, isShaking, now, index, tableOrderCount 
             <div className="flex items-center justify-between pt-1">
               <Currency value={order.totalAmount} className="font-display font-bold text-ink text-sm" />
 
-              {/* Payment Pill */}
-              <div className="flex items-center gap-1.5">
+              {/* Payment Pill & Alerts */}
+              <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                {longUnpaid && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700 font-bold border border-rose-300 flex items-center gap-1 animate-pulse shrink-0">
+                    <AlertTriangle size={10} className="text-rose-600" /> Long Unpaid
+                  </span>
+                )}
                 {order.status === 'served' && <RatingBadge rating={order.rating} />}
                 <div
                   className={clsx(
@@ -289,8 +302,8 @@ function OrderCard({ order, highlighted, isShaking, now, index, tableOrderCount 
 
           {/* Card Footer Actions */}
           <div className="px-3.5 pb-3 pt-2 bg-white flex flex-col gap-1.5 border-t border-ink/4">
-            {/* Primary Status Advance Button */}
-            {nextStatus && (
+            {/* Primary Status Advance Button or Served -> Paid Action */}
+            {nextStatus ? (
               <button
                 type="button"
                 onClick={(e) => {
@@ -304,10 +317,34 @@ function OrderCard({ order, highlighted, isShaking, now, index, tableOrderCount 
               >
                 {statusMutation.isPending ? 'Updating…' : NEXT_LABEL[order.status]}
               </button>
-            )}
+            ) : order.status === 'served' && order.paymentStatus === 'unpaid' ? (
+              /* Next step after Served: direct prominent Paid buttons */
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); payMutation.mutate('cash'); }}
+                  disabled={payMutation.isPending}
+                  className="flex-1 py-2 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-1"
+                >
+                  <DollarSign size={13} /> Paid (Cash)
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); payMutation.mutate('pos'); }}
+                  disabled={payMutation.isPending}
+                  className="flex-1 py-2 rounded-lg text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 shadow-sm transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-1"
+                >
+                  <CreditCard size={13} /> Paid (POS)
+                </button>
+              </div>
+            ) : order.paymentStatus === 'paid' ? (
+              <div className="py-1 text-center text-xs font-semibold text-emerald-600 flex items-center justify-center gap-1">
+                <CheckCircle2 size={13} /> Paid ({order.paymentMethod?.toUpperCase() || 'PAID'})
+              </div>
+            ) : null}
 
-            {/* Mark as Paid Action Buttons */}
-            {order.paymentStatus === 'unpaid' && order.status !== 'cancelled' && (
+            {/* Quick payment options for other in-progress statuses if unpaid */}
+            {order.status !== 'served' && order.paymentStatus === 'unpaid' && order.status !== 'cancelled' && (
               <div className="flex gap-1.5">
                 <button
                   type="button"
@@ -323,7 +360,7 @@ function OrderCard({ order, highlighted, isShaking, now, index, tableOrderCount 
                   disabled={payMutation.isPending}
                   className="flex-1 py-1 rounded-md border border-ink/12 text-[11px] font-medium text-ink-muted hover:bg-ink/5 transition-colors flex items-center justify-center gap-1"
                 >
-                  <DollarSign size={11} /> POS
+                  <CreditCard size={11} /> POS
                 </button>
               </div>
             )}
@@ -498,11 +535,29 @@ function OrderRowDetails({ order, now, isExpanded, onToggle }) {
           {/* Payment actions */}
           {order.paymentStatus === 'unpaid' && order.status !== 'cancelled' && (
             <div className="flex gap-2 mt-2">
-              <button onClick={(e) => { e.stopPropagation(); payMutation.mutate('cash'); }} disabled={payMutation.isPending} className="flex-1 py-1 rounded-md border border-ink/12 text-[12px] font-medium text-ink-muted hover:bg-ink/5 transition-colors flex items-center justify-center gap-1">
-                <DollarSign size={12} /> Cash
+              <button
+                onClick={(e) => { e.stopPropagation(); payMutation.mutate('cash'); }}
+                disabled={payMutation.isPending}
+                className={clsx(
+                  "flex-1 py-1.5 rounded-md text-[12px] font-semibold transition-all flex items-center justify-center gap-1",
+                  order.status === 'served'
+                    ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+                    : "border border-ink/12 text-ink-muted hover:bg-ink/5"
+                )}
+              >
+                <DollarSign size={13} /> Paid (Cash)
               </button>
-              <button onClick={(e) => { e.stopPropagation(); payMutation.mutate('pos'); }} disabled={payMutation.isPending} className="flex-1 py-1 rounded-md border border-ink/12 text-[12px] font-medium text-ink-muted hover:bg-ink/5 transition-colors flex items-center justify-center gap-1">
-                <DollarSign size={12} /> POS
+              <button
+                onClick={(e) => { e.stopPropagation(); payMutation.mutate('pos'); }}
+                disabled={payMutation.isPending}
+                className={clsx(
+                  "flex-1 py-1.5 rounded-md text-[12px] font-semibold transition-all flex items-center justify-center gap-1",
+                  order.status === 'served'
+                    ? "bg-teal-600 hover:bg-teal-700 text-white shadow-xs"
+                    : "border border-ink/12 text-ink-muted hover:bg-ink/5"
+                )}
+              >
+                <CreditCard size={13} /> Paid (POS)
               </button>
             </div>
           )}
@@ -531,19 +586,19 @@ export default function Orders() {
   // Default to list view everywhere; Board remains available on wide screens (>=1024px)
   const [viewMode, setViewMode] = useState('list'); // 'board' or 'list'
   const [showCancelled, setShowCancelled] = useState(false);
-  const [activeFilter, setActiveFilter] = useState('all'); // chip filter: 'all' or status
+  const [activeFilter, setActiveFilter] = useState('all'); // chip filter: 'all', 'unpaid', or status
   const [expandedSections, setExpandedSections] = useState(() => ({
     placed: true,
     accepted: true,
     preparing: true,
     ready: true,
-    served: false, // served collapsed by default
+    served: true, // served expanded by default
   }));
-  const [expandedOrders, setExpandedOrders] = useState({});
+  const [collapsedOrders, setCollapsedOrders] = useState({});
   const listContainerRef = useRef(null);
 
   const toggleOrderExpanded = (orderId) => {
-    setExpandedOrders((s) => ({ ...s, [orderId]: !s[orderId] }));
+    setCollapsedOrders((s) => ({ ...s, [orderId]: !s[orderId] }));
   };
   const [highlightedId, setHighlightedId] = useState(null);
   const [shakingId, setShakingId] = useState(null);
@@ -566,6 +621,10 @@ export default function Orders() {
 
   const orders = data?.orders ?? [];
 
+  const longUnpaidOrders = useMemo(() => {
+    return orders.filter((o) => isLongUnpaid(o, now));
+  }, [orders, now]);
+
   const activeOrdersPerTable = useMemo(() => {
     const counts = {};
     for (const o of orders) {
@@ -585,6 +644,17 @@ export default function Orders() {
       toast.success(`${capitalize(responseData.order.status)} — ${responseData.order.tableId?.label ?? 'Table'}`);
     },
     onError: () => toast.error('Status update failed'),
+  });
+
+  // Page-level payment mutation for List view & Quick actions
+  const payOrderMutation = useMutation({
+    mutationFn: ({ id, paymentMethod }) =>
+      api.patch(`/orders/${id}/payment`, { paymentMethod }).then((r) => r.data),
+    onSuccess: (responseData) => {
+      qc.setQueryData(['orders-kanban'], (old) => mergeOrder(old, responseData.order));
+      toast.success(`Marked as paid (${responseData.order.paymentMethod?.toUpperCase() || 'PAID'}) — ${responseData.order.tableId?.label ?? 'Table'}`);
+    },
+    onError: () => toast.error('Payment update failed'),
   });
 
   // ── Drag and Drop Handler ─────────────────────────────────────────────────
@@ -713,7 +783,7 @@ export default function Orders() {
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-paper">
       {/* ── Header Bar ────────────────────────────────────────────────── */}
-      <div className="px-6 py-4 border-b border-ink/8 flex items-center justify-between shrink-0 bg-white shadow-2xs">
+      <div className="px-6 pt-4 lg:pt-14 pb-4 border-b border-ink/8 flex items-center justify-between shrink-0 bg-white shadow-2xs">
         <div>
           <h1 className="font-display font-bold text-xl text-ink">Live Orders</h1>
           <p className="text-xs text-ink-muted mt-0.5 flex items-center gap-1.5">
@@ -781,6 +851,29 @@ export default function Orders() {
         </div>
       </div>
 
+      {/* Top Alert Banner for Long Unpaid Orders */}
+      {longUnpaidOrders.length > 0 && (
+        <div className="bg-rose-50 border-b border-rose-200 px-6 py-2.5 flex items-center justify-between gap-3 text-rose-800 text-xs font-medium shrink-0 animate-in fade-in duration-200">
+          <div className="flex items-center gap-2 min-w-0">
+            <AlertTriangle size={15} className="text-rose-600 shrink-0 animate-pulse" />
+            <span className="truncate">
+              <strong>{longUnpaidOrders.length} {longUnpaidOrders.length === 1 ? 'order has' : 'orders have'} been unpaid for an extended time:</strong>{' '}
+              {longUnpaidOrders.map((o) => o.tableId?.label || 'Table').slice(0, 5).join(', ')}
+              {longUnpaidOrders.length > 5 ? '…' : ''}
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              setViewMode('list');
+              setActiveFilter('unpaid');
+            }}
+            className="px-2.5 py-1 rounded-md bg-rose-600 hover:bg-rose-700 text-white font-semibold text-[11px] transition-colors shrink-0"
+          >
+            Filter Unpaid ({longUnpaidOrders.length})
+          </button>
+        </div>
+      )}
+
       {/* ── Main View Area ────────────────────────────────────────────── */}
       <div className="flex-1 overflow-x-auto overflow-y-hidden">
         {viewMode === 'board' ? (
@@ -815,37 +908,57 @@ export default function Orders() {
           <div ref={listContainerRef} className="max-w-4xl mx-auto px-4 md:px-6 py-4 overflow-y-auto h-full space-y-6 pb-32">
             {/* Filter Chips Row (horizontally scrollable on small screens) */}
             <div className="flex gap-2 overflow-x-auto no-scrollbar py-2">
-              {['all', ...STATUS_FLOW].filter(s => s !== 'cancelled').map((s) => (
-                <button
-                  key={s}
-                  onClick={() => {
-                    const key = s === 'all' ? 'all' : s;
-                    setActiveFilter(key);
-                    if (key !== 'all') {
-                      // If targeting served, ensure the section is expanded so users see content
-                      if (key === 'served') setExpandedSections((p) => ({ ...p, served: true }));
-                      scrollToSection(key);
-                    }
-                  }}
-                  className={clsx('text-xs px-3 py-1.5 rounded-full whitespace-nowrap font-medium flex items-center gap-2',
-                    activeFilter === (s === 'all' ? 'all' : s)
-                      ? 'bg-white text-ink shadow-xs'
-                      : 'bg-ink/4 text-ink-muted hover:bg-ink/6')}
-                >
-                  <span className="capitalize">{s === 'all' ? 'All' : STATUS_CONFIG[s]?.label}</span>
-                  {s !== 'all' && (
-                    <span className="text-[11px] px-2 py-0.5 rounded-full border font-semibold text-ink-muted">
-                      {(grouped[s] || []).length}
+              {['all', 'unpaid', ...STATUS_FLOW].filter(s => s !== 'cancelled').map((s) => {
+                const isUnpaidChip = s === 'unpaid';
+                return (
+                  <button
+                    key={s}
+                    onClick={() => {
+                      setActiveFilter(s);
+                      if (s !== 'all' && s !== 'unpaid') {
+                        if (s === 'served') setExpandedSections((p) => ({ ...p, served: true }));
+                        scrollToSection(s);
+                      }
+                    }}
+                    className={clsx(
+                      'text-xs px-3 py-1.5 rounded-full whitespace-nowrap font-medium flex items-center gap-2 transition-all',
+                      activeFilter === s
+                        ? isUnpaidChip
+                          ? 'bg-rose-600 text-white shadow-xs'
+                          : 'bg-white text-ink shadow-xs'
+                        : isUnpaidChip && longUnpaidOrders.length > 0
+                          ? 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100'
+                          : 'bg-ink/4 text-ink-muted hover:bg-ink/6'
+                    )}
+                  >
+                    <span className="capitalize">
+                      {s === 'all' ? 'All' : isUnpaidChip ? 'Long Unpaid' : STATUS_CONFIG[s]?.label}
                     </span>
-                  )}
-                </button>
-              ))}
+                    {isUnpaidChip ? (
+                      longUnpaidOrders.length > 0 && (
+                        <span className={clsx('text-[11px] px-2 py-0.5 rounded-full font-bold', activeFilter === s ? 'bg-white/20 text-white' : 'bg-rose-200 text-rose-800')}>
+                          {longUnpaidOrders.length}
+                        </span>
+                      )
+                    ) : s !== 'all' ? (
+                      <span className="text-[11px] px-2 py-0.5 rounded-full border font-semibold text-ink-muted">
+                        {(grouped[s] || []).length}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
             </div>
 
             {/* Sections */}
             {['placed', 'accepted', 'preparing', 'ready', 'served'].map((status) => {
-              if (!grouped[status] || grouped[status].length === 0) return null;
-              if (activeFilter !== 'all' && activeFilter !== status) return null;
+              let sectionOrders = grouped[status] || [];
+              if (activeFilter === 'unpaid') {
+                sectionOrders = sectionOrders.filter((o) => isLongUnpaid(o, now));
+              } else if (activeFilter !== 'all' && activeFilter !== status) {
+                return null;
+              }
+              if (sectionOrders.length === 0) return null;
               const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.placed;
               const isExpanded = expandedSections[status];
 
@@ -873,70 +986,119 @@ export default function Orders() {
 
                   {isExpanded && (
                     <div className="space-y-2">
-                      {(grouped[status] || []).map((order, idx) => (
-                        <div key={order._id} className={clsx('animate-fade-in')}>
-                          {/* Render order row (non-draggable) */}
-                          <div onClick={() => toggleOrderExpanded(order._id)} className={clsx('bg-white rounded-xl border border-ink/10 p-4 shadow-sm overflow-hidden cursor-pointer', order._id === highlightedId && 'ring-2 ring-teal')}>
-                            {/* Reuse structure from OrderCard header/body */}
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex items-start gap-3 min-w-0">
-                                <div className="w-2 rounded-full shrink-0" style={{ backgroundColor: cfg.accentColor, height: '48px' }} />
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="font-display font-bold text-ink text-base truncate">
-                                      {order.tableId?.label ?? 'Table'}
-                                    </span>
-                                    {order.guestName && (
-                                      <span className="text-xs px-2 py-0.5 rounded-md bg-teal/8 text-teal font-medium flex items-center gap-1">
-                                        <User size={11} /> {order.guestName}
+                      {(sectionOrders || []).map((order) => {
+                        const isOrderLongUnpaid = isLongUnpaid(order, now);
+                        const isOrderExpanded = !collapsedOrders[order._id];
+                        return (
+                          <div key={order._id} className={clsx('animate-fade-in')}>
+                            {/* Render order row (non-draggable) */}
+                            <div
+                              onClick={() => toggleOrderExpanded(order._id)}
+                              className={clsx(
+                                'bg-white rounded-xl border border-ink/10 p-4 shadow-sm overflow-hidden cursor-pointer transition-all',
+                                order._id === highlightedId && 'ring-2 ring-teal',
+                                isOrderLongUnpaid && 'border-rose-300 ring-1 ring-rose-200'
+                              )}
+                            >
+                              {/* Reuse structure from OrderCard header/body */}
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex items-start gap-3 min-w-0">
+                                  <div className="w-2 rounded-full shrink-0" style={{ backgroundColor: cfg.accentColor, height: '48px' }} />
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="font-display font-bold text-ink text-base truncate">
+                                        {order.tableId?.label ?? 'Table'}
                                       </span>
-                                    )}
-                                    {(activeOrdersPerTable[order.tableId?._id] || 1) > 1 && (
-                                      <span
-                                        title={`${activeOrdersPerTable[order.tableId?._id]} active orders at this table`}
-                                        className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold border border-amber-200"
-                                      >
-                                        {activeOrdersPerTable[order.tableId?._id]} orders
+                                      {order.guestName && (
+                                        <span className="text-xs px-2 py-0.5 rounded-md bg-teal/8 text-teal font-medium flex items-center gap-1">
+                                          <User size={11} /> {order.guestName}
+                                        </span>
+                                      )}
+                                      {(activeOrdersPerTable[order.tableId?._id] || 1) > 1 && (
+                                        <span
+                                          title={`${activeOrdersPerTable[order.tableId?._id]} active orders at this table`}
+                                          className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold border border-amber-200"
+                                        >
+                                          {activeOrdersPerTable[order.tableId?._id]} orders
+                                        </span>
+                                      )}
+                                      <span className={clsx('text-xs px-2 py-0.5 rounded-full border font-semibold', cfg.badgeStyle)}>
+                                        {cfg.label}
                                       </span>
-                                    )}
-                                    <span className={clsx('text-xs px-2 py-0.5 rounded-full border font-semibold', cfg.badgeStyle)}>
-                                      {cfg.label}
-                                    </span>
+                                      {isOrderLongUnpaid && (
+                                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 font-bold border border-rose-300 flex items-center gap-1 animate-pulse">
+                                          <AlertTriangle size={10} className="text-rose-600" /> Long Unpaid ({Math.round(getElapsedMinutes(order.createdAt, now))}m)
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-xs text-ink-muted truncate mt-1">
+                                      {order.items.slice(0, 2).map((i) => `${i.qty}× ${i.name}`).join(', ')}
+                                      {order.items.length > 2 ? ` +${order.items.length - 2} more` : ''}
+                                    </p>
                                   </div>
-                                  <p className="text-xs text-ink-muted truncate mt-1">
-                                    {order.items.slice(0,2).map(i=>`${i.qty}× ${i.name}`).join(', ')}{order.items.length>2?` +${order.items.length-2} more`:''}
-                                  </p>
+                                </div>
+
+                                <div className="flex items-center gap-3 shrink-0">
+                                  <span className="font-display font-bold text-ink text-sm">
+                                    <Currency value={order.totalAmount} />
+                                  </span>
+                                  <span className="text-xs text-ink-muted font-medium flex items-center gap-1">
+                                    <Clock size={11} /> {timeAgo(order.createdAt, now)}
+                                  </span>
+                                  {NEXT_STATUS[order.status] ? (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        updateStatusMutation.mutate({ id: order._id, status: NEXT_STATUS[order.status] });
+                                      }}
+                                      className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white shadow-xs"
+                                      style={{ backgroundColor: cfg.accentColor }}
+                                    >
+                                      {NEXT_LABEL[order.status]}
+                                    </button>
+                                  ) : order.status === 'served' && order.paymentStatus === 'unpaid' ? (
+                                    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          payOrderMutation.mutate({ id: order._id, paymentMethod: 'cash' });
+                                        }}
+                                        disabled={payOrderMutation.isPending}
+                                        className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs flex items-center gap-1 transition-all active:scale-95"
+                                      >
+                                        <DollarSign size={12} /> Paid (Cash)
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          payOrderMutation.mutate({ id: order._id, paymentMethod: 'pos' });
+                                        }}
+                                        disabled={payOrderMutation.isPending}
+                                        className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 shadow-xs flex items-center gap-1 transition-all active:scale-95"
+                                      >
+                                        <CreditCard size={12} /> Paid (POS)
+                                      </button>
+                                    </div>
+                                  ) : order.paymentStatus === 'paid' ? (
+                                    <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-semibold border border-emerald-200 flex items-center gap-1">
+                                      <CheckCircle2 size={12} /> Paid
+                                    </span>
+                                  ) : null}
+                                  {order.status === 'served' && <RatingBadge rating={order.rating} />}
+                                  <span className="text-ink-muted">
+                                    {isOrderExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                                  </span>
                                 </div>
                               </div>
 
-                              <div className="flex items-center gap-3 shrink-0">
-                                <span className="font-display font-bold text-ink text-sm">
-                                  <Currency value={order.totalAmount} />
-                                </span>
-                                <span className="text-xs text-ink-muted font-medium flex items-center gap-1">
-                                  <Clock size={11} /> {timeAgo(order.createdAt, now)}
-                                </span>
-                                {NEXT_STATUS[order.status] && (
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); updateStatusMutation.mutate({ id: order._id, status: NEXT_STATUS[order.status] }); }}
-                                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white shadow-xs"
-                                    style={{ backgroundColor: cfg.accentColor }}
-                                  >
-                                    {NEXT_LABEL[order.status]}
-                                  </button>
-                                )}
-                                {order.status === 'served' && <RatingBadge rating={order.rating} />}
-                              </div>
+                              {/* Expand in place details (clicking row toggles) */}
+                              <OrderRowDetails order={order} now={now} isExpanded={isOrderExpanded} onToggle={() => toggleOrderExpanded(order._id)} />
                             </div>
-
-                            {/* Expand in place details (clicking row toggles) */}
-                            {/* Keep same behavior: reveal item list, modifiers, notes, payment actions */}
-                            {/* For brevity reuse a simple toggle local to this render */}
-                            <OrderRowDetails order={order} now={now} isExpanded={!!expandedOrders[order._id]} onToggle={() => toggleOrderExpanded(order._id)} />
-
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </section>
@@ -958,7 +1120,7 @@ export default function Orders() {
         className="lg:hidden fixed right-6 z-40 rounded-full flex items-center gap-2 px-4 shadow-xl text-white font-semibold text-xs transition-transform active:scale-95 hover:shadow-2xl"
         style={{
           height: '52px',
-          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)',
+          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 76px)',
           background: 'var(--color-primary)'
         }}
       >
