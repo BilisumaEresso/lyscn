@@ -250,6 +250,7 @@ export async function renderFreshMartPortrait(ctx, {
     cy: height - 60,
     badgeW: 390,
     badgeH: 56,
+    templateId: 'fresh_mart',
     theme: 'light',
     accentColor: deepEmerald,
   });
@@ -415,6 +416,7 @@ export async function renderFreshMartLandscape(ctx, {
     cy: height - 55,
     badgeW: 360,
     badgeH: 52,
+    templateId: 'fresh_mart',
     theme: 'dark',
     accentColor: mintAccent,
   });
@@ -497,6 +499,7 @@ export async function renderFreshMartLandscape(ctx, {
     cy: height - 55,
     badgeW: 360,
     badgeH: 52,
+    templateId: 'fresh_mart',
     theme: 'dark',
     accentColor: mintAccent,
   });

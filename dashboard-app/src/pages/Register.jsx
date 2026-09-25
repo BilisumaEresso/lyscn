@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
+import { AlertCircle } from 'lucide-react';
 import api from '../lib/api';
 import { useAuthStore } from '../store/authStore';
 import Input from '../components/ui/Input';
@@ -10,6 +11,7 @@ import logo from '../assets/logo.png';
 
 export default function Register() {
   const [loading, setLoading] = useState(false);
+  const [regError, setRegError] = useState('');
   const { setSession } = useAuthStore();
   const navigate = useNavigate();
 
@@ -17,17 +19,19 @@ export default function Register() {
     register,
     handleSubmit,
     formState: { errors },
+    setError,
     watch,
   } = useForm();
 
   const onSubmit = async ({ restaurantName, ownerName, email, password }) => {
     setLoading(true);
+    setRegError('');
     try {
       // 1. Register restaurant + owner + default branch (created server-side)
       const { data } = await api.post('/auth/register', {
         restaurantName,
         ownerName,
-        email,
+        email: email.trim(),
         password,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
       });
@@ -38,7 +42,17 @@ export default function Register() {
       toast.success('Restaurant created — welcome to LayoScan!');
       navigate('/');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Registration failed. Please try again.');
+      const msg = err.response?.data?.message || 'Registration failed. Please try again.';
+      setRegError(msg);
+      toast.error(msg);
+
+      if (err.response?.data?.errors && Array.isArray(err.response.data.errors)) {
+        err.response.data.errors.forEach((validationErr) => {
+          if (validationErr.path) {
+            setError(validationErr.path, { type: 'server', message: validationErr.msg });
+          }
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -59,6 +73,14 @@ export default function Register() {
             Set up your LayoScan account — takes less than a minute.
           </p>
         </div>
+
+        {/* Error Alert Banner */}
+        {regError && (
+          <div className="mb-4 p-3.5 rounded-xl bg-danger/10 border border-danger/25 text-rose-300 text-xs flex items-start gap-2.5">
+            <AlertCircle size={16} className="shrink-0 mt-0.5 text-rose-400" />
+            <span className="leading-snug">{regError}</span>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
           <Input
@@ -106,11 +128,12 @@ export default function Register() {
 
           <Button
             type="submit"
-            disabled={loading}
+            loading={loading}
+            loadingText="Creating your restaurant…"
             className="w-full"
             size="lg"
           >
-            {loading ? 'Creating your restaurant…' : 'Create restaurant & continue →'}
+            Create restaurant & continue →
           </Button>
         </form>
 

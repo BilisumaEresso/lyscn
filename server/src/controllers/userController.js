@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const RefreshToken = require('../models/RefreshToken');
 const crypto = require('crypto');
+const { normalizePhone, isValidPhone } = require('../utils/phone');
 
 // ── GET /api/users ─────────────────────────────────────────────────────────────
 const listUsers = async (req, res, next) => {
@@ -18,7 +19,7 @@ const listUsers = async (req, res, next) => {
 // ── POST /api/users ────────────────────────────────────────────────────────────
 const createUser = async (req, res, next) => {
   try {
-    const { name, email, role, password } = req.body;
+    const { name, phone, email, role, password } = req.body;
 
     const ALLOWED_ROLES = ['manager', 'kitchen', 'waiter'];
     if (!role || !ALLOWED_ROLES.includes(role)) {
@@ -28,12 +29,41 @@ const createUser = async (req, res, next) => {
       });
     }
 
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
-    if (existingUser) {
-      return res.status(409).json({
+    if (!phone && !email) {
+      return res.status(400).json({
         success: false,
-        message: 'A user with this email address already exists.',
+        message: 'Phone number or email is required for staff members.',
       });
+    }
+
+    let normalizedPhone;
+    if (phone) {
+      if (!isValidPhone(phone)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please provide a valid phone number (e.g. 0911223344 or 0711223344).',
+        });
+      }
+      normalizedPhone = normalizePhone(phone);
+      const existingPhoneUser = await User.findOne({ phone: normalizedPhone });
+      if (existingPhoneUser) {
+        return res.status(409).json({
+          success: false,
+          message: 'A user with this phone number already exists.',
+        });
+      }
+    }
+
+    let cleanEmail;
+    if (email) {
+      cleanEmail = email.toLowerCase().trim();
+      const existingEmailUser = await User.findOne({ email: cleanEmail });
+      if (existingEmailUser) {
+        return res.status(409).json({
+          success: false,
+          message: 'A user with this email address already exists.',
+        });
+      }
     }
 
     // Default to provided password or generate an 8-byte hex temp password
@@ -42,7 +72,8 @@ const createUser = async (req, res, next) => {
     const user = await User.create({
       restaurantId: req.tenantId,
       name,
-      email: email.toLowerCase(),
+      phone: normalizedPhone,
+      email: cleanEmail,
       role,
       passwordHash: userPassword,
     });
@@ -63,7 +94,7 @@ const createUser = async (req, res, next) => {
 // ── PATCH /api/users/:id ───────────────────────────────────────────────────────
 const updateUser = async (req, res, next) => {
   try {
-    const { role, isActive, name } = req.body;
+    const { role, isActive, name, phone } = req.body;
 
     const targetUser = await User.findOne({
       _id: req.params.id,
@@ -84,17 +115,30 @@ const updateUser = async (req, res, next) => {
     }
 
     if (name) targetUser.name = name;
+    if (phone) {
+      if (!isValidPhone(phone)) {
+        return res.status(400).json({ success: false, message: 'Invalid phone format.' });
+      }
+      targetUser.phone = normalizePhone(phone);
+    }
     if (role && ['manager', 'kitchen', 'waiter'].includes(role)) {
       targetUser.role = role;
     }
     if (typeof isActive === 'boolean') {
       targetUser.isActive = isActive;
-      // If deactivating, revoke active refresh tokens
+      // If deactivating, revoke active refresh tokens and emit real-time event
       if (!isActive) {
         await RefreshToken.updateMany(
           { userId: targetUser._id, revokedAt: null },
           { revokedAt: new Date() }
         );
+
+        const io = req.app.get('io');
+        if (io) {
+          io.to(`user:${targetUser._id}`).emit('auth:revoked', {
+            reason: 'Your account has been deactivated by management.',
+          });
+        }
       }
     }
 
@@ -125,6 +169,10 @@ const deleteUser = async (req, res, next) => {
       return res.status(403).json({ success: false, message: 'Cannot deactivate the restaurant owner.' });
     }
 
+    if (req.user.role === 'manager' && (targetUser.role === 'owner' || targetUser.role === 'manager')) {
+      return res.status(403).json({ success: false, message: 'Managers cannot deactivate owners or other managers.' });
+    }
+
     if (String(targetUser._id) === String(req.user.userId)) {
       return res.status(400).json({ success: false, message: 'Cannot deactivate your own account.' });
     }
@@ -137,6 +185,14 @@ const deleteUser = async (req, res, next) => {
       { userId: targetUser._id, revokedAt: null },
       { revokedAt: new Date() }
     );
+
+    // Notify client via Socket.IO immediately
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user:${targetUser._id}`).emit('auth:revoked', {
+        reason: 'Your staff account has been removed or deactivated by management.',
+      });
+    }
 
     return res.json({ success: true, message: 'Staff member deactivated.' });
   } catch (err) {

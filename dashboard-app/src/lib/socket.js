@@ -16,16 +16,39 @@ const SOCKET_URL = (import.meta.env.VITE_API_URL || '').replace(/\/api\/?$/, '')
 function createSocket() {
   const { accessToken } = useAuthStore.getState();
 
-  return io(SOCKET_URL, {
+  const s = io(SOCKET_URL, {
     autoConnect:      false,  // explicit connect() so components control lifecycle
     reconnection:     true,
     reconnectionDelay: 2000,
     reconnectionAttempts: Infinity,
     auth: accessToken ? { token: accessToken } : {},
   });
+
+  return s;
 }
 
 const socket = createSocket();
+
+// Keep socket credentials in sync whenever token refreshes
+useAuthStore.subscribe((state) => {
+  if (state.accessToken) {
+    socket.auth = { token: state.accessToken };
+  }
+});
+
+// Update auth payload on reconnection attempts
+socket.io.on('reconnect_attempt', () => {
+  const currentToken = useAuthStore.getState().accessToken;
+  socket.auth = currentToken ? { token: currentToken } : {};
+});
+
+// Real-time account revocation (e.g. owner/manager removed this staff member)
+socket.on('auth:revoked', (data) => {
+  useAuthStore.getState().logout();
+  if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+    window.location.href = '/login';
+  }
+});
 
 // Dev-only connection state logging
 if (import.meta.env.DEV) {

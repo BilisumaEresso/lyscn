@@ -11,6 +11,7 @@ import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
 import Spinner from '../components/ui/Spinner';
+import LoadingIndicator from '../components/ui/LoadingIndicator';
 import EmptyState from '../components/ui/EmptyState';
 
 const ROLE_CONFIG = {
@@ -55,7 +56,7 @@ export default function Staff() {
   // Form state
   const [formData, setFormData] = useState({
     name: '',
-    email: '',
+    phone: '',
     role: 'waiter',
     password: '',
   });
@@ -78,11 +79,12 @@ export default function Staff() {
       setAddModalOpen(false);
       if (res.tempPassword) {
         setCreatedCredentials({
-          email: res.user.email,
+          name: res.user.name,
+          phone: res.user.phone || res.user.email,
           password: res.tempPassword,
         });
       }
-      setFormData({ name: '', email: '', role: 'waiter', password: '' });
+      setFormData({ name: '', phone: '', role: 'waiter', password: '' });
     },
     onError: (err) => {
       toast.error(err.response?.data?.message || 'Failed to create staff member.');
@@ -127,7 +129,7 @@ export default function Staff() {
 
   const handleCopyCredentials = () => {
     if (!createdCredentials) return;
-    const text = `LayoScan Login Credentials:\nEmail: ${createdCredentials.email}\nTemporary Password: ${createdCredentials.password}\nLogin URL: ${window.location.origin}/login`;
+    const text = `LayoScan Login Credentials:\nPhone: ${createdCredentials.phone}\nTemporary Password: ${createdCredentials.password}\nLogin URL: ${window.location.origin}/login`;
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -136,13 +138,13 @@ export default function Staff() {
 
   const handleCreateSubmit = (e) => {
     e.preventDefault();
-    if (!formData.name.trim() || !formData.email.trim()) {
-      toast.error('Name and email are required.');
+    if (!formData.name.trim() || !formData.phone.trim()) {
+      toast.error('Name and phone number are required.');
       return;
     }
     createMutation.mutate({
       name: formData.name.trim(),
-      email: formData.email.trim(),
+      phone: formData.phone.trim(),
       role: formData.role,
       ...(formData.password.trim() && { password: formData.password.trim() }),
     });
@@ -207,7 +209,7 @@ export default function Staff() {
             <div>
               <p className="text-sm font-semibold text-ink">Temporary Login Credentials Generated</p>
               <p className="text-xs text-ink-muted font-mono mt-0.5">
-                {createdCredentials.email} • Password: <span className="bg-black/5 px-1.5 py-0.5 rounded font-semibold text-ink">{createdCredentials.password}</span>
+                Phone: <span className="font-semibold text-ink">{createdCredentials.phone}</span> • Password: <span className="bg-black/5 px-1.5 py-0.5 rounded font-semibold text-ink">{createdCredentials.password}</span>
               </p>
             </div>
           </div>
@@ -229,9 +231,8 @@ export default function Staff() {
       {/* Staff Table */}
       <div className="bg-white rounded-2xl border border-ink/8 shadow-xs overflow-hidden">
         {isLoading ? (
-          <div className="py-16 flex flex-col items-center justify-center gap-3">
-            <Spinner />
-            <p className="text-xs text-ink-muted">Loading team members…</p>
+          <div className="p-6">
+            <LoadingIndicator variant="list" rows={4} text="Loading team members…" />
           </div>
         ) : error ? (
           <div className="py-12 px-6 text-center text-danger text-sm">
@@ -260,12 +261,15 @@ export default function Staff() {
               <tbody className="divide-y divide-ink/6">
                 {users.map((staff) => {
                   const roleMeta = ROLE_CONFIG[staff.role] || ROLE_CONFIG.waiter;
-                  const isCurrentAccount = staff._id === currentUser?.userId || staff.email === currentUser?.email;
+                  const isCurrentAccount = staff._id === currentUser?.userId || staff.email === currentUser?.email || staff.phone === currentUser?.phone;
                   const isStaffOwner = staff.role === 'owner';
+                  const canManageMember =
+                    (isOwner && !isStaffOwner && !isCurrentAccount) ||
+                    (isManager && !isStaffOwner && staff.role !== 'manager' && !isCurrentAccount);
 
                   return (
                     <tr key={staff._id} className="hover:bg-ink/1 transition-colors">
-                      {/* Name & Email */}
+                      {/* Name & Phone/Email */}
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 rounded-full bg-ink/5 text-ink font-semibold text-xs flex items-center justify-center shrink-0">
@@ -285,7 +289,7 @@ export default function Staff() {
                                 </span>
                               )}
                             </div>
-                            <div className="text-xs text-ink-muted font-mono">{staff.email}</div>
+                            <div className="text-xs text-ink-muted font-mono">{staff.phone || staff.email}</div>
                           </div>
                         </div>
                       </td>
@@ -343,7 +347,7 @@ export default function Staff() {
 
                       {/* Actions */}
                       <td className="py-4 px-6 text-right">
-                        {isOwner && !isStaffOwner && !isCurrentAccount && (
+                        {canManageMember && (
                           <div className="flex items-center justify-end gap-1">
                             {staff.isActive ? (
                               <button
@@ -402,11 +406,12 @@ export default function Staff() {
           />
 
           <Input
-            label="Email Address"
-            type="email"
-            placeholder="mario@restaurant.com"
-            value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            label="Phone Number"
+            type="tel"
+            placeholder="0911223344 or 0711223344"
+            value={formData.phone}
+            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+            helperText="Mobile number used by the staff member to sign in to the dashboard."
             required
           />
 
@@ -454,8 +459,12 @@ export default function Staff() {
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={createMutation.isPending}>
-              {createMutation.isPending ? 'Creating…' : 'Create Member'}
+            <Button
+              type="submit"
+              loading={createMutation.isPending}
+              loadingText="Creating member…"
+            >
+              Create Member
             </Button>
           </div>
         </form>

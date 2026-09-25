@@ -1,11 +1,13 @@
 const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 
 /**
  * protect
- * Verifies the JWT access token from the Authorization header (Bearer scheme).
+ * Verifies the JWT access token from the Authorization header (Bearer scheme),
+ * and confirms the user exists and is active in the database.
  * On success, attaches { userId, restaurantId, role } to req.user.
  */
-const protect = (req, res, next) => {
+const protect = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
 
@@ -19,10 +21,19 @@ const protect = (req, res, next) => {
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
+    // Fast check: Ensure user still exists and has not been deactivated by manager/owner
+    const user = await User.findById(decoded.userId).select('isActive role restaurantId');
+    if (!user || !user.isActive) {
+      return res.status(401).json({
+        success: false,
+        message: 'Your account has been deactivated or no longer exists.',
+      });
+    }
+
     req.user = {
-      userId:       decoded.userId,
-      restaurantId: decoded.restaurantId,
-      role:         decoded.role,
+      userId:       user._id,
+      restaurantId: user.restaurantId,
+      role:         user.role,
     };
 
     return next();

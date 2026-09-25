@@ -482,14 +482,19 @@ export async function renderFastCasualPortrait(ctx, {
     ctx.restore();
   }
 
-  // 12. "Powered by LayoScan" Footer Badge
+  // 12. "Powered by LayoScan" Footer Badge (High-contrast solid dark pill on yellow ribbon wave)
   await drawLayoScanFooter(ctx, {
     cx: width / 2,
     cy: height - 60,
     badgeW: 390,
     badgeH: 56,
-    theme: 'dark',
+    templateId: 'fast_casual',
+    theme: 'solid-dark',
+    bgColor: '#141416',
+    borderColor: 'rgba(255, 168, 0, 0.65)',
+    textColor: '#FFFFFF',
     accentColor: yellow,
+    shadowColor: 'rgba(0, 0, 0, 0.4)',
   });
 }
 
@@ -647,14 +652,19 @@ export async function renderFastCasualLandscape(ctx, {
     ctx.restore();
   }
 
-  // Left Footer
+  // Left Footer (High-contrast solid dark pill on yellow ribbon wave)
   await drawLayoScanFooter(ctx, {
     cx: 320,
     cy: height - 55,
     badgeW: 360,
     badgeH: 52,
-    theme: 'dark',
+    templateId: 'fast_casual',
+    theme: 'solid-dark',
+    bgColor: '#141416',
+    borderColor: 'rgba(255, 168, 0, 0.65)',
+    textColor: '#FFFFFF',
     accentColor: yellow,
+    shadowColor: 'rgba(0, 0, 0, 0.4)',
   });
 
   // 5. Right Section: Large QR Code Presentation (x: 980 -> 1800)
@@ -739,7 +749,12 @@ export async function renderFastCasualLandscape(ctx, {
     cy: height - 55,
     badgeW: 360,
     badgeH: 52,
-    theme: 'dark',
+    templateId: 'fast_casual',
+    theme: 'solid-dark',
+    bgColor: '#141416',
+    borderColor: 'rgba(255, 168, 0, 0.65)',
+    textColor: '#FFFFFF',
     accentColor: yellow,
+    shadowColor: 'rgba(0, 0, 0, 0.4)',
   });
 }

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, AlertCircle } from 'lucide-react';
 import api from '../lib/api';
 import { useAuthStore } from '../store/authStore';
 import Input from '../components/ui/Input';
@@ -12,6 +12,7 @@ import logo from '../assets/logo.png';
 export default function Login() {
   const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [authError, setAuthError] = useState('');
   const { setSession } = useAuthStore();
   const navigate = useNavigate();
 
@@ -21,14 +22,22 @@ export default function Login() {
     formState: { errors },
   } = useForm();
 
-  const onSubmit = async ({ email, password }) => {
+  const onSubmit = async ({ identifier, password }) => {
     setLoading(true);
+    setAuthError('');
     try {
-      const { data } = await api.post('/auth/login', { email, password });
+      const cleanId = identifier.trim();
+      const { data } = await api.post('/auth/login', {
+        identifier: cleanId,
+        email: cleanId,
+        password,
+      });
       setSession(data);
       navigate('/');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Sign in failed. Check your credentials.');
+      const msg = err.response?.data?.message || 'Sign in failed. Check your credentials.';
+      setAuthError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -48,17 +57,30 @@ export default function Login() {
           <p className="text-white/45 text-sm mt-1.5">Dashboard · Sign in to continue</p>
         </div>
 
+        {/* Error Alert Banner */}
+        {authError && (
+          <div className="mb-4 p-3.5 rounded-xl bg-danger/10 border border-danger/25 text-rose-300 text-xs flex items-start gap-2.5">
+            <AlertCircle size={16} className="shrink-0 mt-0.5 text-rose-400" />
+            <span className="leading-snug">{authError}</span>
+          </div>
+        )}
+
         {/* Form */}
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
           <Input
-            label="Email address"
-            type="email"
-            placeholder="you@restaurant.com"
-            autoComplete="email"
-            error={errors.email?.message}
-            {...register('email', {
-              required: 'Email is required',
-              pattern: { value: /\S+@\S+\.\S+/, message: 'Enter a valid email' },
+            label="Email or Phone number"
+            type="text"
+            placeholder="0911223344 or you@restaurant.com"
+            autoComplete="username"
+            error={errors.identifier?.message}
+            {...register('identifier', {
+              required: 'Email or phone number is required',
+              validate: (value) => {
+                const clean = value.trim();
+                const isEmail = clean.includes('@') && /\S+@\S+\.\S+/.test(clean);
+                const isPhone = /^(?:\+251|0)?[79]\d{8}$/.test(clean.replace(/[\s\-\(\)]/g, '')) || /^\+?\d{8,15}$/.test(clean.replace(/[\s\-\(\)]/g, ''));
+                return isEmail || isPhone || 'Enter a valid email or phone number';
+              },
             })}
           />
           <div className="relative">
@@ -82,11 +104,12 @@ export default function Login() {
 
           <Button
             type="submit"
-            disabled={loading}
+            loading={loading}
+            loadingText="Signing in…"
             className="w-full mt-2"
             size="lg"
           >
-            {loading ? 'Signing in…' : 'Sign in'}
+            Sign in
           </Button>
         </form>
 

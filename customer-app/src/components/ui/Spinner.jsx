@@ -1,9 +1,5 @@
 import LoadingIndicator from './LoadingIndicator';
 
-/**
- * Backward-compatible Spinner component powered by LayoScan's brand loading indicator.
- * Existing imports of <Spinner size="md" /> continue working seamlessly.
- */
 export default function Spinner({ size = 'md', color = 'primary', className = '', ...props }) {
   return <LoadingIndicator variant="spinner" size={size} color={color} className={className} {...props} />;
 }

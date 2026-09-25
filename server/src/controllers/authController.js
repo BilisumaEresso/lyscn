@@ -5,21 +5,23 @@ const Branch = require('../models/Branch');
 const Table = require('../models/Table');
 const RefreshToken = require('../models/RefreshToken');
 
+const { normalizePhone } = require('../utils/phone');
+
 // ── Token helpers ─────────────────────────────────────────────────────────────
 const signAccessToken = (user) =>
   jwt.sign(
     { userId: user._id, restaurantId: user.restaurantId, role: user.role },
     process.env.JWT_SECRET,
-    { expiresIn: '15m' }
+    { expiresIn: '2h' }
   );
 
 const signRefreshToken = (user) =>
-  jwt.sign({ userId: user._id }, process.env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
+  jwt.sign({ userId: user._id }, process.env.JWT_REFRESH_SECRET, { expiresIn: '90d' });
 
 const persistRefreshToken = async (userId, tokenString) => {
   const tokenHash = RefreshToken.hashToken(tokenString);
   const decoded = jwt.decode(tokenString);
-  const expiresAt = new Date((decoded?.exp || Date.now() / 1000 + 7 * 86400) * 1000);
+  const expiresAt = new Date((decoded?.exp || Date.now() / 1000 + 90 * 86400) * 1000);
   await RefreshToken.create({ userId, tokenHash, expiresAt });
 };
 
@@ -95,17 +97,33 @@ const register = async (req, res, next) => {
 // ── POST /api/auth/login ───────────────────────────────────────────────────────
 const login = async (req, res, next) => {
   try {
-    const { email, password } = req.body;
+    const identifier = req.body.identifier || req.body.email || req.body.phone;
+    const { password } = req.body;
 
-    if (!email || !password) {
+    if (!identifier || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Email and password are required.',
+        message: 'Email or phone number and password are required.',
       });
     }
 
+    const cleanIdentifier = String(identifier).trim();
+    const isEmail = cleanIdentifier.includes('@');
+    const normalizedPhone = normalizePhone(cleanIdentifier);
+
+    // Query either by email or normalized phone
+    const userQuery = isEmail
+      ? { email: cleanIdentifier.toLowerCase() }
+      : {
+          $or: [
+            { phone: normalizedPhone },
+            { phone: cleanIdentifier },
+            { email: cleanIdentifier.toLowerCase() },
+          ],
+        };
+
     // Explicitly select passwordHash (it has select: false by default)
-    const user = await User.findOne({ email: email.toLowerCase() }).select('+passwordHash');
+    const user = await User.findOne(userQuery).select('+passwordHash');
 
     if (!user || !user.isActive) {
       return res.status(401).json({ success: false, message: 'Invalid credentials.' });
@@ -164,8 +182,24 @@ const refresh = async (req, res, next) => {
       return res.status(401).json({ success: false, message: 'Invalid or unrecognized refresh token.' });
     }
 
-    // Reuse detection: if this token was already replaced or revoked, revoke all tokens for this user
+    // Reuse detection with 60-second grace period for concurrent requests & multi-tab navigation
     if (storedToken.revokedAt || storedToken.replacedByTokenHash) {
+      const GRACE_PERIOD_MS = 60 * 1000;
+      const isWithinGracePeriod =
+        storedToken.revokedAt &&
+        Date.now() - new Date(storedToken.revokedAt).getTime() < GRACE_PERIOD_MS;
+
+      if (isWithinGracePeriod && storedToken.replacedByTokenHash) {
+        const user = await User.findById(decoded.userId);
+        if (user && user.isActive) {
+          const newAccessToken = signAccessToken(user);
+          return res.json({
+            success: true,
+            accessToken: newAccessToken,
+          });
+        }
+      }
+
       await RefreshToken.updateMany(
         { userId: storedToken.userId, revokedAt: null },
         { revokedAt: new Date() }

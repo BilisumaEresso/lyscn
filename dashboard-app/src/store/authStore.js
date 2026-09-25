@@ -21,6 +21,14 @@ export const useAuthStore = create(
       /** Called by the restaurant settings form to refresh the local copy. */
       setRestaurant: (restaurant) => set({ restaurant }),
 
+      /** Called after a silent token refresh in api.js to keep in-memory Zustand store and storage in sync. */
+      setTokens: ({ accessToken, refreshToken }) =>
+        set((state) => ({
+          ...state,
+          accessToken,
+          ...(refreshToken ? { refreshToken } : {}),
+        })),
+
       /** Called after a silent token refresh in api.js. */
       updateAccessToken: (accessToken) => set({ accessToken }),
 
@@ -31,3 +39,17 @@ export const useAuthStore = create(
     { name: 'layoscan-auth' }
   )
 );
+
+// Cross-tab synchronization: if logged out or updated in another tab, sync state immediately
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'layoscan-auth') {
+      try {
+        const parsed = JSON.parse(e.newValue || '{}');
+        if (!parsed?.state?.accessToken && useAuthStore.getState().accessToken) {
+          useAuthStore.getState().logout();
+        }
+      } catch (_) {}
+    }
+  });
+}

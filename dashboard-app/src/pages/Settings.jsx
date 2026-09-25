@@ -18,6 +18,7 @@ import toast from "react-hot-toast";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import Spinner from "../components/ui/Spinner";
+import LoadingIndicator from "../components/ui/LoadingIndicator";
 import ImageUploader from "../components/ui/ImageUploader";
 import { useInstallPrompt } from "../hooks/useInstallPrompt";
 import api from "../lib/api";
@@ -534,10 +535,11 @@ export default function Settings() {
                 type="button"
                 variant="outline"
                 onClick={verifyBranchLocation}
-                disabled={locationSaving || !branch}
+                disabled={!branch}
+                loading={locationSaving}
+                loadingText="Checking location…"
               >
-                <MapPin size={14} />{" "}
-                {locationSaving ? "Checking…" : "Use my current location"}
+                <MapPin size={14} /> Use my current location
               </Button>
             </div>
             <label
@@ -772,8 +774,12 @@ export default function Settings() {
           >
             Discard changes
           </Button>
-          <Button type="submit" disabled={updateMutation.isPending}>
-            {updateMutation.isPending ? "Saving…" : "Save changes"}
+          <Button
+            type="submit"
+            loading={updateMutation.isPending}
+            loadingText="Saving changes…"
+          >
+            Save changes
           </Button>
         </div>
       </form>
@@ -792,8 +798,14 @@ export default function Settings() {
           opacity: updateMutation.isPending ? 0.7 : 1
         }}
       >
-        <Check size={18} strokeWidth={2.5} />
-        <span>{updateMutation.isPending ? 'Saving…' : isDirty ? 'Save changes*' : 'Save changes'}</span>
+        {updateMutation.isPending ? (
+          <LoadingIndicator variant="button" size="sm" color="white" text="Saving changes…" />
+        ) : (
+          <>
+            <Check size={18} strokeWidth={2.5} />
+            <span>{isDirty ? 'Save changes*' : 'Save changes'}</span>
+          </>
+        )}
       </button>
     </div>
   );

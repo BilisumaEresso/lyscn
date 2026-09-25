@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { useAuthStore } from '../store/authStore';
 
 // ── Configured axios instance ─────────────────────────────────────────────────
 const api = axios.create({
@@ -8,11 +9,16 @@ const api = axios.create({
 // ── Request interceptor: attach Bearer token ──────────────────────────────────
 api.interceptors.request.use((config) => {
   try {
-    const stored = localStorage.getItem('layoscan-auth');
-    if (stored) {
-      const { state } = JSON.parse(stored);
-      if (state?.accessToken) {
-        config.headers.Authorization = `Bearer ${state.accessToken}`;
+    const accessToken = useAuthStore.getState().accessToken;
+    if (accessToken) {
+      config.headers.Authorization = `Bearer ${accessToken}`;
+    } else {
+      const stored = localStorage.getItem('layoscan-auth');
+      if (stored) {
+        const { state } = JSON.parse(stored);
+        if (state?.accessToken) {
+          config.headers.Authorization = `Bearer ${state.accessToken}`;
+        }
       }
     }
   } catch (_) {
@@ -38,7 +44,15 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Do NOT attempt refresh on auth endpoints (login, register, logout, refresh)
+    const requestUrl = originalRequest?.url || '';
+    const isAuthEndpoint =
+      requestUrl.includes('/auth/login') ||
+      requestUrl.includes('/auth/register') ||
+      requestUrl.includes('/auth/refresh') ||
+      requestUrl.includes('/auth/logout');
+
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -54,9 +68,9 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const stored = localStorage.getItem('layoscan-auth');
-        const { state } = JSON.parse(stored || '{}');
-        const refreshToken = state?.refreshToken;
+        const refreshToken =
+          useAuthStore.getState().refreshToken ||
+          JSON.parse(localStorage.getItem('layoscan-auth') || '{}')?.state?.refreshToken;
 
         if (!refreshToken) throw new Error('No refresh token available.');
 
@@ -68,23 +82,37 @@ api.interceptors.response.use(
         const newToken = data.accessToken;
         const newRefreshToken = data.refreshToken;
 
-        // Patch the persisted Zustand store in localStorage
-        const authRaw = JSON.parse(localStorage.getItem('layoscan-auth') || '{}');
-        if (authRaw.state) {
-          authRaw.state.accessToken = newToken;
-          if (newRefreshToken) {
-            authRaw.state.refreshToken = newRefreshToken;
-          }
-          localStorage.setItem('layoscan-auth', JSON.stringify(authRaw));
-        }
+        // CRITICAL: Synchronize Zustand in-memory state so any future setRestaurant()
+        // or settings save does not overwrite localStorage with stale revoked tokens!
+        useAuthStore.getState().setTokens({
+          accessToken: newToken,
+          refreshToken: newRefreshToken,
+        });
 
         processQueue(null, newToken);
         originalRequest.headers.Authorization = `Bearer ${newToken}`;
         return api(originalRequest);
       } catch (err) {
         processQueue(err, null);
-        localStorage.removeItem('layoscan-auth');
-        window.location.href = '/login';
+
+        // Only kick user to /login if server explicitly rejected the refresh token (401/403)
+        // or no token was available. Avoid logging out on transient network errors.
+        const isAuthRejection =
+          err.response?.status === 401 ||
+          err.response?.status === 403 ||
+          err.message === 'No refresh token available.';
+
+        if (isAuthRejection) {
+          useAuthStore.getState().logout();
+          if (
+            typeof window !== 'undefined' &&
+            window.location.pathname !== '/login' &&
+            window.location.pathname !== '/register'
+          ) {
+            window.location.href = '/login';
+          }
+        }
+
         return Promise.reject(err);
       } finally {
         isRefreshing = false;

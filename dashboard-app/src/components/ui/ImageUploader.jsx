@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
-import { Upload, Trash2, Loader2, RefreshCw, Cloud, CheckCircle2, ImageOff } from 'lucide-react';
+import { Upload, Trash2, RefreshCw, Cloud, CheckCircle2, ImageOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 import api from '../../lib/api';
+import LoadingIndicator from './LoadingIndicator';
 
 /**
  * ImageUploader component for LayoScan dashboard.
@@ -142,10 +143,13 @@ export default function ImageUploader({
               )}
 
               {isUploading && (
-                <div className="absolute inset-0 bg-ink/65 backdrop-blur-xs flex items-center justify-center text-white gap-2 text-xs font-medium z-20">
-                  <Loader2 size={20} className="animate-spin text-teal" />
-                  Uploading directly to Cloudinary…
-                </div>
+                <LoadingIndicator
+                  variant="overlay"
+                  size="md"
+                  color="white"
+                  text="Uploading to Cloudinary…"
+                  className="rounded-2xl"
+                />
               )}
             </div>
 
@@ -212,9 +216,9 @@ export default function ImageUploader({
           )}
         >
           {isUploading ? (
-            <div className="flex flex-col items-center gap-2 text-teal">
-              <Loader2 size={24} className="animate-spin" />
-              <span className="text-xs font-semibold">Uploading directly to Cloudinary…</span>
+            <div className="flex flex-col items-center gap-2">
+              <LoadingIndicator variant="spinner" size="md" color="primary" />
+              <span className="text-xs font-semibold text-teal">Uploading directly to Cloudinary…</span>
             </div>
           ) : (
             <>

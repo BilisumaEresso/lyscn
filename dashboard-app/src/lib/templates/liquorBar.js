@@ -698,6 +698,7 @@ export async function renderLiquorBarPortrait(ctx, {
     badgeH: 56,
     theme: 'dark',
     accentColor: goldAccent,
+    templateId: 'liquor_bar',
   });
 }
 
@@ -894,6 +895,7 @@ export async function renderLiquorBarLandscape(ctx, {
     badgeH: 50,
     theme: 'dark',
     accentColor: goldAccent,
+    templateId: 'liquor_bar',
   });
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -985,5 +987,6 @@ export async function renderLiquorBarLandscape(ctx, {
     badgeH: 50,
     theme: 'dark',
     accentColor: goldAccent,
+    templateId: 'liquor_bar',
   });
 }

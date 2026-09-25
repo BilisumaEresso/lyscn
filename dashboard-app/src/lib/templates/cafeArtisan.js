@@ -231,6 +231,7 @@ export async function renderCafeArtisanPortrait(ctx, {
     cy: height - 60,
     badgeW: 390,
     badgeH: 56,
+    templateId: 'cafe_artisan',
     theme: 'light',
     accentColor: brandDark,
   });
@@ -406,6 +407,7 @@ export async function renderCafeArtisanLandscape(ctx, {
     cy: height - 55,
     badgeW: 360,
     badgeH: 52,
+    templateId: 'cafe_artisan',
     theme: 'light',
     accentColor: brandDark,
   });
@@ -488,6 +490,7 @@ export async function renderCafeArtisanLandscape(ctx, {
     cy: height - 55,
     badgeW: 360,
     badgeH: 52,
+    templateId: 'cafe_artisan',
     theme: 'light',
     accentColor: brandDark,
   });

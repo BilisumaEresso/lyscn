@@ -7,6 +7,7 @@ import Currency from '../components/Currency';
 import { Minus, Plus, Trash2, ChevronLeft } from 'lucide-react';
 import clsx from 'clsx';
 import api from '../lib/api';
+import LoadingIndicator from '../components/ui/LoadingIndicator';
 import { applyBrandColor } from '../lib/theme';
 import { useSessionStore } from '../store/sessionStore';
 import { useCartStore, cartItemCount, cartSubtotal } from '../store/cartStore';
@@ -273,11 +274,13 @@ export default function Checkout() {
             outlineColor: 'var(--color-primary)',
           }}
         >
-          {(placeMutation.isPending || isSubmitting)
-            ? 'Placing order…'
-            : session.orderHistory?.length > 0
-              ? `Place round #${session.orderHistory.length + 1} · ${itemCount} item${itemCount !== 1 ? 's' : ''}`
-              : `Place order · ${itemCount} item${itemCount !== 1 ? 's' : ''}`}
+          {(placeMutation.isPending || isSubmitting) ? (
+            <LoadingIndicator variant="button" text="Placing order…" color="white" />
+          ) : session.orderHistory?.length > 0 ? (
+            `Place round #${session.orderHistory.length + 1} · ${itemCount} item${itemCount !== 1 ? 's' : ''}`
+          ) : (
+            `Place order · ${itemCount} item${itemCount !== 1 ? 's' : ''}`
+          )}
         </button>
       </div>
     </div>

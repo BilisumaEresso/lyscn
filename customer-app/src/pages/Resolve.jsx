@@ -5,6 +5,7 @@ import api from '../lib/api';
 import { useSessionStore } from '../store/sessionStore';
 import { applyBrandColor } from '../lib/theme';
 import { saveVisitedRestaurant } from '../lib/visitedRestaurants';
+import LoadingIndicator from '../components/ui/LoadingIndicator';
 import logo from '../assets/logo.png';
 
 /**
@@ -236,38 +237,12 @@ export default function Resolve() {
 
   /* ── Loading / resolving state (the scan moment) ─────────────────── */
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-8 text-center bg-paper">
-      <div className="relative mb-8">
-        <div
-          className="absolute inset-0 rounded-2xl opacity-20 scale-110 animate-pulse-slow"
-          style={{ background: 'var(--color-primary)' }}
-        />
-        <div
-          className="w-20 h-20 rounded-2xl flex items-center justify-center shadow-xl overflow-hidden relative gradient-brand"
-        >
-          <img src={logo} alt="LayoScan" className="w-20 h-20 object-cover" loading="eager" />
-        </div>
-      </div>
-
-      <p className="font-display font-semibold text-xl text-ink mb-2">
-        Setting up your table…
-      </p>
-      <p className="text-ink-muted text-sm animate-pulse-slow">
-        Scanning QR code
-      </p>
-
-      <div className="flex items-center gap-1.5 mt-6">
-        {[0, 1, 2].map((i) => (
-          <span
-            key={i}
-            className="w-2 h-2 rounded-full"
-            style={{
-              background:  'var(--color-primary)',
-              animation:   `pulse 1.4s ease-in-out ${i * 0.2}s infinite`,
-            }}
-          />
-        ))}
-      </div>
-    </div>
+    <LoadingIndicator
+      variant="full"
+      size="xl"
+      backdrop="light"
+      text="Setting up your table…"
+      description="Connecting to LayoScan digital menu"
+    />
   );
 }

@@ -11,7 +11,19 @@ const userSchema = new mongoose.Schema(
       default: null,
     },
     name:  { type: String, required: true, trim: true },
-    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    email: {
+      type: String,
+      sparse: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+    },
+    phone: {
+      type: String,
+      sparse: true,
+      unique: true,
+      trim: true,
+    },
 
     // select: false — never returned in queries unless explicitly requested
     passwordHash: { type: String, required: true, select: false },
@@ -25,6 +37,14 @@ const userSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// Require at least one contact identifier (email or phone)
+userSchema.pre('validate', function (next) {
+  if (!this.email && !this.phone) {
+    return next(new Error('User must have either an email or a phone number.'));
+  }
+  next();
+});
 
 // ── Pre-save hook: hash passwordHash if it was modified ───────────────────────
 userSchema.pre('save', async function (next) {

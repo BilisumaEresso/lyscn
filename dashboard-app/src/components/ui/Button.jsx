@@ -1,4 +1,5 @@
 import clsx from 'clsx';
+import LoadingIndicator from './LoadingIndicator';
 
 const variants = {
   primary:   'hover:opacity-90',
@@ -19,6 +20,8 @@ export default function Button({
   size = 'md',
   className = '',
   disabled,
+  loading = false,
+  loadingText,
   style = {},
   children,
   ...props
@@ -31,7 +34,7 @@ export default function Button({
 
   return (
     <button
-      disabled={disabled}
+      disabled={disabled || loading}
       style={primaryStyle}
       className={clsx(
         'inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors',
@@ -43,7 +46,16 @@ export default function Button({
       )}
       {...props}
     >
-      {children}
+      {loading ? (
+        <LoadingIndicator
+          variant="button"
+          size={size === 'lg' ? 'md' : 'sm'}
+          color={variant === 'primary' || variant === 'danger' ? 'white' : 'current'}
+          text={loadingText || (typeof children === 'string' ? `${children}…` : undefined)}
+        />
+      ) : (
+        children
+      )}
     </button>
   );
 }

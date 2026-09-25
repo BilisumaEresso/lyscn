@@ -270,6 +270,7 @@ export async function renderLuxuryHotelPortrait(ctx, {
     badgeH: 56,
     theme: 'dark',
     accentColor: goldAccent,
+    templateId: 'luxury_hotel',
   });
 }
 
@@ -443,6 +444,7 @@ export async function renderLuxuryHotelLandscape(ctx, {
     badgeH: 52,
     theme: 'dark',
     accentColor: goldAccent,
+    templateId: 'luxury_hotel',
   });
 
   // 4. Right Section: Large QR Code Presentation (x: 980 -> 1800)
@@ -525,5 +527,6 @@ export async function renderLuxuryHotelLandscape(ctx, {
     badgeH: 52,
     theme: 'dark',
     accentColor: goldAccent,
+    templateId: 'luxury_hotel',
   });
 }

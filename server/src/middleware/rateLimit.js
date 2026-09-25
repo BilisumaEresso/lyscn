@@ -22,9 +22,14 @@ const createLimiter = ({ max }) =>
     skip: () => process.env.RATE_LIMIT_DISABLED === 'true',
   });
 
-/** Login, register, refresh — per IP */
+/** Login, register — per IP */
 const authLimiter = createLimiter({
-  max: Number(process.env.RATE_LIMIT_AUTH_MAX) || 30,
+  max: Number(process.env.RATE_LIMIT_AUTH_MAX) || 60,
+});
+
+/** Silent token refresh — per IP, higher threshold so restaurant shared Wi-Fi is never locked out */
+const refreshLimiter = createLimiter({
+  max: Number(process.env.RATE_LIMIT_REFRESH_MAX) || 300,
 });
 
 /** QR table resolve (GET) — mitigates token guessing */
@@ -39,6 +44,7 @@ const publicWriteLimiter = createLimiter({
 
 module.exports = {
   authLimiter,
+  refreshLimiter,
   tableResolveLimiter,
   publicWriteLimiter,
 };

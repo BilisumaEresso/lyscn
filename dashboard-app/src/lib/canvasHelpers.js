@@ -3,6 +3,8 @@ import logoImg from '../assets/logo.png';
 
 export const saveAs = fileSaver.saveAs || fileSaver;
 
+let cachedLayoScanLogo = null;
+
 /**
  * Safely load an HTMLImageElement
  */
@@ -543,6 +545,258 @@ export function drawCoffeeCupEmblem(ctx, cx, cy, size = 110, color = '#1B382B') 
 }
 
 /**
+ * Draw bespoke archetype-themed vector mark inside the LayoScan footer badge
+ */
+export function drawThemedFooterMark(ctx, x, y, size = 34, templateId = 'cafe_artisan') {
+  ctx.save();
+  const radius = 8;
+  const cx = x + size / 2;
+  const cy = y + size / 2;
+
+  // 1. Container background & border per template archetype
+  ctx.beginPath();
+  ctx.roundRect(x, y, size, size, radius);
+
+  if (templateId === 'fast_casual') {
+    ctx.fillStyle = '#1A1A1E';
+    ctx.fill();
+    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = '#FFA800';
+    ctx.stroke();
+
+    // Mini Burger & Pizza mark
+    ctx.save();
+    // Top Bun
+    ctx.beginPath();
+    ctx.arc(cx - 1, cy - 2, 7, Math.PI, 0);
+    ctx.fillStyle = '#FFA800';
+    ctx.fill();
+    // Patty / Cheese line
+    ctx.beginPath();
+    ctx.moveTo(cx - 7, cy + 1);
+    ctx.lineTo(cx + 4, cy + 1);
+    ctx.strokeStyle = '#FF4B26';
+    ctx.lineWidth = 1.8;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    // Bottom Bun
+    ctx.beginPath();
+    ctx.roundRect(cx - 6, cy + 3, 9, 3, 1);
+    ctx.fillStyle = '#FFA800';
+    ctx.fill();
+    // Mini pizza slice tip on right
+    ctx.beginPath();
+    ctx.moveTo(cx + 6, cy - 4);
+    ctx.lineTo(cx + 10, cy + 5);
+    ctx.lineTo(cx + 5, cy + 6);
+    ctx.closePath();
+    ctx.fillStyle = '#FF4B26';
+    ctx.fill();
+    // Pepperoni dot
+    ctx.beginPath();
+    ctx.arc(cx + 7, cy + 1, 0.9, 0, Math.PI * 2);
+    ctx.fillStyle = '#FFA800';
+    ctx.fill();
+    ctx.restore();
+
+  } else if (templateId === 'fresh_mart') {
+    ctx.fillStyle = '#0B3B24';
+    ctx.fill();
+    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = '#86EFAC';
+    ctx.stroke();
+
+    // Botanical harvest sprout / leaf duo
+    ctx.save();
+    ctx.strokeStyle = '#86EFAC';
+    ctx.lineWidth = 1.8;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy + 8);
+    ctx.quadraticCurveTo(cx, cy + 1, cx - 1, cy - 2);
+    ctx.stroke();
+    // Left leaf
+    ctx.beginPath();
+    ctx.moveTo(cx - 1, cy - 1);
+    ctx.bezierCurveTo(cx - 7, cy - 3, cx - 7, cy - 8, cx - 1, cy - 7);
+    ctx.bezierCurveTo(cx, cy - 5, cx, cy - 2, cx - 1, cy - 1);
+    ctx.fillStyle = '#86EFAC';
+    ctx.fill();
+    // Right leaf
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.bezierCurveTo(cx + 6, cy - 2, cx + 6, cy - 7, cx + 1, cy - 6);
+    ctx.bezierCurveTo(cx - 1, cy - 4, cx - 1, cy - 1, cx, cy);
+    ctx.fillStyle = '#4ADE80';
+    ctx.fill();
+    ctx.restore();
+
+  } else if (templateId === 'luxury_hotel') {
+    ctx.fillStyle = '#070E1A';
+    ctx.fill();
+    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = '#E5C583';
+    ctx.stroke();
+
+    // 5-Star Architectural Crown / Crest
+    ctx.save();
+    ctx.strokeStyle = '#E5C583';
+    ctx.fillStyle = '#E5C583';
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    // Base platform
+    ctx.beginPath();
+    ctx.moveTo(cx - 8, cy + 7);
+    ctx.lineTo(cx + 8, cy + 7);
+    ctx.stroke();
+    // Crown peaks
+    ctx.beginPath();
+    ctx.moveTo(cx - 7, cy + 5);
+    ctx.lineTo(cx - 6, cy - 2);
+    ctx.lineTo(cx - 3, cy + 1);
+    ctx.lineTo(cx, cy - 6);
+    ctx.lineTo(cx + 3, cy + 1);
+    ctx.lineTo(cx + 6, cy - 2);
+    ctx.lineTo(cx + 7, cy + 5);
+    ctx.stroke();
+    // Jewels
+    ctx.beginPath();
+    ctx.arc(cx - 6, cy - 3.5, 1, 0, Math.PI * 2);
+    ctx.arc(cx, cy - 7.5, 1.2, 0, Math.PI * 2);
+    ctx.arc(cx + 6, cy - 3.5, 1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+  } else if (templateId === 'cultural_heritage') {
+    ctx.fillStyle = '#781812';
+    ctx.fill();
+    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = '#F59E0B';
+    ctx.stroke();
+
+    // Authentic Ethiopian Mesob basket vessel
+    ctx.save();
+    ctx.strokeStyle = '#F59E0B';
+    ctx.fillStyle = '#F59E0B';
+    ctx.lineWidth = 1.6;
+    ctx.lineCap = 'round';
+    // Base tray
+    ctx.beginPath();
+    ctx.moveTo(cx - 8, cy + 7);
+    ctx.lineTo(cx + 8, cy + 7);
+    ctx.stroke();
+    // Dome lid
+    ctx.beginPath();
+    ctx.moveTo(cx - 7, cy + 5);
+    ctx.bezierCurveTo(cx - 3, cy - 4, cx + 3, cy - 4, cx + 7, cy + 5);
+    ctx.stroke();
+    // Top knob
+    ctx.beginPath();
+    ctx.arc(cx, cy - 5.5, 1.6, 0, Math.PI * 2);
+    ctx.fill();
+    // Woven mid-rib accent
+    ctx.strokeStyle = '#E5C583';
+    ctx.lineWidth = 1.1;
+    ctx.beginPath();
+    ctx.moveTo(cx - 5, cy + 1);
+    ctx.lineTo(cx + 5, cy + 1);
+    ctx.moveTo(cx - 6, cy + 4);
+    ctx.lineTo(cx + 6, cy + 4);
+    ctx.stroke();
+    ctx.restore();
+
+  } else if (templateId === 'liquor_bar') {
+    ctx.fillStyle = '#14110E';
+    ctx.fill();
+    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = '#E5C583';
+    ctx.stroke();
+
+    // Martini glass & beer mug mark
+    ctx.save();
+    ctx.strokeStyle = '#E5C583';
+    ctx.fillStyle = '#E5C583';
+    ctx.lineWidth = 1.4;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    // Martini V-bowl
+    ctx.beginPath();
+    ctx.moveTo(cx - 8, cy - 3);
+    ctx.lineTo(cx + 1, cy - 3);
+    ctx.lineTo(cx - 3.5, cy + 3.5);
+    ctx.closePath();
+    ctx.stroke();
+    // Stem & base
+    ctx.beginPath();
+    ctx.moveTo(cx - 3.5, cy + 3.5);
+    ctx.lineTo(cx - 3.5, cy + 7.5);
+    ctx.moveTo(cx - 6.5, cy + 7.5);
+    ctx.lineTo(cx - 0.5, cy + 7.5);
+    ctx.stroke();
+    // Olive
+    ctx.beginPath();
+    ctx.arc(cx - 5, cy - 1, 1, 0, Math.PI * 2);
+    ctx.fill();
+    // Beer stein
+    ctx.strokeStyle = '#F59E0B';
+    ctx.beginPath();
+    ctx.roundRect(cx + 2.5, cy - 0.5, 6, 8, 1);
+    ctx.stroke();
+    // Beer handle
+    ctx.beginPath();
+    ctx.arc(cx + 8.5, cy + 3.5, 2, -Math.PI * 0.5, Math.PI * 0.5);
+    ctx.stroke();
+    // Foam top
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(cx + 4, cy - 1, 1.5, Math.PI, 0);
+    ctx.arc(cx + 7, cy - 1, 1.5, Math.PI, 0);
+    ctx.stroke();
+    ctx.restore();
+
+  } else {
+    // cafe_artisan default: Steaming coffee cup
+    ctx.fillStyle = '#1B382B';
+    ctx.fill();
+    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.stroke();
+
+    ctx.save();
+    ctx.strokeStyle = '#FAF6EF';
+    ctx.lineWidth = 1.6;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    // Cup
+    ctx.beginPath();
+    ctx.roundRect(cx - 6, cy - 1, 10, 7.5, [0, 0, 2.5, 2.5]);
+    ctx.stroke();
+    // Handle
+    ctx.beginPath();
+    ctx.arc(cx + 4, cy + 2.5, 2.2, -Math.PI * 0.5, Math.PI * 0.5);
+    ctx.stroke();
+    // Saucer
+    ctx.beginPath();
+    ctx.moveTo(cx - 8, cy + 7.5);
+    ctx.lineTo(cx + 6, cy + 7.5);
+    ctx.stroke();
+    // Steam wisps
+    ctx.strokeStyle = '#86EFAC';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(cx - 3.5, cy - 3);
+    ctx.quadraticCurveTo(cx - 2, cy - 5, cx - 3.5, cy - 7);
+    ctx.moveTo(cx + 1, cy - 3);
+    ctx.quadraticCurveTo(cx + 2.5, cy - 5, cx + 1, cy - 7);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+/**
  * Standard High-Visibility "Powered by LayoScan" Footer Badge
  */
 export async function drawLayoScanFooter(ctx, {
@@ -550,9 +804,14 @@ export async function drawLayoScanFooter(ctx, {
   cy,
   badgeW = 390,
   badgeH = 58,
+  templateId = null,
   markLogo = null,
-  theme = 'light', // 'light' | 'dark'
+  theme = 'light', // 'light' | 'dark' | 'solid-dark'
   accentColor = '#1B382B',
+  bgColor = null,
+  borderColor = null,
+  textColor = null,
+  shadowColor = null,
 }) {
   ctx.save();
   const radius = badgeH / 2;
@@ -563,15 +822,21 @@ export async function drawLayoScanFooter(ctx, {
   ctx.beginPath();
   ctx.roundRect(x, y, badgeW, badgeH, radius);
 
-  if (theme === 'dark') {
+  if (bgColor) {
+    ctx.fillStyle = bgColor;
+    ctx.strokeStyle = borderColor || (theme === 'dark' || theme === 'solid-dark' ? 'rgba(255, 255, 255, 0.18)' : 'rgba(0, 0, 0, 0.12)');
+  } else if (theme === 'solid-dark') {
+    ctx.fillStyle = '#141416';
+    ctx.strokeStyle = borderColor || 'rgba(255, 168, 0, 0.5)';
+  } else if (theme === 'dark') {
     ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+    ctx.strokeStyle = borderColor || 'rgba(255, 255, 255, 0.18)';
   } else {
     ctx.fillStyle = '#FFFFFF';
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.12)';
+    ctx.strokeStyle = borderColor || 'rgba(0, 0, 0, 0.12)';
   }
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.08)';
-  ctx.shadowBlur = 12;
+  ctx.shadowColor = shadowColor || (theme === 'solid-dark' ? 'rgba(0, 0, 0, 0.35)' : 'rgba(0, 0, 0, 0.08)');
+  ctx.shadowBlur = theme === 'solid-dark' ? 16 : 12;
   ctx.shadowOffsetY = 4;
   ctx.fill();
   ctx.lineWidth = 1.6;
@@ -579,38 +844,53 @@ export async function drawLayoScanFooter(ctx, {
   ctx.restore();
 
   // Content inside badge
-  const loadedMark = markLogo || (await loadImage(logoImg));
-  const markSize = 32;
+  const markSize = 34;
   const textStr = 'Powered by LayoScan';
 
   ctx.save();
   ctx.font = '700 24px "Space Grotesk", Inter, sans-serif';
   const textWidth = ctx.measureText(textStr).width;
-  const totalW = (loadedMark ? markSize + 12 : 0) + textWidth;
+  const totalW = markSize + 12 + textWidth;
   const startX = cx - totalW / 2;
 
-  if (loadedMark) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.roundRect(startX, cy - markSize / 2, markSize, markSize, 7);
-    ctx.clip();
-    ctx.drawImage(loadedMark, startX, cy - markSize / 2, markSize, markSize);
-    ctx.restore();
+  const resolvedTextColor = textColor || (theme === 'dark' || theme === 'solid-dark' ? '#E5E7EB' : '#1E1510');
 
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = theme === 'dark' ? '#E5E7EB' : '#1E1510';
-    ctx.fillText('Powered by ', startX + markSize + 12, cy);
+  const markY = cy - markSize / 2;
 
-    const prefixW = ctx.measureText('Powered by ').width;
-    ctx.fillStyle = accentColor;
-    ctx.fillText('LayoScan', startX + markSize + 12 + prefixW, cy);
-  } else {
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = theme === 'dark' ? '#E5E7EB' : '#1E1510';
-    ctx.fillText('Powered by LayoScan', cx, cy);
+  // Load and render official LayoScan logo on all templates
+  let logoToDraw = markLogo;
+  if (!logoToDraw) {
+    if (!cachedLayoScanLogo) {
+      cachedLayoScanLogo = await loadImage(logoImg);
+    }
+    logoToDraw = cachedLayoScanLogo;
   }
+
+  if (logoToDraw) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    if (markLogo) {
+      ctx.beginPath();
+      ctx.roundRect(startX, markY, markSize, markSize, 8);
+      ctx.clip();
+    }
+    ctx.drawImage(logoToDraw, startX, markY, markSize, markSize);
+    ctx.restore();
+  } else {
+    drawThemedFooterMark(ctx, startX, markY, markSize, templateId);
+  }
+
+  // Draw typography
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = resolvedTextColor;
+  ctx.fillText('Powered by ', startX + markSize + 12, cy);
+
+  const prefixW = ctx.measureText('Powered by ').width;
+  ctx.fillStyle = accentColor;
+  ctx.fillText('LayoScan', startX + markSize + 12 + prefixW, cy);
+
   ctx.restore();
 }
 

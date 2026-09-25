@@ -976,6 +976,7 @@ export async function renderCulturalHeritagePortrait(ctx, {
     badgeH: 54,
     theme: 'light',
     accentColor: ETH_BURGUNDY,
+    templateId: 'cultural_heritage',
   });
 }
 
@@ -1148,6 +1149,7 @@ export async function renderCulturalHeritageLandscape(ctx, {
     badgeH: 52,
     theme: 'light',
     accentColor: ETH_BURGUNDY,
+    templateId: 'cultural_heritage',
   });
 
   // 4. Right Section: Large QR Code Presentation (x: 980 -> 1800)
@@ -1243,5 +1245,6 @@ export async function renderCulturalHeritageLandscape(ctx, {
     badgeH: 52,
     theme: 'light',
     accentColor: ETH_BURGUNDY,
+    templateId: 'cultural_heritage',
   });
 }

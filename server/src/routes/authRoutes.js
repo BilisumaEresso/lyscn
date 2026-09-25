@@ -3,13 +3,13 @@ const { body } = require('express-validator');
 const router = express.Router();
 const { register, login, refresh, logout, me } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
-const { authLimiter } = require('../middleware/rateLimit');
+const { authLimiter, refreshLimiter } = require('../middleware/rateLimit');
 const { validate } = require('../middleware/validator');
-
-router.use(authLimiter);
+const { isValidPhone } = require('../utils/phone');
 
 router.post(
   '/register',
+  authLimiter,
   [
     body('restaurantName')
       .trim()
@@ -33,11 +33,21 @@ router.post(
 
 router.post(
   '/login',
+  authLimiter,
   [
-    body('email')
-      .trim()
-      .isEmail()
-      .withMessage('Valid email is required'),
+    body().custom((value, { req }) => {
+      const id = req.body.identifier || req.body.email || req.body.phone;
+      if (!id || !String(id).trim()) {
+        throw new Error('Email or phone number is required');
+      }
+      const clean = String(id).trim();
+      const isEmail = clean.includes('@') && /\S+@\S+\.\S+/.test(clean);
+      const isPhone = isValidPhone(clean);
+      if (!isEmail && !isPhone) {
+        throw new Error('Please enter a valid email or phone number');
+      }
+      return true;
+    }),
     body('password')
       .notEmpty()
       .withMessage('Password is required'),
@@ -46,7 +56,7 @@ router.post(
   login
 );
 
-router.post('/refresh', refresh);
+router.post('/refresh', refreshLimiter, refresh);
 router.post('/logout', logout);
 router.get('/me', protect, me);
 
