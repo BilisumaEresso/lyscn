@@ -10,6 +10,7 @@ import api from '../lib/api';
 import { applyBrandColor } from '../lib/theme';
 import { useSessionStore } from '../store/sessionStore';
 import { useCartStore, cartItemCount, cartSubtotal } from '../store/cartStore';
+import StrictLocationGate from '../components/StrictLocationGate';
 import PoweredBy from '../components/PoweredBy';
 import { getRestaurantLogo } from '../lib/branding';
 import { saveVisitedRestaurant } from '../lib/visitedRestaurants';
@@ -65,6 +66,11 @@ export default function Checkout() {
         toast.error('Your session has ended — please scan the QR code again to continue ordering.');
         useSessionStore.getState().clearSession();
         navigate('/');
+        return;
+      }
+      if (err.response?.data?.code === 'LOCATION_REQUIRED') {
+        useSessionStore.getState().setLocationVerified(false);
+        toast.error('Physical location verification required to place an order.');
         return;
       }
       toast.error(err.response?.data?.message || 'Failed to place order — please try again.');
@@ -128,6 +134,7 @@ export default function Checkout() {
 
   return (
     <div className="min-h-screen bg-paper max-w-[560px] mx-auto pb-40">
+      <StrictLocationGate onSuccess={handlePlaceOrder} />
       {/* Header */}
       <div className="sticky top-0 z-10 bg-paper/95 backdrop-blur-sm border-b border-ink/6 px-4 py-3.5 flex items-center gap-3">
         <button

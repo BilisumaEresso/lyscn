@@ -1,6 +1,7 @@
-const Order  = require('../models/Order');
+const Order   = require('../models/Order');
 const Product = require('../models/Product');
 const Table   = require('../models/Table');
+const Branch  = require('../models/Branch');
 
 const VALID_STATUSES = ['placed', 'accepted', 'preparing', 'ready', 'served', 'cancelled'];
 
@@ -83,6 +84,18 @@ const placeOrder = async (req, res, next) => {
         success: false,
         message: 'Your session has expired — please scan the QR code again.',
       });
+    }
+
+    // Strict Location Enforcement: If branch has GPS coordinates, verify diner location
+    const branch = await Branch.findById(branchId).select('location locationStrictMode');
+    if (branch && Number.isFinite(branch.location?.lat) && Number.isFinite(branch.location?.lng)) {
+      if (table.sessionLocationVerified !== true) {
+        return res.status(403).json({
+          success: false,
+          code: 'LOCATION_REQUIRED',
+          message: 'Location verification is required before placing an order. Please verify your position at the table.',
+        });
+      }
     }
 
     // Build order items with server-side price computation
@@ -464,23 +477,130 @@ const updateOrderPayment = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Order not found.' });
     }
 
-    // ── Realtime: broadcast to restaurant room, order room, and table room ───
     const io = req.app.get('io');
+
+    // ── Table-wide payment synchronization ─────────────────────────────────
+    // If the order belongs to a table with other unpaid rounds, mark them paid too!
+    const targetTableId = order.tableId?._id || order.tableId;
+    if (targetTableId) {
+      const siblingUnpaid = await Order.find({
+        tableId: targetTableId,
+        restaurantId: req.tenantId,
+        paymentStatus: 'unpaid',
+        status: { $ne: 'cancelled' },
+        _id: { $ne: order._id },
+      });
+
+      if (siblingUnpaid.length > 0) {
+        await Order.updateMany(
+          { _id: { $in: siblingUnpaid.map((o) => o._id) } },
+          { $set: { paymentStatus: 'paid', paymentMethod } }
+        );
+
+        const updatedSiblings = await Order.find({
+          _id: { $in: siblingUnpaid.map((o) => o._id) },
+        })
+          .populate('tableId', 'label')
+          .populate('branchId', 'name');
+
+        if (io) {
+          for (const sib of updatedSiblings) {
+            io.to(`restaurant:${sib.restaurantId}`).emit('order:updated', sib);
+            io.to(`order:${sib._id}`).emit('order:updated', sib);
+            io.to(`table:${targetTableId}`).emit('order:updated', sib);
+          }
+        }
+      }
+    }
+
+    // ── Realtime: broadcast to restaurant room, order room, and table room ───
     if (io) {
       io.to(`restaurant:${order.restaurantId}`).emit('order:updated', order);
       io.to(`order:${order._id}`).emit('order:updated', order);
-      const targetTableId = order.tableId?._id || order.tableId;
       if (targetTableId) {
         io.to(`table:${targetTableId}`).emit('order:updated', order);
       }
     }
 
     if (order.status === 'served' && order.paymentStatus === 'paid') {
-      suggestTableReadyToClear(req, order.tableId?._id || order.tableId, order.restaurantId)
+      suggestTableReadyToClear(req, targetTableId, order.restaurantId)
         .catch((err) => (req.log || console).error({ err }, 'Unable to evaluate table clear suggestion'));
     }
 
     return res.json({ success: true, order });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ── PATCH /api/orders/table/:tableId/payment — protected, staff ───────────────
+// Updates paymentStatus to 'paid' for ALL unpaid orders at a table at once.
+// Fulfillment status (placed, accepted, preparing, ready, served) stays as it is!
+const updateTablePayment = async (req, res, next) => {
+  try {
+    const { paymentMethod } = req.body;
+    const VALID_METHODS = ['cash', 'pos'];
+
+    if (!paymentMethod || !VALID_METHODS.includes(paymentMethod)) {
+      return res.status(400).json({
+        success: false,
+        message: 'paymentMethod must be "cash" or "pos".',
+      });
+    }
+
+    const tableId = req.params.tableId;
+    const unpaidOrders = await Order.find({
+      tableId,
+      restaurantId: req.tenantId,
+      paymentStatus: 'unpaid',
+      status: { $ne: 'cancelled' },
+    });
+
+    if (unpaidOrders.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No unpaid orders found for this table.',
+      });
+    }
+
+    // Bulk update paymentStatus to paid, leave fulfillment status as it is
+    await Order.updateMany(
+      {
+        tableId,
+        restaurantId: req.tenantId,
+        paymentStatus: 'unpaid',
+        status: { $ne: 'cancelled' },
+      },
+      {
+        $set: { paymentStatus: 'paid', paymentMethod },
+      }
+    );
+
+    const updatedOrders = await Order.find({
+      _id: { $in: unpaidOrders.map((o) => o._id) },
+    })
+      .populate('tableId', 'label')
+      .populate('branchId', 'name');
+
+    // ── Realtime: broadcast to restaurant room, table room, and order rooms ───
+    const io = req.app.get('io');
+    if (io) {
+      for (const order of updatedOrders) {
+        io.to(`restaurant:${order.restaurantId}`).emit('order:updated', order);
+        io.to(`order:${order._id}`).emit('order:updated', order);
+        io.to(`table:${tableId}`).emit('order:updated', order);
+      }
+      io.to(`table:${tableId}`).emit('table:updated', { tableId });
+    }
+
+    suggestTableReadyToClear(req, tableId, req.tenantId)
+      .catch((err) => (req.log || console).error({ err }, 'Unable to evaluate table clear suggestion'));
+
+    return res.json({
+      success: true,
+      count: updatedOrders.length,
+      orders: updatedOrders,
+    });
   } catch (err) {
     return next(err);
   }
@@ -493,5 +613,6 @@ module.exports = {
   getTableOrders,
   updateOrderStatus,
   updateOrderPayment,
+  updateTablePayment,
   submitOrderFeedback,
 };

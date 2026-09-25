@@ -14,23 +14,87 @@ import logo from '../assets/logo.png';
 export default function Resolve() {
   const { qrToken } = useParams();
   const navigate    = useNavigate();
-  const setSession  = useSessionStore((s) => s.setSession);
+  const setSession          = useSessionStore((s) => s.setSession);
+  const setLocationVerified = useSessionStore((s) => s.setLocationVerified);
   const [locationBlocked, setLocationBlocked] = useState(false);
+  const [locationError, setLocationError]     = useState('');
+  const [isVerifyingLoc, setIsVerifyingLoc]   = useState(false);
+  const [confirmMigrate, setConfirmMigrate]   = useState(false);
 
-  const existingSessionToken = useSessionStore.getState().sessionToken;
+  const existing = useSessionStore.getState();
 
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['table-resolve', qrToken],
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['table-resolve', qrToken, confirmMigrate],
     queryFn: () =>
       api.get(`/public/table/${qrToken}`, {
-        params: existingSessionToken ? { sessionToken: existingSessionToken } : undefined,
+        params: {
+          sessionToken:         existing.sessionToken || undefined,
+          previousTableId:      existing.table?._id && existing.qrToken !== qrToken ? existing.table._id : undefined,
+          previousSessionToken: existing.sessionToken && existing.qrToken !== qrToken ? existing.sessionToken : undefined,
+          migrateTable:         confirmMigrate ? 'true' : undefined,
+        },
       }).then((r) => r.data),
     retry: false,
-    staleTime: 30_000,
+    staleTime: 0,
   });
 
+  const requestGeolocation = (sessionTokenToVerify, onVerified) => {
+    if (!navigator.geolocation) {
+      setLocationBlocked(true);
+      setLocationError('Geolocation services are not supported by your browser.');
+      return;
+    }
+
+    setIsVerifyingLoc(true);
+    setLocationError('');
+
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        try {
+          const res = await api.post(`/public/table/${qrToken}/verify-location`, {
+            sessionToken: sessionTokenToVerify,
+            lat: coords.latitude,
+            lng: coords.longitude,
+          });
+
+          if (res.data?.verified === true || res.data?.verified === null) {
+            setLocationVerified(true);
+            setLocationBlocked(false);
+            if (onVerified) onVerified();
+          } else {
+            setLocationBlocked(true);
+            setLocationError(
+              `You appear to be ${res.data?.distanceMeters || 'too far'} meters away from the cafe. Location access inside the restaurant is mandatory.`
+            );
+          }
+        } catch (error) {
+          setLocationBlocked(true);
+          setLocationError(
+            error.response?.data?.message || 'Could not verify that you are at the cafe. Please try again.'
+          );
+        } finally {
+          setIsVerifyingLoc(false);
+        }
+      },
+      (error) => {
+        setIsVerifyingLoc(false);
+        setLocationBlocked(true);
+        if (error.code === error.PERMISSION_DENIED) {
+          setLocationError(
+            'Location permission was denied. Location access is mandatory to view the menu and place orders.'
+          );
+        } else if (error.code === error.TIMEOUT) {
+          setLocationError('Location request timed out. Please tap retry.');
+        } else {
+          setLocationError('Unable to detect your device location. Please ensure GPS is turned on.');
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 0 }
+    );
+  };
+
   useEffect(() => {
-    if (data?.success) {
+    if (data?.success && !data?.tableSwitchPrompt) {
       // Apply per-restaurant brand color to CSS custom properties
       applyBrandColor(data.restaurant?.brandColor);
 
@@ -41,9 +105,9 @@ export default function Resolve() {
         qrToken,
       });
 
-      const existing = useSessionStore.getState();
-      const isSameTable = existing.qrToken === qrToken;
-      const myActiveOrderId = existing.activeOrderId;
+      const currentStore = useSessionStore.getState();
+      const isSameTable = currentStore.qrToken === qrToken;
+      const myActiveOrderId = currentStore.activeOrderId;
 
       // If user had an active order on this device for this table and it's still active, resume to order tracking
       const orderStillActive =
@@ -70,49 +134,86 @@ export default function Resolve() {
         navigate(destination, { replace: true });
       };
 
-      if (data.locationCheckRequired && navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          async ({ coords }) => {
-            try {
-              await api.post(`/public/table/${qrToken}/verify-location`, {
-                sessionToken: data.sessionToken,
-                lat: coords.latitude,
-                lng: coords.longitude,
-              });
-              proceed();
-            } catch (error) {
-              if (error.response?.status === 403) {
-                setLocationBlocked(true);
-                return;
-              }
-              proceed();
-            }
-          },
-          () => {
-            if (data.branch?.locationStrictMode) setLocationBlocked(true);
-            else proceed();
-          },
-          { enableHighAccuracy: false, timeout: 8000, maximumAge: 60_000 }
-        );
-      } else if (data.locationCheckRequired && data.branch?.locationStrictMode) {
-        setLocationBlocked(true);
+      const hasConfiguredGps =
+        Number.isFinite(data.branch?.location?.lat) && Number.isFinite(data.branch?.location?.lng);
+
+      if (hasConfiguredGps && data.table?.sessionLocationVerified !== true) {
+        requestGeolocation(data.sessionToken, proceed);
       } else {
         proceed();
       }
     }
   }, [data, qrToken, setSession, navigate]);
 
-  /* ── Error state ──────────────────────────────────────────────────── */
+  /* ── Interactive Location Blocked / Re-prompt State ──────────────── */
   if (locationBlocked) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-8 text-center bg-paper">
-        <h1 className="font-display font-bold text-2xl text-ink mb-3">Location access required</h1>
-        <p className="text-ink-muted text-sm max-w-sm leading-relaxed">
-          This restaurant only accepts orders while you are nearby. Enable location access and scan the QR code again.
+      <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center bg-paper animate-in fade-in duration-200">
+        <div className="w-16 h-16 rounded-3xl bg-rose-100 text-rose-600 flex items-center justify-center mb-5 shadow-sm">
+          <span className="text-3xl">📍</span>
+        </div>
+        <h1 className="font-display font-bold text-2xl text-ink mb-2">Location access required</h1>
+        <p className="text-ink-muted text-xs sm:text-sm max-w-sm leading-relaxed mb-4">
+          To ensure orders are only placed from inside the restaurant, location permission is{' '}
+          <strong className="text-ink">strictly mandatory</strong>.
         </p>
-        <button type="button" onClick={() => window.location.reload()} className="mt-6 px-5 py-3 rounded-2xl text-white font-semibold" style={{ background: 'var(--color-primary)' }}>
-          Try again
+
+        {locationError && (
+          <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-left text-xs text-rose-800 max-w-sm w-full space-y-1.5">
+            <p className="font-semibold">{locationError}</p>
+            <p className="text-[11px] text-rose-700/80">
+              Please enable location in your browser settings (tap 🔒 lock icon in the address bar) and tap below.
+            </p>
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={() => requestGeolocation(data?.sessionToken || existing.sessionToken, () => navigate('/menu', { replace: true }))}
+          disabled={isVerifyingLoc}
+          className="w-full max-w-xs py-3.5 px-6 rounded-2xl text-white font-semibold text-sm shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+          style={{ background: 'var(--color-primary, #0D9488)' }}
+        >
+          {isVerifyingLoc ? 'Detecting GPS location…' : 'Allow Location & Verify'}
         </button>
+      </div>
+    );
+  }
+
+  /* ── Table Switch Migration Prompt ───────────────────────────────── */
+  if (data?.tableSwitchPrompt) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center bg-paper animate-in fade-in duration-200">
+        <div className="w-16 h-16 rounded-3xl bg-amber-100 text-amber-700 flex items-center justify-center mb-5 shadow-sm">
+          <span className="text-3xl">🪑</span>
+        </div>
+        <h1 className="font-display font-bold text-2xl text-ink mb-2">Move to {data.newTable?.label}?</h1>
+        <p className="text-ink-muted text-sm max-w-sm leading-relaxed mb-6">
+          You currently have <strong>{data.activeOrdersCount} active order(s)</strong> at{' '}
+          <strong>{data.previousTable?.label}</strong>. Would you like to move your order to{' '}
+          <strong>{data.newTable?.label}</strong>?
+        </p>
+
+        <div className="flex flex-col gap-3 w-full max-w-xs">
+          <button
+            type="button"
+            onClick={() => setConfirmMigrate(true)}
+            className="w-full py-3.5 px-6 rounded-2xl text-white font-semibold text-sm shadow-md active:scale-95 transition-all"
+            style={{ background: 'var(--color-primary, #0D9488)' }}
+          >
+            Move Orders to {data.newTable?.label}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              // Return to previous table
+              navigate(existing.activeOrderId ? `/order/${existing.activeOrderId}` : '/menu', { replace: true });
+            }}
+            className="w-full py-3.5 px-6 rounded-2xl bg-ink/6 hover:bg-ink/10 text-ink font-semibold text-sm transition-colors"
+          >
+            Stay at {data.previousTable?.label}
+          </button>
+        </div>
       </div>
     );
   }

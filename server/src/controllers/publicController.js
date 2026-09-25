@@ -36,6 +36,60 @@ const resolveQRCode = async (req, res, next) => {
 
     const now = new Date();
     const io = req.app.get('io');
+
+    // ── Table switching & single table occupancy ────────────────────────────
+    const { previousTableId, previousSessionToken, migrateTable } = req.query;
+    if (previousTableId && String(previousTableId) !== String(table._id)) {
+      const prevTable = await Table.findOne({
+        _id: previousTableId,
+        restaurantId: req.tenantId,
+      });
+
+      if (prevTable) {
+        const prevUnpaidOrders = await Order.find({
+          tableId: prevTable._id,
+          restaurantId: req.tenantId,
+          paymentStatus: 'unpaid',
+          status: { $ne: 'cancelled' },
+        });
+
+        if (prevUnpaidOrders.length === 0) {
+          // Diner was just reading / browsing at previous table (or previous orders are settled).
+          // Automatically release Table 1 to 'available' so one user cannot occupy multiple tables!
+          await releaseTable(prevTable, io);
+        } else if (migrateTable === 'true') {
+          // Diner explicitly confirmed moving their active orders to this new table
+          await Order.updateMany(
+            { tableId: prevTable._id, paymentStatus: 'unpaid', status: { $ne: 'cancelled' } },
+            { $set: { tableId: table._id, branchId: branch._id } }
+          );
+          await releaseTable(prevTable, io);
+          for (const ord of prevUnpaidOrders) {
+            if (io) {
+              io.to(`restaurant:${table.restaurantId}`).emit('order:updated', { ...ord.toObject(), tableId: table });
+              io.to(`order:${ord._id}`).emit('order:updated', { ...ord.toObject(), tableId: table });
+            }
+          }
+        } else {
+          // Diner has active orders at previous table and needs to confirm migration
+          return res.json({
+            success: true,
+            tableSwitchPrompt: true,
+            previousTable: {
+              id: prevTable._id,
+              label: prevTable.label,
+            },
+            newTable: {
+              id: table._id,
+              label: table.label,
+            },
+            activeOrdersCount: prevUnpaidOrders.length,
+            message: `You have ${prevUnpaidOrders.length} active order${prevUnpaidOrders.length === 1 ? '' : 's'} at ${prevTable.label}. Would you like to move your order to ${table.label}?`,
+          });
+        }
+      }
+    }
+
     const activeOrders = await Order.find({
       tableId: table._id,
       restaurantId: table.restaurantId,

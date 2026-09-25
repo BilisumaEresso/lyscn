@@ -23,6 +23,7 @@ import { applyBrandColor } from '../lib/theme';
 import { useSessionStore } from '../store/sessionStore';
 import { useCartStore, cartItemCount, cartSubtotal } from '../store/cartStore';
 import AssistanceButton from '../components/AssistanceButton';
+import StrictLocationGate from '../components/StrictLocationGate';
 import Currency, { formatBirr } from '../components/Currency';
 import CulinaryPlaceholder from '../components/menu/CulinaryPlaceholder';
 import PoweredBy from '../components/PoweredBy';
@@ -779,6 +780,7 @@ export default function Menu() {
 
   return (
     <div className="min-h-screen bg-paper max-w-[560px] mx-auto relative flex flex-col">
+      <StrictLocationGate />
       {/* ── Header / Cover ─────────────────────────────────────────────── */}
       <div className="relative h-56 overflow-hidden shrink-0">
         <img

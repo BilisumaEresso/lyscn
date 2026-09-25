@@ -138,8 +138,13 @@ function OrderCard({ order, highlighted, isShaking, now, index, tableOrderCount 
     mutationFn: (paymentMethod) =>
       api.patch(`/orders/${order._id}/payment`, { paymentMethod }).then((r) => r.data),
     onSuccess: (data) => {
-      qc.setQueryData(['orders-kanban'], (old) => mergeOrder(old, data.order));
-      toast.success('Marked as paid');
+      qc.invalidateQueries({ queryKey: ['orders-kanban'] });
+      qc.invalidateQueries({ queryKey: ['orders-unpaid'] });
+      toast.success(
+        tableOrderCount > 1
+          ? `All rounds marked as paid for ${order.tableId?.label ?? 'Table'}`
+          : 'Marked as paid'
+      );
     },
     onError: () => toast.error('Payment update failed'),
   });
@@ -319,23 +324,30 @@ function OrderCard({ order, highlighted, isShaking, now, index, tableOrderCount 
               </button>
             ) : order.status === 'served' && order.paymentStatus === 'unpaid' ? (
               /* Next step after Served: direct prominent Paid buttons */
-              <div className="flex gap-1.5">
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); payMutation.mutate('cash'); }}
-                  disabled={payMutation.isPending}
-                  className="flex-1 py-2 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-1"
-                >
-                  <DollarSign size={13} /> Paid (Cash)
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); payMutation.mutate('pos'); }}
-                  disabled={payMutation.isPending}
-                  className="flex-1 py-2 rounded-lg text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 shadow-sm transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-1"
-                >
-                  <CreditCard size={13} /> Paid (POS)
-                </button>
+              <div className="flex flex-col gap-1">
+                {tableOrderCount > 1 && (
+                  <p className="text-[10px] text-amber-800 font-semibold bg-amber-50 rounded px-1.5 py-0.5 border border-amber-200 text-center">
+                    Settles all {tableOrderCount} rounds for this table at once
+                  </p>
+                )}
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); payMutation.mutate('cash'); }}
+                    disabled={payMutation.isPending}
+                    className="flex-1 py-2 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-1"
+                  >
+                    <DollarSign size={13} /> {tableOrderCount > 1 ? 'Pay All (Cash)' : 'Paid (Cash)'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); payMutation.mutate('pos'); }}
+                    disabled={payMutation.isPending}
+                    className="flex-1 py-2 rounded-lg text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 shadow-sm transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-1"
+                  >
+                    <CreditCard size={13} /> {tableOrderCount > 1 ? 'Pay All (POS)' : 'Paid (POS)'}
+                  </button>
+                </div>
               </div>
             ) : order.paymentStatus === 'paid' ? (
               <div className="py-1 text-center text-xs font-semibold text-emerald-600 flex items-center justify-center gap-1">
@@ -477,7 +489,7 @@ function mergeOrder(currentData, updatedOrder) {
 }
 
 // ── Order Row Details used by list view (expandable) ─────────────────────────
-function OrderRowDetails({ order, now, isExpanded, onToggle }) {
+function OrderRowDetails({ order, now, isExpanded, onToggle, tableOrderCount = 1 }) {
   const qc = useQueryClient();
   const [confirmingCancel, setConfirmingCancel] = useState(false);
 
@@ -494,8 +506,13 @@ function OrderRowDetails({ order, now, isExpanded, onToggle }) {
   const payMutation = useMutation({
     mutationFn: (paymentMethod) => api.patch(`/orders/${order._id}/payment`, { paymentMethod }).then((r) => r.data),
     onSuccess: (data) => {
-      qc.setQueryData(['orders-kanban'], (old) => mergeOrder(old, data.order));
-      toast.success('Marked as paid');
+      qc.invalidateQueries({ queryKey: ['orders-kanban'] });
+      qc.invalidateQueries({ queryKey: ['orders-unpaid'] });
+      toast.success(
+        tableOrderCount > 1
+          ? `All rounds marked as paid for ${order.tableId?.label ?? 'Table'}`
+          : 'Marked as paid'
+      );
     },
     onError: () => toast.error('Payment update failed'),
   });
@@ -534,31 +551,38 @@ function OrderRowDetails({ order, now, isExpanded, onToggle }) {
 
           {/* Payment actions */}
           {order.paymentStatus === 'unpaid' && order.status !== 'cancelled' && (
-            <div className="flex gap-2 mt-2">
-              <button
-                onClick={(e) => { e.stopPropagation(); payMutation.mutate('cash'); }}
-                disabled={payMutation.isPending}
-                className={clsx(
-                  "flex-1 py-1.5 rounded-md text-[12px] font-semibold transition-all flex items-center justify-center gap-1",
-                  order.status === 'served'
-                    ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
-                    : "border border-ink/12 text-ink-muted hover:bg-ink/5"
-                )}
-              >
-                <DollarSign size={13} /> Paid (Cash)
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); payMutation.mutate('pos'); }}
-                disabled={payMutation.isPending}
-                className={clsx(
-                  "flex-1 py-1.5 rounded-md text-[12px] font-semibold transition-all flex items-center justify-center gap-1",
-                  order.status === 'served'
-                    ? "bg-teal-600 hover:bg-teal-700 text-white shadow-xs"
-                    : "border border-ink/12 text-ink-muted hover:bg-ink/5"
-                )}
-              >
-                <CreditCard size={13} /> Paid (POS)
-              </button>
+            <div className="space-y-1 mt-2">
+              {tableOrderCount > 1 && (
+                <p className="text-[10px] text-amber-800 font-semibold bg-amber-50 rounded px-2 py-0.5 border border-amber-200 text-center">
+                  Settles all {tableOrderCount} rounds for this table at once
+                </p>
+              )}
+              <div className="flex gap-2">
+                <button
+                  onClick={(e) => { e.stopPropagation(); payMutation.mutate('cash'); }}
+                  disabled={payMutation.isPending}
+                  className={clsx(
+                    "flex-1 py-1.5 rounded-md text-[12px] font-semibold transition-all flex items-center justify-center gap-1",
+                    order.status === 'served'
+                      ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+                      : "border border-ink/12 text-ink-muted hover:bg-ink/5"
+                  )}
+                >
+                  <DollarSign size={13} /> {tableOrderCount > 1 ? 'Pay All (Cash)' : 'Paid (Cash)'}
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); payMutation.mutate('pos'); }}
+                  disabled={payMutation.isPending}
+                  className={clsx(
+                    "flex-1 py-1.5 rounded-md text-[12px] font-semibold transition-all flex items-center justify-center gap-1",
+                    order.status === 'served'
+                      ? "bg-teal-600 hover:bg-teal-700 text-white shadow-xs"
+                      : "border border-ink/12 text-ink-muted hover:bg-ink/5"
+                  )}
+                >
+                  <CreditCard size={13} /> {tableOrderCount > 1 ? 'Pay All (POS)' : 'Paid (POS)'}
+                </button>
+              </div>
             </div>
           )}
 
@@ -651,8 +675,9 @@ export default function Orders() {
     mutationFn: ({ id, paymentMethod }) =>
       api.patch(`/orders/${id}/payment`, { paymentMethod }).then((r) => r.data),
     onSuccess: (responseData) => {
-      qc.setQueryData(['orders-kanban'], (old) => mergeOrder(old, responseData.order));
-      toast.success(`Marked as paid (${responseData.order.paymentMethod?.toUpperCase() || 'PAID'}) — ${responseData.order.tableId?.label ?? 'Table'}`);
+      qc.invalidateQueries({ queryKey: ['orders-kanban'] });
+      qc.invalidateQueries({ queryKey: ['orders-unpaid'] });
+      toast.success(`Marked all rounds paid (${responseData.order.paymentMethod?.toUpperCase() || 'PAID'}) — ${responseData.order.tableId?.label ?? 'Table'}`);
     },
     onError: () => toast.error('Payment update failed'),
   });
@@ -1067,7 +1092,7 @@ export default function Orders() {
                                         disabled={payOrderMutation.isPending}
                                         className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs flex items-center gap-1 transition-all active:scale-95"
                                       >
-                                        <DollarSign size={12} /> Paid (Cash)
+                                        <DollarSign size={12} /> {(activeOrdersPerTable[order.tableId?._id] || 1) > 1 ? `Pay All (${activeOrdersPerTable[order.tableId?._id]}) Cash` : 'Paid (Cash)'}
                                       </button>
                                       <button
                                         type="button"
@@ -1078,7 +1103,7 @@ export default function Orders() {
                                         disabled={payOrderMutation.isPending}
                                         className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 shadow-xs flex items-center gap-1 transition-all active:scale-95"
                                       >
-                                        <CreditCard size={12} /> Paid (POS)
+                                        <CreditCard size={12} /> {(activeOrdersPerTable[order.tableId?._id] || 1) > 1 ? `Pay All (${activeOrdersPerTable[order.tableId?._id]}) POS` : 'Paid (POS)'}
                                       </button>
                                     </div>
                                   ) : order.paymentStatus === 'paid' ? (
@@ -1094,7 +1119,7 @@ export default function Orders() {
                               </div>
 
                               {/* Expand in place details (clicking row toggles) */}
-                              <OrderRowDetails order={order} now={now} isExpanded={isOrderExpanded} onToggle={() => toggleOrderExpanded(order._id)} />
+                              <OrderRowDetails order={order} now={now} isExpanded={isOrderExpanded} onToggle={() => toggleOrderExpanded(order._id)} tableOrderCount={activeOrdersPerTable[order.tableId?._id] || 1} />
                             </div>
                           </div>
                         );

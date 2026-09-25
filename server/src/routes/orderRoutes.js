@@ -7,6 +7,7 @@ const {
   getTableOrders,
   updateOrderStatus,
   updateOrderPayment,
+  updateTablePayment,
   submitOrderFeedback,
 } = require('../controllers/orderController');
 const { protect }               = require('../middleware/auth');
@@ -23,8 +24,9 @@ router.patch('/public/:id/feedback', publicWriteLimiter, submitOrderFeedback);
 // ── Protected routes (staff only) ────────────────────────────────────────────
 router.use(protect, resolveTenantFromAuth);
 
-router.get('/',               listOrders);
-router.patch('/:id/status',   updateOrderStatus);
-router.patch('/:id/payment',  updateOrderPayment);
+router.get('/',                            listOrders);
+router.patch('/:id/status',                updateOrderStatus);
+router.patch('/:id/payment',               updateOrderPayment);
+router.patch('/table/:tableId/payment',    updateTablePayment);
 
 module.exports = router;

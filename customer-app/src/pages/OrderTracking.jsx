@@ -26,6 +26,7 @@ import { useSessionStore } from '../store/sessionStore';
 import { useCustomerNotificationStore } from '../store/customerNotificationStore';
 import AssistanceButton from '../components/AssistanceButton';
 import PushNotificationPrompt from '../components/PushNotificationPrompt';
+import StrictLocationGate from '../components/StrictLocationGate';
 import Currency, { formatBirr } from '../components/Currency';
 import PoweredBy from '../components/PoweredBy';
 import { getRestaurantLogo } from '../lib/branding';
@@ -152,32 +153,44 @@ export default function OrderTracking() {
     enabled: !!session.sessionToken,
   });
 
-  const rounds = tableData?.rounds ?? [];
+  const allRounds = tableData?.rounds ?? [];
   const summary = tableData?.summary ?? {};
 
-  // Preserve user-selected round or initialize safely
+  // Active rounds: any round that is NOT yet completely finished (paid AND served)
+  const activeRounds = useMemo(() => {
+    return allRounds.filter((r) => !(r.paymentStatus === 'paid' && r.status === 'served'));
+  }, [allRounds]);
+
+  // Finished rounds: paid AND served
+  const finishedRounds = useMemo(() => {
+    return allRounds.filter((r) => r.paymentStatus === 'paid' && r.status === 'served');
+  }, [allRounds]);
+
+  const allRoundsFinished = allRounds.length > 0 && activeRounds.length === 0;
+
+  // Preserve user-selected active round or initialize safely
   useEffect(() => {
-    if (!rounds || rounds.length === 0) return;
+    if (!activeRounds || activeRounds.length === 0) return;
 
     setSelectedRoundId((prev) => {
-      // If user has already selected a valid round present in current rounds, keep it!
-      if (prev && rounds.some((r) => r.id === prev)) {
+      // If user has already selected a valid round present in current active rounds, keep it!
+      if (prev && activeRounds.some((r) => r.id === prev)) {
         return prev;
       }
-      // If URL has an orderId that exists, select it on first load
-      if (orderId && rounds.some((r) => r.id === orderId)) {
+      // If URL has an orderId that exists in active rounds, select it on first load
+      if (orderId && activeRounds.some((r) => r.id === orderId)) {
         return orderId;
       }
-      // Default to latest round
-      return rounds[rounds.length - 1].id;
+      // Default to latest active round
+      return activeRounds[activeRounds.length - 1].id;
     });
-  }, [rounds, orderId]);
+  }, [activeRounds, orderId]);
 
   // Active round object
   const currentRound = useMemo(() => {
-    if (rounds.length === 0) return null;
-    return rounds.find((r) => r.id === selectedRoundId) || rounds[rounds.length - 1];
-  }, [rounds, selectedRoundId]);
+    if (activeRounds.length === 0) return null;
+    return activeRounds.find((r) => r.id === selectedRoundId) || activeRounds[activeRounds.length - 1];
+  }, [activeRounds, selectedRoundId]);
 
   const activeStatus = currentRound?.status ?? 'placed';
   const paymentStatus = currentRound?.paymentStatus || (summary.allPaid ? 'paid' : 'unpaid');
@@ -208,29 +221,29 @@ export default function OrderTracking() {
     el?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
   };
 
-  // ── Touch swiping between rounds ───────────────────────────────────────────
+  // ── Touch swiping between active rounds ─────────────────────────────────────
   const handleTouchStart = (e) => {
     touchStartX.current = e.touches[0].clientX;
     touchStartY.current = e.touches[0].clientY;
   };
 
   const handleTouchEnd = (e) => {
-    if (!rounds || rounds.length <= 1) return;
+    if (!activeRounds || activeRounds.length <= 1) return;
 
     const diffX = e.changedTouches[0].clientX - touchStartX.current;
     const diffY = e.changedTouches[0].clientY - touchStartY.current;
 
     // Minimum horizontal swipe distance of 45px, horizontal dominating vertical scroll
     if (Math.abs(diffX) > 45 && Math.abs(diffX) > Math.abs(diffY) * 1.3) {
-      const currentIdx = rounds.findIndex((r) => r.id === currentRound?.id);
+      const currentIdx = activeRounds.findIndex((r) => r.id === currentRound?.id);
       if (currentIdx === -1) return;
 
-      if (diffX < 0 && currentIdx < rounds.length - 1) {
-        // Swiped left -> Next round
-        handleSelectRound(rounds[currentIdx + 1].id, 'left');
+      if (diffX < 0 && currentIdx < activeRounds.length - 1) {
+        // Swiped left -> Next active round
+        handleSelectRound(activeRounds[currentIdx + 1].id, 'left');
       } else if (diffX > 0 && currentIdx > 0) {
-        // Swiped right -> Previous round
-        handleSelectRound(rounds[currentIdx - 1].id, 'right');
+        // Swiped right -> Previous active round
+        handleSelectRound(activeRounds[currentIdx - 1].id, 'right');
       }
     }
   };
@@ -242,7 +255,7 @@ export default function OrderTracking() {
     socket.connect();
 
     const joinAllRounds = () => {
-      rounds.forEach((r) => {
+      allRounds.forEach((r) => {
         if (!joinedRooms.current.has(r.id)) {
           socket.emit('join:order', { orderId: r.id, sessionToken: session.sessionToken });
           joinedRooms.current.add(r.id);
@@ -266,10 +279,11 @@ export default function OrderTracking() {
       socket.off('order:updated', onOrderUpdated);
       joinedRooms.current.clear();
     };
-  }, [rounds, qc, session.sessionToken, session.sessionId]);
+  }, [allRounds, qc, session.sessionToken, session.sessionId]);
 
   return (
     <div className="min-h-screen bg-paper max-w-[560px] mx-auto flex flex-col">
+      <StrictLocationGate />
       {/* ── Top App Bar ──────────────────────────────────────────────── */}
       <div className="sticky top-0 z-20 bg-paper/95 backdrop-blur-md border-b border-ink/6 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0">
@@ -321,6 +335,8 @@ export default function OrderTracking() {
             <h1 className="font-display font-bold text-2xl text-ink leading-tight">
               {isCancelled
                 ? 'Order cancelled'
+                : allRoundsFinished
+                ? 'All rounds finished! 🎉'
                 : summary.allServed
                 ? 'All rounds served! 🎉'
                 : 'Table Orders'}
@@ -328,7 +344,9 @@ export default function OrderTracking() {
             <p className="text-ink-muted text-xs mt-0.5">
               {isCancelled
                 ? 'This round was cancelled. Please ask staff.'
-                : 'Track each round placed at your table.'}
+                : allRoundsFinished
+                ? 'All rounds have been served and paid. Thank you!'
+                : 'Track each active round placed at your table.'}
             </p>
           </div>
 
@@ -352,14 +370,29 @@ export default function OrderTracking() {
         <PushNotificationPrompt />
       </div>
 
-      {/* ── Multi-Round Selector (When multiple rounds exist) ─────────── */}
-      {rounds.length > 0 && (
+      {/* ── Finished Rounds Settled Notice ───────────────────────────── */}
+      {finishedRounds.length > 0 && activeRounds.length > 0 && (
+        <div className="mx-4 my-2 px-3.5 py-2.5 rounded-2xl bg-emerald-50 border border-emerald-200/80 flex items-center justify-between text-xs text-emerald-800 animate-in fade-in duration-200">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+            <span>
+              <strong>{finishedRounds.length} previous {finishedRounds.length === 1 ? 'round' : 'rounds'}</strong> finished & paid
+            </span>
+          </div>
+          <span className="text-[11px] font-semibold text-emerald-700 bg-white/80 px-2 py-0.5 rounded-full border border-emerald-200/60 shrink-0">
+            Cleared from active
+          </span>
+        </div>
+      )}
+
+      {/* ── Multi-Round Selector (When multiple active rounds exist) ──── */}
+      {activeRounds.length > 0 && (
         <div className="px-4 py-2">
           <div className="text-xs font-semibold text-ink-muted mb-2 px-1 flex items-center justify-between">
             <span className="font-display font-bold text-ink">
-              Rounds ({rounds.length})
+              Active Rounds ({activeRounds.length})
             </span>
-            {rounds.length > 1 && (
+            {activeRounds.length > 1 && (
               <span className="text-[11px] text-ink-muted flex items-center gap-1">
                 <span>👈 Swipe between rounds 👉</span>
               </span>
@@ -370,7 +403,7 @@ export default function OrderTracking() {
             className="flex items-center gap-2.5 overflow-x-auto pb-1.5"
             style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
           >
-            {rounds.map((round) => {
+            {activeRounds.map((round) => {
               const isSelected = round.id === currentRound?.id;
               const isServed = round.status === 'served';
               const isPrep = ['accepted', 'preparing', 'ready'].includes(round.status);
@@ -617,12 +650,12 @@ export default function OrderTracking() {
       </div>
 
       {/* ── Meal Complete & Paid Card ─────────────────────────────────── */}
-      {summary.allServed && summary.allPaid && (
-        <div className="mx-4 my-2.5 p-4 rounded-3xl bg-emerald-50 border border-emerald-200/80 shadow-xs flex flex-col items-center text-center">
-          <span className="text-2xl mb-1">🎉</span>
-          <h4 className="font-display font-bold text-base text-ink">Meal Complete & Paid</h4>
-          <p className="text-xs text-ink-muted mt-0.5 mb-3 max-w-xs leading-relaxed">
-            All rounds have been served and paid for. Ready to start a brand new order at this table?
+      {(allRoundsFinished || (summary.allServed && summary.allPaid)) && (
+        <div className="mx-4 my-2.5 p-5 rounded-3xl bg-emerald-50 border border-emerald-200/80 shadow-xs flex flex-col items-center text-center animate-in fade-in duration-300">
+          <span className="text-3xl mb-1.5">🎉</span>
+          <h4 className="font-display font-bold text-lg text-ink">Meal Complete & Paid!</h4>
+          <p className="text-xs text-ink-muted mt-1 mb-4 max-w-xs leading-relaxed">
+            All rounds have been served and paid for. Finished rounds have been cleared from your active table tracker. Ready to start a brand new order at this table?
           </p>
           <button
             onClick={() => {
@@ -630,10 +663,10 @@ export default function OrderTracking() {
               toast.success('Session reset! You can now place a brand new order.');
               navigate('/menu');
             }}
-            className="px-5 py-2.5 rounded-2xl font-display font-bold text-xs text-white shadow-sm active:scale-95 transition-all flex items-center gap-1.5"
+            className="w-full py-3.5 px-5 rounded-2xl font-display font-bold text-sm text-white shadow-md active:scale-95 transition-all flex items-center justify-center gap-2"
             style={{ background: 'var(--color-primary)' }}
           >
-            <Sparkles size={14} /> Start Fresh Order
+            <Sparkles size={16} /> Start Fresh Order
           </button>
         </div>
       )}
@@ -646,7 +679,10 @@ export default function OrderTracking() {
               Table Total
             </h3>
             <p className="text-xs text-ink-muted">
-              {rounds.length} round{rounds.length !== 1 ? 's' : ''} combined
+              {allRounds.length} round{allRounds.length !== 1 ? 's' : ''} combined
+              {finishedRounds.length > 0 && activeRounds.length > 0 && (
+                <span> ({finishedRounds.length} finished, {activeRounds.length} active)</span>
+              )}
             </p>
           </div>
           <span className="font-display font-bold text-xl text-ink">
@@ -659,17 +695,17 @@ export default function OrderTracking() {
           className="p-3 rounded-2xl border flex items-center justify-between text-xs"
           style={{
             backgroundColor:
-              paymentStatus === 'paid'
+              paymentStatus === 'paid' || allRoundsFinished
                 ? 'rgba(85,230,165,0.08)'
                 : 'rgba(245,158,11,0.08)',
             borderColor:
-              paymentStatus === 'paid'
+              paymentStatus === 'paid' || allRoundsFinished
                 ? 'rgba(85,230,165,0.35)'
                 : 'rgba(245,158,11,0.3)',
           }}
         >
           <div className="flex items-center gap-2">
-            {paymentStatus === 'paid' ? (
+            {paymentStatus === 'paid' || allRoundsFinished ? (
               <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
             ) : (
               <Clock size={16} className="text-amber shrink-0" />
@@ -678,24 +714,50 @@ export default function OrderTracking() {
               <p
                 className={clsx(
                   'font-bold',
-                  paymentStatus === 'paid'
+                  paymentStatus === 'paid' || allRoundsFinished
                     ? 'text-emerald-700'
                     : 'text-amber'
                 )}
               >
-                {paymentStatus === 'paid'
+                {paymentStatus === 'paid' || allRoundsFinished
                   ? 'Paid in full ✓'
                   : 'Unpaid — pay your server'}
               </p>
               <p className="text-[11px] text-ink-muted mt-0.5">
-                {paymentStatus === 'paid'
-                  ? 'Receipt confirmed by staff'
-                  : 'Your server will bring the bill when you are ready.'}
+                {paymentStatus === 'paid' || allRoundsFinished
+                  ? 'Receipt confirmed by staff for all table rounds'
+                  : 'When paying, your server settles all table rounds at once.'}
               </p>
             </div>
           </div>
         </div>
       </div>
+
+      {/* ── Finished Rounds Accordion / History ──────────────────────── */}
+      {finishedRounds.length > 0 && (
+        <details className="mx-4 my-2 rounded-2xl bg-paper/60 border border-ink/8 p-3 text-xs">
+          <summary className="font-semibold text-ink-muted cursor-pointer flex items-center justify-between select-none">
+            <span className="flex items-center gap-1.5 text-ink">
+              <Receipt size={14} className="text-emerald-600" />
+              <span>Settled Rounds History ({finishedRounds.length})</span>
+            </span>
+            <span className="text-[11px] text-emerald-700 font-medium">Show items ▾</span>
+          </summary>
+          <div className="mt-2.5 pt-2 border-t border-ink/6 divide-y divide-ink/4 space-y-2">
+            {finishedRounds.map((fr) => (
+              <div key={fr.id} className="pt-2 text-[11px]">
+                <div className="flex justify-between font-semibold text-ink">
+                  <span>Round #{fr.roundNumber} (Finished ✓)</span>
+                  <Currency value={fr.totalAmount} />
+                </div>
+                <p className="text-ink-muted mt-0.5">
+                  {fr.items?.map((it) => `${it.qty}× ${it.name}`).join(', ')}
+                </p>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
 
       {/* ── Action Buttons: Next Round / Back to Menu ──────────────────── */}
       <div className="px-4 pt-4 pb-2 space-y-2.5">

@@ -15,16 +15,17 @@ export const useSessionStore = create(
       restaurant:    null,
       branch:        null,
       table:         null,
-      guestName:     '',
-      activeOrderId: null,
-      orderHistory:  [],
+      guestName:        '',
+      activeOrderId:    null,
+      orderHistory:     [],
+      locationVerified: false,
 
       /**
        * Called by the /t/:qrToken page after a successful table resolution.
        * If freshSession is true (e.g. previous meal ended, no ongoing orders),
        * starts with a clean sessionId and empty order history.
        */
-      setSession: ({ qrToken, restaurant, branch, table, sessionToken, freshSession = false }) => {
+      setSession: ({ qrToken, restaurant, branch, table, sessionToken, freshSession = false, locationVerified }) => {
         const existing = get();
         const isSameTable = existing.qrToken === qrToken;
 
@@ -38,10 +39,15 @@ export const useSessionStore = create(
           restaurant,
           branch,
           table,
-          activeOrderId: shouldStartFresh ? null : existing.activeOrderId,
-          orderHistory:  shouldStartFresh ? [] : (existing.orderHistory || []),
+          activeOrderId:    shouldStartFresh ? null : existing.activeOrderId,
+          orderHistory:     shouldStartFresh ? [] : (existing.orderHistory || []),
+          locationVerified: typeof locationVerified === 'boolean'
+            ? locationVerified
+            : (table?.sessionLocationVerified === true || (isSameTable && existing.locationVerified)),
         });
       },
+
+      setLocationVerified: (locationVerified) => set({ locationVerified }),
 
       setGuestName: (guestName) => set({ guestName }),
 
@@ -85,14 +91,15 @@ export const useSessionStore = create(
 
       clearSession: () =>
         set({
-          qrToken:       null,
-          sessionId:     null,
-          sessionToken:  null,
-          restaurant:    null,
-          branch:        null,
-          table:         null,
-          activeOrderId: null,
-          orderHistory:  [],
+          qrToken:          null,
+          sessionId:        null,
+          sessionToken:     null,
+          restaurant:       null,
+          branch:           null,
+          table:            null,
+          activeOrderId:    null,
+          orderHistory:     [],
+          locationVerified: false,
         }),
     }),
     { name: 'layoscan-session' }

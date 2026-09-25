@@ -1,6 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ShoppingBag, Clock, DollarSign, AlertCircle, MapPin, ClipboardList } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import api from '../lib/api';
 import { useAuthStore } from '../store/authStore';
 import Badge from '../components/ui/Badge';
@@ -27,7 +29,53 @@ function StatCard({ icon: Icon, label, value, sub, accent = false }) {
 }
 
 export default function Dashboard() {
+  const qc = useQueryClient();
   const { restaurant } = useAuthStore();
+  const [calibratingLoc, setCalibratingLoc] = useState(false);
+
+  // Branch data for strict GPS configuration
+  const { data: branchData } = useQuery({
+    queryKey: ['branches'],
+    queryFn: () => api.get('/branches').then((r) => r.data),
+  });
+  const branch = branchData?.branches?.[0];
+  const hasConfiguredGps =
+    Number.isFinite(branch?.location?.lat) && Number.isFinite(branch?.location?.lng);
+
+  const calibrateLocation = () => {
+    if (!branch?._id || !navigator.geolocation) {
+      toast.error('Location services are not available in this browser.');
+      return;
+    }
+    setCalibratingLoc(true);
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        try {
+          await api.patch(`/branches/${branch._id}/location`, {
+            lat: coords.latitude,
+            lng: coords.longitude,
+            radiusMeters: branch.location?.radiusMeters || 150,
+            locationStrictMode: true,
+          });
+          qc.invalidateQueries({ queryKey: ['branches'] });
+          toast.success('Cafe location calibrated & strict presence enforcement active!');
+        } catch (err) {
+          toast.error(err.response?.data?.message || 'Could not save cafe location.');
+        } finally {
+          setCalibratingLoc(false);
+        }
+      },
+      (error) => {
+        setCalibratingLoc(false);
+        if (error.code === error.PERMISSION_DENIED) {
+          toast.error('Location permission was denied. Please allow location in your browser.');
+        } else {
+          toast.error('Could not detect your GPS location. Please try again.');
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 0 }
+    );
+  };
 
   // Today's orders
   const today = new Date().toISOString().split('T')[0];
@@ -60,6 +108,32 @@ export default function Dashboard() {
 
   return (
     <div className="max-w-[1200px] mx-auto px-4 py-5 md:px-6 md:py-6 lg:px-8 lg:pt-14 lg:pb-8">
+      {/* Strict Location Calibration Alert Banner */}
+      {branch && !hasConfiguredGps && (
+        <div className="mb-6 p-4 rounded-2xl bg-amber-50 border border-amber-200/90 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs animate-in fade-in duration-200">
+          <div className="flex items-start gap-3">
+            <AlertCircle size={20} className="text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-amber-900 text-sm">
+                Cafe GPS Location Not Configured
+              </p>
+              <p className="text-amber-800/80 mt-0.5 leading-relaxed">
+                Customer location verification is mandatory. Stand inside your cafe and tap calibrate to lock venue GPS coordinates so diners can verify presence and place orders.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={calibrateLocation}
+            disabled={calibratingLoc}
+            className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-semibold flex items-center justify-center gap-1.5 shrink-0 transition-all active:scale-95 disabled:opacity-50 shadow-xs"
+          >
+            <MapPin size={14} className={calibratingLoc ? 'animate-bounce' : ''} />
+            <span>{calibratingLoc ? 'Calibrating GPS…' : 'Calibrate Location Now'}</span>
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="mb-6 md:mb-8">
         <h1 className="font-display font-bold text-2xl text-ink">
@@ -208,10 +282,10 @@ export default function Dashboard() {
       <Link
         to="/orders"
         aria-label="Open live orders"
-        className="lg:hidden fixed right-6 z-40 rounded-full flex items-center gap-2 px-4 shadow-xl text-white font-semibold text-xs transition-transform active:scale-95 hover:shadow-2xl"
+        className="lg:hidden fixed right-6 z-50 rounded-full flex items-center gap-2 px-4 shadow-xl text-white font-semibold text-xs transition-transform active:scale-95 hover:shadow-2xl"
         style={{
           height: '52px',
-          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)',
+          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 80px)',
           background: 'var(--color-primary)'
         }}
       >

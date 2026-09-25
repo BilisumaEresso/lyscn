@@ -240,10 +240,10 @@ export default function Settings() {
             lat: coords.latitude,
             lng: coords.longitude,
             radiusMeters: branch.location?.radiusMeters || 150,
-            locationStrictMode: branch.locationStrictMode || false,
+            locationStrictMode: true,
           });
           qc.invalidateQueries({ queryKey: ["branches"] });
-          toast.success("Cafe location verified and saved.");
+          toast.success("Cafe location calibrated and strict verification enabled.");
         } catch (err) {
           toast.error(
             err.response?.data?.message || "Could not save cafe location.",
@@ -252,9 +252,13 @@ export default function Settings() {
           setLocationSaving(false);
         }
       },
-      () => {
+      (error) => {
         setLocationSaving(false);
-        toast.error("Could not read your current location.");
+        if (error.code === error.PERMISSION_DENIED) {
+          toast.error("Location permission denied. Please allow location in your browser.");
+        } else {
+          toast.error("Could not read your current location.");
+        }
       },
       { enableHighAccuracy: true, timeout: 10_000, maximumAge: 0 },
     );
@@ -488,8 +492,8 @@ export default function Settings() {
 
         <section>
           <SectionHeader
-            title="Order location verification"
-            description="Optionally verify that customers are near this branch when they scan a table QR code."
+            title="Strict table location verification"
+            description="Mandatory location verification blocks remote ordering by requiring customers to be physically present at the cafe table."
           />
           <div className="rounded-2xl border border-ink/8 bg-ink/2 p-4 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -758,10 +762,10 @@ export default function Settings() {
         onClick={handleSubmit(onSubmit)}
         disabled={updateMutation.isPending}
         aria-label="Save settings"
-        className="lg:hidden fixed right-6 z-40 rounded-full flex items-center gap-2 px-5 shadow-xl text-white font-semibold text-xs transition-transform active:scale-95 hover:shadow-2xl"
+        className="lg:hidden fixed right-6 z-50 rounded-full flex items-center gap-2 px-5 shadow-xl text-white font-semibold text-xs transition-transform active:scale-95 hover:shadow-2xl"
         style={{
           height: '52px',
-          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)',
+          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 80px)',
           background: isDirty ? 'var(--color-primary)' : '#121A2C',
           opacity: updateMutation.isPending ? 0.7 : 1
         }}
