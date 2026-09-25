@@ -4,13 +4,19 @@ import toast from 'react-hot-toast';
 import {
   Plus, Download, RefreshCw, QrCode, ChevronDown, ChevronUp, Archive,
   Trash2, Edit2, Check, X, Layers, AlertTriangle, MoreVertical, Clock3,
-  Sparkles, ListChecks, RotateCcw, Search, SlidersHorizontal, Users, CircleCheck, CircleDot, MapPin, Copy
+  Sparkles, ListChecks, RotateCcw, Search, SlidersHorizontal, Users, CircleCheck, CircleDot, MapPin, Copy, Printer
 } from 'lucide-react';
 import api from '../lib/api';
 import socket from '../lib/socket';
 import { useAuthStore } from '../store/authStore';
-import { generateThemeFromColor } from '../lib/theme';
-import { createStyledQR, downloadTableCard, downloadAllTablesZip, formatTableCode } from '../lib/qrCardComposer';
+import {
+  QR_TEMPLATES,
+  renderPrintCardCanvas,
+  downloadTableCard,
+  downloadAllTablesZip,
+  formatTableCode,
+} from '../lib/qrCardComposer';
+import QRTemplateSelector from '../components/tables/QRTemplateSelector';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Toggle from '../components/ui/Toggle';
@@ -57,31 +63,53 @@ function getSuggestedLabelInfo(tables, branchId, currentPrefix = 'Table') {
   };
 }
 
-// ── QR Modal ─────────────────────────────────────────────────────────────────
+// ── QR Modal: LayoScan QR Print Studio ────────────────────────────────────────
 function QRModal({ table, open, onClose }) {
   const qc = useQueryClient();
   const { restaurant } = useAuthStore();
-  const qrContainerRef = useRef(null);
-  const [confirmRegen, setConfirmRegen] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState(
+    restaurant?.qrCardTemplate || 'cafe_artisan'
+  );
+  const [orientation, setOrientation] = useState('portrait');
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [isGenerating, setIsGenerating] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [confirmRegen, setConfirmRegen] = useState(false);
 
-  const qrUrl = `${CUSTOMER_URL}/t/${table?.qrToken}`;
-  const brandColor = restaurant?.brandColor || '#14B8A6';
-  const theme = generateThemeFromColor(brandColor);
+  // Sync default template from restaurant preferences when opening modal
+  useEffect(() => {
+    if (open && restaurant?.qrCardTemplate) {
+      setSelectedTemplate(restaurant.qrCardTemplate);
+    }
+  }, [open, restaurant?.qrCardTemplate]);
 
   useEffect(() => {
-    if (!open || !table || !qrContainerRef.current) return;
+    if (!open || !table) return;
 
-    const qrStyling = createStyledQR({
-      url: qrUrl,
-      brandColor,
-      logoUrl: restaurant?.logoUrl,
-      size: 210,
-    });
+    let isCancelled = false;
+    setIsGenerating(true);
 
-    qrContainerRef.current.innerHTML = '';
-    qrStyling.append(qrContainerRef.current);
-  }, [open, table, qrUrl, brandColor, restaurant?.logoUrl]);
+    renderPrintCardCanvas({
+      table,
+      restaurant,
+      templateId: selectedTemplate,
+      orientation,
+    })
+      .then((canvas) => {
+        if (!isCancelled) {
+          setPreviewUrl(canvas.toDataURL('image/png'));
+          setIsGenerating(false);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to generate preview canvas:', err);
+        if (!isCancelled) setIsGenerating(false);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [open, table, restaurant, selectedTemplate, orientation]);
 
   const regenMutation = useMutation({
     mutationFn: () => api.post(`/tables/${table._id}/regenerate-qr`),
@@ -96,13 +124,60 @@ function QRModal({ table, open, onClose }) {
   const handleDownload = async () => {
     try {
       setIsDownloading(true);
-      await downloadTableCard({ table, restaurant });
-      toast.success('Downloaded print-ready QR card PNG!');
+      await downloadTableCard({
+        table,
+        restaurant,
+        templateId: selectedTemplate,
+        orientation,
+      });
+      toast.success(`Downloaded ${orientation === 'landscape' ? 'tent stand' : 'card'} PNG!`);
     } catch (err) {
+      console.error(err);
       toast.error('Failed to generate PNG card');
     } finally {
       setIsDownloading(false);
     }
+  };
+
+  const handlePrint = () => {
+    if (!previewUrl) return;
+    const printWin = window.open('', '_blank');
+    if (!printWin) {
+      toast.error('Pop-up blocked. Please allow pop-ups to print directly.');
+      return;
+    }
+    printWin.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Print QR Stand - ${table?.label || 'Table'}</title>
+          <style>
+            @page {
+              size: ${orientation === 'landscape' ? 'landscape' : 'portrait'};
+              margin: 0;
+            }
+            body {
+              margin: 0;
+              padding: 0;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              min-height: 100vh;
+              background: #FFFFFF;
+            }
+            img {
+              max-width: 100vw;
+              max-height: 100vh;
+              object-fit: contain;
+            }
+          </style>
+        </head>
+        <body>
+          <img src="${previewUrl}" onload="window.print();window.close();" />
+        </body>
+      </html>
+    `);
+    printWin.document.close();
   };
 
   const formattedCode = formatTableCode(table?.qrToken);
@@ -117,179 +192,230 @@ function QRModal({ table, open, onClose }) {
   if (!table) return null;
 
   return (
-    <Modal open={open} onClose={onClose} title={`Table Card — ${table.label}`} size="md">
-      <div className="flex flex-col items-center gap-5">
-        {/* ── Vintage Stationery Card Preview ────────────────────────────── */}
-        <div
-          className="w-full max-w-sm rounded-[32px] p-3.5 border-2 border-[#884D25]/35 shadow-xl flex flex-col items-center relative overflow-hidden transition-all"
-          style={{
-            background: 'linear-gradient(180deg, #FAF7F1 0%, #F5ECE0 100%)',
-            animation: 'qr-reveal 300ms ease-out',
-          }}
-        >
-          {/* Inner scalloped vintage border container */}
-          <div className="w-full rounded-[24px] border border-[#884D25]/25 p-5 flex flex-col items-center relative bg-transparent">
-            {/* Top-left botanical sprig decoration */}
-            <svg
-              className="absolute top-2 left-2 w-14 h-14 text-[#884D25]/30 pointer-events-none"
-              viewBox="0 0 100 100"
-              fill="currentColor"
-            >
-              <path d="M10,10 Q30,20 50,60 Q70,90 90,95 M20,15 Q40,-5 55,10 Q35,30 20,15 M35,35 Q10,40 5,60 Q30,55 35,35 M50,55 Q75,40 85,60 Q65,75 50,55 M65,75 Q45,95 40,100 Q65,95 65,75" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-            </svg>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={`Table QR Print Studio · ${table.label}`}
+      size="4xl"
+    >
+      <div className="flex flex-col lg:flex-row gap-6 items-stretch min-h-[520px]">
+        {/* ── LEFT PANEL: Archetype Selector & Format Switcher (~42%) ─────── */}
+        <div className="w-full lg:w-[410px] flex flex-col justify-between gap-4 shrink-0 border-b lg:border-b-0 lg:border-r border-ink/8 pb-5 lg:pb-0 lg:pr-5">
+          <div className="space-y-4">
+            {/* 1. Format Switcher */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-bold text-ink uppercase tracking-wider">
+                  1. Print Format
+                </label>
+                <span className="text-[11px] font-medium text-ink-muted">
+                  {orientation === 'landscape' ? '150 × 100 mm' : '100 × 150 mm'}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setOrientation('portrait')}
+                  className={`p-2.5 rounded-2xl border-2 transition-all flex items-center gap-2.5 text-left active:scale-98 ${
+                    orientation === 'portrait'
+                      ? 'border-teal bg-teal/5 text-ink shadow-xs ring-2 ring-teal/20'
+                      : 'border-ink/8 bg-white text-ink-muted hover:border-ink/20'
+                  }`}
+                >
+                  <div
+                    className={`w-6 h-9 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${
+                      orientation === 'portrait' ? 'border-teal bg-teal/20 text-teal' : 'border-ink/20 text-ink/30'
+                    }`}
+                  >
+                    <div className="w-2.5 h-2.5 rounded-xs bg-current opacity-70" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-bold text-xs leading-tight text-ink">Vertical Stand</p>
+                    <p className="text-[10px] text-ink-muted truncate">A6 / Acrylic Frame</p>
+                  </div>
+                </button>
 
-            {/* Bottom-right botanical sprig decoration */}
-            <svg
-              className="absolute bottom-2 right-2 w-14 h-14 text-[#884D25]/30 pointer-events-none rotate-180"
-              viewBox="0 0 100 100"
-              fill="currentColor"
-            >
-              <path d="M10,10 Q30,20 50,60 Q70,90 90,95 M20,15 Q40,-5 55,10 Q35,30 20,15 M35,35 Q10,40 5,60 Q30,55 35,35 M50,55 Q75,40 85,60 Q65,75 50,55 M65,75 Q45,95 40,100 Q65,95 65,75" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-            </svg>
+                <button
+                  type="button"
+                  onClick={() => setOrientation('landscape')}
+                  className={`p-2.5 rounded-2xl border-2 transition-all flex items-center gap-2.5 text-left active:scale-98 ${
+                    orientation === 'landscape'
+                      ? 'border-teal bg-teal/5 text-ink shadow-xs ring-2 ring-teal/20'
+                      : 'border-ink/8 bg-white text-ink-muted hover:border-ink/20'
+                  }`}
+                >
+                  <div
+                    className={`w-9 h-6 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${
+                      orientation === 'landscape' ? 'border-teal bg-teal/20 text-teal' : 'border-ink/20 text-ink/30'
+                    }`}
+                  >
+                    <div className="w-2.5 h-2.5 rounded-xs bg-current opacity-70" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-bold text-xs leading-tight text-ink">Table Tent</p>
+                    <p className="text-[10px] text-ink-muted truncate">Folded / Horizontal</p>
+                  </div>
+                </button>
+              </div>
+            </div>
 
-            {/* Header: Circular Logo Badge */}
-            <div className="relative mb-2 mt-1">
-              <div className="w-14 h-14 rounded-full border-2 border-[#884D25]/40 shadow-sm bg-white p-0.5 flex items-center justify-center overflow-hidden">
-                <img
-                  src={restaurant?.logoUrl || cafeLogoPlaceholder || logoImg}
-                  alt={restaurant?.name || 'Restaurant'}
-                  className="w-full h-full object-cover rounded-full"
+            {/* 2. Archetype Selector Showcase */}
+            <div className="flex-1 flex flex-col min-h-0">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-bold text-ink uppercase tracking-wider">
+                  2. Design Archetype
+                </label>
+                <span className="text-[11px] font-semibold text-teal">
+                  5 Archetypes Available
+                </span>
+              </div>
+              <div className="overflow-y-auto max-h-[340px] lg:max-h-[380px] pr-1.5 scrollbar-thin">
+                <QRTemplateSelector
+                  selectedTemplateId={selectedTemplate}
+                  onSelectTemplate={setSelectedTemplate}
+                  defaultTemplateId={restaurant?.qrCardTemplate || 'cafe_artisan'}
+                  layout="list"
                 />
               </div>
             </div>
+          </div>
 
-            {/* Restaurant Name */}
-            <h3 className="font-serif font-bold text-xl text-[#241810] leading-tight text-center tracking-tight">
-              {restaurant?.name || 'LayoScan'}
-            </h3>
-            <div className="w-8 h-0.5 bg-[#884D25]/40 rounded-full mt-1 mb-1.5" />
-
-            {/* Location Tag */}
-            <p className="text-xs text-[#6E5C51] font-medium flex items-center gap-1 mb-4 text-center">
-              <MapPin size={11} className="text-[#884D25]" />
-              <span>{restaurant?.contactInfo?.address || 'Addis Ababa, Ethiopia'}</span>
-            </p>
-
-            {/* QR Code Container */}
-            <div className="p-2.5 bg-white rounded-2xl shadow-md border border-[#884D25]/25 flex items-center justify-center overflow-hidden mb-4">
-              <div
-                ref={qrContainerRef}
-                style={{ width: '210px', height: '210px' }}
-                className="flex items-center justify-center"
-              />
-            </div>
-
-            {/* Scan Divider with Viewfinder Bracket */}
-            <div className="w-full flex items-center justify-center gap-2 mb-1.5">
-              <div className="h-px bg-[#884D25]/25 flex-1 max-w-[60px]" />
-              <div className="flex items-center justify-center text-[#884D25]">
-                <QrCode size={14} strokeWidth={2} />
-              </div>
-              <div className="h-px bg-[#884D25]/25 flex-1 max-w-[60px]" />
-            </div>
-
-            <p className="text-[10px] font-semibold text-[#6E5C51] uppercase tracking-[0.2em] mb-2.5">
-              Scan to order
-            </p>
-
-            {/* Table Badge Pill (Rich dark vintage button) */}
-            <div className="px-7 py-2 rounded-full bg-[#3E2415] text-white font-serif font-bold text-base shadow-md border border-white/25 tracking-wide mb-3">
-              {table.label}
-            </div>
-
-            {/* Manual Table Code Badge (for customer manual entry) */}
-            <div className="w-full bg-white/80 backdrop-blur-xs rounded-xl border border-dashed border-[#884D25]/45 px-3 py-2 flex flex-col items-center gap-0.5 shadow-2xs">
-              <span className="text-[9px] font-semibold text-[#856F62] uppercase tracking-wider">
-                Enter code manually on menu:
+          {/* 3. Table Details Bar */}
+          <div className="bg-paper p-3 rounded-2xl border border-ink/8 flex items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="px-2 py-0.5 rounded-md bg-ink text-white font-bold text-[11px] shrink-0 shadow-2xs">
+                {table.label}
               </span>
-              <div className="flex items-center gap-1.5">
-                <span className="font-mono font-bold text-xs text-[#2D1B10] tracking-wider">
-                  {formattedCode}
-                </span>
-                <button
-                  type="button"
-                  onClick={handleCopyCode}
-                  title="Copy table code"
-                  className="p-1 text-[#884D25] hover:bg-[#884D25]/10 rounded transition-colors"
-                >
-                  <Copy size={11} />
-                </button>
-              </div>
-              <span className="text-[9px] text-[#856F62]/80">
-                layoscancustomer.vercel.app
+              <span className="text-ink-muted font-mono font-medium truncate">
+                Code: <strong className="text-ink">{formattedCode}</strong>
               </span>
             </div>
-
-            {/* Prominent "Powered by LayoScan" Footer Badge */}
-            <div className="mt-3.5 px-3.5 py-1 rounded-full bg-white/95 border border-[#884D25]/30 shadow-2xs flex items-center gap-1.5">
-              <img src={logoImg} alt="LayoScan" className="w-3.5 h-3.5 rounded object-cover" />
-              <span className="text-[10px] font-bold text-[#1E1510]">
-                Powered by <span className="text-[#884D25]">LayoScan</span>
-              </span>
-            </div>
+            <button
+              type="button"
+              onClick={handleCopyCode}
+              className="text-teal hover:text-teal/80 font-semibold flex items-center gap-1 shrink-0 transition-colors"
+            >
+              <Copy size={13} /> Copy code
+            </button>
           </div>
         </div>
 
-        <div className="w-full bg-ink/3 rounded-lg px-3 py-2 border border-ink/8">
-          <p className="text-[10px] text-ink-muted font-medium mb-0.5">Scan target URL</p>
-          <p className="text-xs text-ink break-all font-mono">{qrUrl}</p>
-        </div>
-
-        <div className="flex gap-2 w-full">
-          <Button
-            variant="primary"
-            size="sm"
-            className="flex-1 shadow-sm"
-            onClick={handleDownload}
-            disabled={isDownloading}
-          >
-            <Download size={14} /> {isDownloading ? 'Exporting card…' : 'Download Card PNG'}
-          </Button>
-
-          {confirmRegen ? (
-            <div className="flex gap-1 flex-1">
-              <Button
-                variant="danger"
-                size="sm"
-                className="flex-1"
-                onClick={() => regenMutation.mutate()}
-                disabled={regenMutation.isPending}
-              >
-                {regenMutation.isPending ? 'Regenerating…' : 'Confirm'}
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setConfirmRegen(false)}
-              >
-                Cancel
-              </Button>
+        {/* ── RIGHT PANEL: Live Stage Canvas Viewport & Action Dock (~58%) ── */}
+        <div className="flex-1 flex flex-col items-center justify-between min-w-0 bg-ink/[0.02] p-4 sm:p-5 rounded-3xl border border-ink/8 relative">
+          {/* Stage Top Bar */}
+          <div className="w-full flex items-center justify-between gap-2 mb-3">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-xs font-bold text-ink">
+                {orientation === 'landscape' ? 'Tent Stand Preview (1800 × 1200 px)' : 'Vertical Stand Preview (1200 × 1800 px)'}
+              </span>
             </div>
-          ) : (
+            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-white text-ink border border-ink/8 shadow-2xs">
+              ✨ 300 DPI Print Ready
+            </span>
+          </div>
+
+          {/* Canvas Viewport Stage */}
+          <div className="w-full flex-1 flex items-center justify-center min-h-[360px] sm:min-h-[420px] relative p-2">
+            {previewUrl ? (
+              <div
+                className={`relative transition-all duration-300 shadow-2xl rounded-2xl overflow-hidden border border-black/10 bg-white ${
+                  orientation === 'landscape'
+                    ? 'w-full max-w-[460px] aspect-[3/2]'
+                    : 'w-full max-w-[310px] aspect-[2/3]'
+                }`}
+                style={{
+                  boxShadow: '0 20px 48px -10px rgba(18, 26, 44, 0.28)',
+                }}
+              >
+                <img
+                  src={previewUrl}
+                  alt={`Table ${table.label} QR Card`}
+                  className={`w-full h-full object-contain transition-opacity duration-200 ${
+                    isGenerating ? 'opacity-30' : 'opacity-100'
+                  }`}
+                />
+                {isGenerating && (
+                  <div className="absolute inset-0 bg-white/60 backdrop-blur-2xs flex flex-col items-center justify-center gap-2">
+                    <Spinner />
+                    <span className="text-xs font-semibold text-ink">Composing card…</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-2 py-16 text-ink-muted">
+                <Spinner />
+                <span className="text-xs font-medium">Composing card preview…</span>
+              </div>
+            )}
+          </div>
+
+          {/* Stage Bottom Action Dock */}
+          <div className="w-full pt-4 border-t border-ink/8 flex flex-col sm:flex-row items-center gap-2.5">
             <Button
-              variant="outline"
-              size="sm"
-              className="flex-1"
-              onClick={() => setConfirmRegen(true)}
+              variant="primary"
+              size="md"
+              className="w-full sm:flex-1 shadow-md font-bold text-xs py-3"
+              onClick={handleDownload}
+              disabled={isDownloading || isGenerating}
             >
-              <RefreshCw size={14} /> Regenerate
+              <Download size={15} />
+              <span>
+                {isDownloading
+                  ? 'Exporting card…'
+                  : `Download High-Res ${orientation === 'landscape' ? 'Tent PNG' : 'Card PNG'}`}
+              </span>
             </Button>
+
+            <button
+              type="button"
+              onClick={handlePrint}
+              disabled={isGenerating || !previewUrl}
+              className="w-full sm:w-auto px-4 py-3 rounded-xl border border-ink/15 bg-white hover:bg-ink/5 text-ink font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-2xs"
+              title="Print stand directly to your printer"
+            >
+              <Printer size={15} className="text-ink" />
+              <span>Print Stand</span>
+            </button>
+
+            {confirmRegen ? (
+              <div className="flex items-center gap-1.5 w-full sm:w-auto">
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => regenMutation.mutate()}
+                  disabled={regenMutation.isPending}
+                >
+                  {regenMutation.isPending ? 'Regenerating…' : 'Confirm'}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setConfirmRegen(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmRegen(true)}
+                className="w-full sm:w-auto px-3 py-3 rounded-xl border border-ink/10 hover:border-danger/30 text-ink-muted hover:text-danger text-xs font-medium flex items-center justify-center gap-1 transition-colors"
+                title="Regenerate QR code"
+              >
+                <RefreshCw size={13} />
+                <span>Regen</span>
+              </button>
+            )}
+          </div>
+
+          {confirmRegen && (
+            <p className="text-[11px] text-danger font-medium mt-2 text-center">
+              ⚠ Regenerating creates a new token and immediately invalidates all printed cards for this table.
+            </p>
           )}
         </div>
-
-        {confirmRegen && (
-          <p className="text-xs text-amber text-center -mt-1">
-            ⚠ Regenerating invalidates all previously printed QR codes for this table.
-          </p>
-        )}
       </div>
-
-      <style>{`
-        @keyframes qr-reveal {
-          from { opacity: 0; transform: scale(0.92); }
-          to   { opacity: 1; transform: scale(1); }
-        }
-      `}</style>
     </Modal>
   );
 }
@@ -1191,6 +1317,8 @@ export default function Tables() {
       await downloadAllTablesZip({
         tables: selectedTables,
         restaurant,
+        templateId: restaurant?.qrCardTemplate || 'cafe_artisan',
+        orientation: 'portrait',
         onProgress: (current, total, label) => {
           toast.loading(`Generating card ${current}/${total} (${label})…`, { id: toastId });
         },
@@ -1214,6 +1342,8 @@ export default function Tables() {
       await downloadAllTablesZip({
         tables,
         restaurant,
+        templateId: restaurant?.qrCardTemplate || 'cafe_artisan',
+        orientation: 'portrait',
         onProgress: (current, total, label) => {
           toast.loading(`Generating card ${current}/${total} (${label})…`, { id: toastId });
         },

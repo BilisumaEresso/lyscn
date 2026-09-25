@@ -24,6 +24,7 @@ import api from "../lib/api";
 import { useAuthStore } from "../store/authStore";
 import { useNotificationStore } from "../store/notificationStore";
 import { playSoundByType } from "../lib/soundEffects";
+import QRTemplateSelector from "../components/tables/QRTemplateSelector";
 
 function SectionHeader({ title, description }) {
   return (
@@ -121,6 +122,7 @@ export default function Settings() {
       instagram: "",
       facebook: "",
       website: "",
+      qrCardTemplate: "cafe_artisan",
     },
   });
 
@@ -128,12 +130,14 @@ export default function Settings() {
   useEffect(() => {
     register("logoUrl");
     register("coverUrl");
+    register("qrCardTemplate");
   }, [register]);
 
   // Watch fields for live preview
   const brandColor = watch("brandColor") || "#4F46E5";
   const logoUrl = watch("logoUrl");
   const coverUrl = watch("coverUrl");
+  const qrCardTemplate = watch("qrCardTemplate") || "cafe_artisan";
 
   // Populate form only on initial data load to prevent window focus from wiping dirty state
   useEffect(() => {
@@ -152,6 +156,7 @@ export default function Settings() {
       facebook: restaurant.socialLinks?.facebook ?? "",
       tiktok: restaurant.socialLinks?.tiktok ?? "",
       website: restaurant.socialLinks?.website ?? "",
+      qrCardTemplate: restaurant.qrCardTemplate ?? "cafe_artisan",
     });
   }, [restaurant, reset]);
 
@@ -173,6 +178,7 @@ export default function Settings() {
         facebook: d.restaurant.socialLinks?.facebook ?? "",
         tiktok: d.restaurant.socialLinks?.tiktok ?? "",
         website: d.restaurant.socialLinks?.website ?? "",
+        qrCardTemplate: d.restaurant.qrCardTemplate ?? "cafe_artisan",
       });
       qc.invalidateQueries({ queryKey: ["restaurant-me"] });
       toast.success("Settings saved successfully");
@@ -185,6 +191,7 @@ export default function Settings() {
       name: form.name,
       description: form.description,
       brandColor: form.brandColor,
+      qrCardTemplate: form.qrCardTemplate,
       logoUrl: form.logoUrl ? form.logoUrl.trim() : null,
       coverUrl: form.coverUrl ? form.coverUrl.trim() : null,
       contactInfo: {
@@ -406,6 +413,21 @@ export default function Settings() {
               aspectRatio="banner"
             />
           </div>
+        </section>
+
+        {/* ── Table QR Card Template ─────────────────────────────────────── */}
+        <section>
+          <SectionHeader
+            title="Table QR Card Template"
+            description="Choose the default visual aesthetic for your printable table QR cards and counter tent stands. Tables can also override this with custom designs."
+          />
+          <input type="hidden" {...register("qrCardTemplate")} />
+          <QRTemplateSelector
+            selectedTemplateId={qrCardTemplate}
+            onSelectTemplate={(id) => setValue("qrCardTemplate", id, { shouldDirty: true })}
+            defaultTemplateId={restaurant?.qrCardTemplate || "cafe_artisan"}
+            layout="grid"
+          />
         </section>
 
         {/* ── Contact info ─────────────────────────────────────────────── */}

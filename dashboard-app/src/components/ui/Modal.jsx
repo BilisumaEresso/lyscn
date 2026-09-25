@@ -13,7 +13,17 @@ export default function Modal({ open, onClose, title, children, size = 'md', mob
 
   if (!open) return null;
 
-  const widths = { sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-lg', xl: 'max-w-xl' };
+  const widths = {
+    sm: 'max-w-sm',
+    md: 'max-w-md',
+    lg: 'max-w-lg',
+    xl: 'max-w-xl',
+    '2xl': 'max-w-2xl',
+    '3xl': 'max-w-4xl',
+    '4xl': 'max-w-5xl',
+    '5xl': 'max-w-6xl',
+    full: 'max-w-[96vw]',
+  };
 
   return createPortal(
     <div
