@@ -7,6 +7,8 @@ const crypto     = require('crypto');
 const hasConfiguredLocation = (branch) =>
   Number.isFinite(branch?.location?.lat) && Number.isFinite(branch?.location?.lng);
 
+const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes fast auto-free for inactive tables
+
 const releaseTable = async (table, io) => {
   table.status = 'available';
   table.occupiedSince = null;
@@ -108,7 +110,7 @@ const resolveQRCode = async (req, res, next) => {
       // Client explicitly requested a fresh session and no active orders remain on table.
       table.activeSessionToken = crypto.randomBytes(24).toString('hex');
       table.occupiedSince = now;
-      table.sessionExpiresAt = new Date(now.getTime() + 30 * 60 * 1000);
+      table.sessionExpiresAt = new Date(now.getTime() + INACTIVITY_TIMEOUT_MS);
       table.sessionLocationVerified = null;
       await table.save();
       if (io) io.to(`restaurant:${table.restaurantId}`).emit('table:updated', table);
@@ -121,7 +123,7 @@ const resolveQRCode = async (req, res, next) => {
         await releaseTable(table, io);
       } else {
         // Active orders remain: extend session
-        table.sessionExpiresAt = new Date(now.getTime() + 30 * 60 * 1000);
+        table.sessionExpiresAt = new Date(now.getTime() + 15 * 60 * 1000);
         await table.save();
       }
     }
@@ -130,7 +132,7 @@ const resolveQRCode = async (req, res, next) => {
       table.status = 'occupied';
       table.occupiedSince = now;
       table.activeSessionToken = crypto.randomBytes(24).toString('hex');
-      table.sessionExpiresAt = new Date(now.getTime() + 30 * 60 * 1000);
+      table.sessionExpiresAt = new Date(now.getTime() + INACTIVITY_TIMEOUT_MS);
       table.sessionLocationVerified = null;
       await table.save();
       if (io) io.to(`restaurant:${table.restaurantId}`).emit('table:updated', table);
@@ -138,7 +140,7 @@ const resolveQRCode = async (req, res, next) => {
       // Backfill sessions for tables occupied before session security was enabled.
       table.activeSessionToken = crypto.randomBytes(24).toString('hex');
       if (!table.sessionExpiresAt && !hasOrders) {
-        table.sessionExpiresAt = new Date(now.getTime() + 30 * 60 * 1000);
+        table.sessionExpiresAt = new Date(now.getTime() + INACTIVITY_TIMEOUT_MS);
       }
       await table.save();
     }
@@ -184,7 +186,7 @@ const verifyLocation = async (req, res, next) => {
       Branch.findOne({ _id: req.branchId }),
     ]);
     if (!table || !branch || table.activeSessionToken !== sessionToken) {
-      return res.status(401).json({ success: false, message: 'Your session has expired — please scan the QR code again.' });
+      return res.status(401).json({ success: false, code: 'RESCAN_REQUIRED', message: 'Your session has expired — please scan the QR code again.' });
     }
     if (!hasConfiguredLocation(branch) || !Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) {
       return res.json({ success: true, verified: null });
@@ -197,7 +199,8 @@ const verifyLocation = async (req, res, next) => {
       return res.status(403).json({
         success: false,
         verified: false,
-        message: 'This ordering link only works while you’re at the restaurant. Please make sure location access is enabled and try again.',
+        distanceMeters: Math.round(distance),
+        message: 'This cafe requires customers to be within its radius. Location verification is strictly required.',
       });
     }
     return res.json({ success: true, verified, distanceMeters: Math.round(distance) });
@@ -206,4 +209,153 @@ const verifyLocation = async (req, res, next) => {
   }
 };
 
-module.exports = { resolveQRCode, verifyLocation };
+// ── GET /api/public/restaurant/:identifier ────────────────────────────────────
+// Public info for a cafe/restaurant without requiring a table or occupying any table.
+// Returns restaurant branding, branch location/strict mode info, and live table/seat availability.
+const getPublicRestaurant = async (req, res, next) => {
+  try {
+    const { identifier } = req.params;
+    let restaurant = null;
+
+    if (/^[a-f\d]{24}$/i.test(identifier)) {
+      restaurant = await Restaurant.findById(identifier).select(
+        'name slug logoUrl coverUrl brandColor description contactInfo socialLinks'
+      );
+    }
+    if (!restaurant) {
+      restaurant = await Restaurant.findOne({ slug: identifier }).select(
+        'name slug logoUrl coverUrl brandColor description contactInfo socialLinks'
+      );
+    }
+    if (!restaurant && /^[a-f\d]{24}$/i.test(identifier)) {
+      const branchMatch = await Branch.findById(identifier);
+      if (branchMatch) {
+        restaurant = await Restaurant.findById(branchMatch.restaurantId).select(
+          'name slug logoUrl coverUrl brandColor description contactInfo socialLinks'
+        );
+      }
+    }
+
+    if (!restaurant) {
+      return res.status(404).json({ success: false, message: 'Restaurant not found.' });
+    }
+
+    // Resolve primary branch
+    const branch = await Branch.findOne({ restaurantId: restaurant._id }).select(
+      'name address currency timezone location locationStrictMode phone'
+    );
+
+    let tableAvailability = {
+      totalTables: 0,
+      availableTables: 0,
+      occupiedTables: 0,
+      totalSeats: 0,
+      availableSeats: 0,
+    };
+
+    if (branch) {
+      const tables = await Table.find({
+        restaurantId: restaurant._id,
+        branchId: branch._id,
+        isActive: true,
+      }).select('status capacity');
+
+      const totalTables = tables.length;
+      const occupiedTables = tables.filter((t) => t.status === 'occupied').length;
+      const availableTables = Math.max(0, totalTables - occupiedTables);
+      const totalSeats = tables.reduce((sum, t) => sum + (t.capacity || 2), 0);
+      const availableSeats = tables
+        .filter((t) => t.status !== 'occupied')
+        .reduce((sum, t) => sum + (t.capacity || 2), 0);
+
+      tableAvailability = {
+        totalTables,
+        availableTables,
+        occupiedTables,
+        totalSeats,
+        availableSeats,
+      };
+    }
+
+    return res.json({
+      success: true,
+      restaurant,
+      branch,
+      tableAvailability,
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ── POST /api/public/table/heartbeat ──────────────────────────────────────────
+// Sent periodically while diner tab is active to keep table session alive (5 min sliding window)
+const heartbeatTable = async (req, res, next) => {
+  try {
+    const { tableId, sessionToken } = req.body;
+    if (!tableId || !sessionToken) {
+      return res.status(400).json({ success: false, message: 'tableId and sessionToken are required.' });
+    }
+
+    const table = await Table.findOne({ _id: tableId, isActive: true });
+    if (!table || table.activeSessionToken !== sessionToken) {
+      return res.status(401).json({
+        success: false,
+        code: 'RESCAN_REQUIRED',
+        message: 'Your table session has expired or is invalid. Please rescan the table QR code.',
+      });
+    }
+
+    // Extend session by 5 minutes sliding window
+    table.sessionExpiresAt = new Date(Date.now() + INACTIVITY_TIMEOUT_MS);
+    await table.save();
+
+    return res.json({ success: true, expiresAt: table.sessionExpiresAt });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ── POST /api/public/table/release-session ────────────────────────────────────
+// Explicitly frees table if diner closes tab, leaves cafe, or is inactive for 5 minutes
+const releaseTableSession = async (req, res, next) => {
+  try {
+    const { tableId, sessionToken, reason } = req.body;
+    if (!tableId || !sessionToken) {
+      return res.status(400).json({ success: false, message: 'tableId and sessionToken are required.' });
+    }
+
+    const table = await Table.findOne({ _id: tableId, isActive: true });
+    if (!table || table.activeSessionToken !== sessionToken) {
+      return res.status(200).json({ success: true, released: true, note: 'Already released or invalid.' });
+    }
+
+    // Do NOT release if there are active unserved or unpaid orders
+    const hasActiveOrders = await Order.exists({
+      tableId: table._id,
+      restaurantId: table.restaurantId,
+      status: { $nin: ['served', 'cancelled'] },
+    });
+
+    if (hasActiveOrders) {
+      return res.json({
+        success: false,
+        retained: true,
+        message: 'Table has active orders being prepared or served. Not releasing.',
+      });
+    }
+
+    await releaseTable(table, req.app.get('io'));
+    return res.json({ success: true, released: true, reason });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = {
+  resolveQRCode,
+  verifyLocation,
+  getPublicRestaurant,
+  heartbeatTable,
+  releaseTableSession,
+};

@@ -108,6 +108,29 @@ describe('Public Table API', () => {
     expect(res.body.verified).toBe(false);
   });
 
+  it('POST /api/public/table/:qrToken/verify-location - location outside radius in non-strict mode returns 200 with verified: false', async () => {
+    // Temporarily disable strict mode
+    await Branch.updateOne({ _id: branch._id }, { locationStrictMode: false });
+
+    const scanRes = await request(app).get(`/api/public/table/${table.qrToken}`);
+    const sessionToken = scanRes.body.sessionToken;
+
+    const res = await request(app)
+      .post(`/api/public/table/${table.qrToken}/verify-location`)
+      .send({
+        sessionToken,
+        lat: 51.5074, // Far away
+        lng: -0.1278,
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.verified).toBe(false);
+
+    // Restore strict mode
+    await Branch.updateOne({ _id: branch._id }, { locationStrictMode: true });
+  });
+
   it('GET /api/public/table/:qrToken - expired session without orders gets released and assigned a new sessionToken', async () => {
     // Force table session to be expired in the past
     const scanRes = await request(app).get(`/api/public/table/${table.qrToken}`);
@@ -122,5 +145,60 @@ describe('Public Table API', () => {
     expect(res.status).toBe(200);
     expect(res.body.sessionToken).toBeDefined();
     expect(res.body.sessionToken).not.toBe(oldToken);
+  });
+
+  it('GET /api/public/restaurant/:identifier - returns restaurant, branch, and live table availability', async () => {
+    const res = await request(app).get(`/api/public/restaurant/${authData.restaurant._id}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.restaurant).toBeDefined();
+    expect(res.body.restaurant.name).toBe(authData.restaurant.name);
+    expect(res.body.branch).toBeDefined();
+    expect(res.body.tableAvailability).toBeDefined();
+    expect(typeof res.body.tableAvailability.totalTables).toBe('number');
+    expect(typeof res.body.tableAvailability.availableTables).toBe('number');
+    expect(typeof res.body.tableAvailability.totalSeats).toBe('number');
+  });
+
+  it('POST /api/public/table/heartbeat - extends table session expiry', async () => {
+    const scanRes = await request(app).get(`/api/public/table/${table.qrToken}`);
+    const sessionToken = scanRes.body.sessionToken;
+
+    const res = await request(app)
+      .post('/api/public/table/heartbeat')
+      .send({
+        tableId: table._id,
+        sessionToken,
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.expiresAt).toBeDefined();
+  });
+
+  it('POST /api/public/table/release-session - immediately releases table when no active orders exist', async () => {
+    const scanRes = await request(app).get(`/api/public/table/${table.qrToken}`);
+    const sessionToken = scanRes.body.sessionToken;
+
+    // Table is currently occupied
+    let checkTable = await Table.findById(table._id);
+    expect(checkTable.status).toBe('occupied');
+
+    const res = await request(app)
+      .post('/api/public/table/release-session')
+      .send({
+        tableId: table._id,
+        sessionToken,
+        reason: 'tab_closed',
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.released).toBe(true);
+
+    checkTable = await Table.findById(table._id);
+    expect(checkTable.status).toBe('available');
+    expect(checkTable.activeSessionToken).toBeNull();
   });
 });

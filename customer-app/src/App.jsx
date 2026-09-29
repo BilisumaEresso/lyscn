@@ -5,7 +5,9 @@ import { Toaster } from 'react-hot-toast';
 import { useSessionStore } from './store/sessionStore';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useCustomerNotifications } from './hooks/useCustomerNotifications';
+import { useTableSessionPresence } from './hooks/useTableSessionPresence';
 import CustomerNotificationPill from './components/CustomerNotificationPill';
+import RescanModal from './components/RescanModal';
 
 // ── Code-split pages (loaded on demand) ──────────────────────────────────────
 const Resolve       = lazy(() => import('./pages/Resolve'));
@@ -14,12 +16,25 @@ const About         = lazy(() => import('./pages/About'));
 const Checkout      = lazy(() => import('./pages/Checkout'));
 const OrderTracking = lazy(() => import('./pages/OrderTracking'));
 const Landing       = lazy(() => import('./pages/Landing'));
+const CafePreview   = lazy(() => import('./pages/CafePreview'));
 const NoSession     = lazy(() => import('./pages/NoSession'));
 const NotFound      = lazy(() => import('./pages/NotFound'));
 
 function CustomerNotificationCoordinator() {
   useCustomerNotifications();
-  return <CustomerNotificationPill />;
+  const { isOffline, rescanRequired, dismissRescan } = useTableSessionPresence();
+
+  return (
+    <>
+      <CustomerNotificationPill />
+      {rescanRequired && <RescanModal onDismiss={dismissRescan} />}
+      {isOffline && (
+        <div className="fixed top-0 inset-x-0 z-50 bg-amber-600 text-white text-xs font-semibold py-1 px-4 text-center shadow-md animate-in slide-in-from-top flex items-center justify-center gap-1.5 pointer-events-none">
+          <span>⚠️ You are offline. Please check your internet connection.</span>
+        </div>
+      )}
+    </>
+  );
 }
 
 // ── Skeleton fallbacks ────────────────────────────────────────────────────────
@@ -94,6 +109,9 @@ export default function App() {
 
               {/* QR entry point */}
               <Route path="/t/:qrToken" element={<Resolve />} />
+
+              {/* Cafe preview from history / explore (no table required) */}
+              <Route path="/cafe/:restaurantId" element={<CafePreview />} />
 
               {/* Session-guarded routes */}
               <Route

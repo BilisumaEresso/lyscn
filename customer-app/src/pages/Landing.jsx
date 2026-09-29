@@ -166,6 +166,11 @@ export default function Landing() {
     }
 
     if (token) {
+      if (!navigator.onLine) {
+        setInvalidCodeError("You are currently offline. Please connect to the internet to connect to your table.");
+        setTimeout(() => setInvalidCodeError(null), 4500);
+        return;
+      }
       // Valid LayoScan code — stop camera and navigate
       await closeScanner();
       navigate(`/t/${token}`);
@@ -180,6 +185,12 @@ export default function Landing() {
     e.preventDefault();
     const trimmed = manualCode.trim();
     if (!trimmed) return;
+
+    if (!navigator.onLine) {
+      setInvalidCodeError("You are currently offline. Please connect to the internet to connect to your table.");
+      setTimeout(() => setInvalidCodeError(null), 4500);
+      return;
+    }
 
     const match = trimmed.match(/\/t\/([a-zA-Z0-9_-]+)/);
     const token = match ? match[1] : trimmed.replace(/[\s-]/g, '');
@@ -291,11 +302,7 @@ export default function Landing() {
                 <div
                   key={place.id}
                   onClick={() => {
-                    if (place.qrToken) {
-                      navigate(`/t/${place.qrToken}`);
-                    } else {
-                      navigate("/menu");
-                    }
+                    navigate(`/cafe/${place.id}`);
                   }}
                   className="w-full p-3.5 rounded-2xl border border-ink/10 bg-white/95 shadow-2xs hover:border-teal/50 hover:shadow-md transition-all flex items-center justify-between gap-3 cursor-pointer group active:scale-[0.99]"
                 >

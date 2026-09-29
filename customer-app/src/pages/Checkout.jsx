@@ -81,6 +81,13 @@ export default function Checkout() {
 
   const handlePlaceOrder = () => {
     if (items.length === 0 || isSubmitting || placeMutation.isPending) return;
+
+    const hasGps = Number.isFinite(branch?.location?.lat) && Number.isFinite(branch?.location?.lng);
+    if (hasGps && !session.locationVerified) {
+      toast.error('Location verification is required before placing an order.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     const orderItems = items.map((item) => ({
@@ -136,7 +143,11 @@ export default function Checkout() {
 
   return (
     <div className="min-h-screen bg-paper max-w-[560px] mx-auto pb-40">
-      <StrictLocationGate onSuccess={handlePlaceOrder} />
+      <StrictLocationGate
+        onSuccess={handlePlaceOrder}
+        onBypass={() => navigate('/menu')}
+        isOrderingGate={true}
+      />
       {/* Header */}
       <div className="sticky top-0 z-10 bg-paper/95 backdrop-blur-sm border-b border-ink/6 px-4 py-3.5 flex items-center gap-3">
         <button

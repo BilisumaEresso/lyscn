@@ -16,6 +16,7 @@ const tableSchema = new mongoose.Schema(
       index: true,
     },
     label:    { type: String, required: true, trim: true },
+    capacity: { type: Number, default: 2, min: 1 },
     qrToken:  { type: String, unique: true, index: true },
     isActive: { type: Boolean, default: true },
     status: {

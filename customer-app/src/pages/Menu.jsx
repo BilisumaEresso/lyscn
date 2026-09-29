@@ -16,6 +16,7 @@ import {
   Clock,
   UtensilsCrossed,
   SlidersHorizontal,
+  Compass,
 } from 'lucide-react';
 import clsx from 'clsx';
 import api from '../lib/api';
@@ -837,6 +838,16 @@ export default function Menu() {
 
       {/* ── Device Notification & Sound Permissions Prompt ─────────────── */}
       <PermissionsPrompt variant="menu" />
+
+      {/* ── Browsing Mode Banner (when location not verified & GPS configured) ── */}
+      {!session.locationVerified && Number.isFinite(branch?.location?.lat) && (
+        <div className="bg-amber-500/10 border-y border-amber-500/20 px-4 py-2 flex items-center justify-between text-xs text-amber-900">
+          <div className="flex items-center gap-1.5 min-w-0 truncate">
+            <Compass size={14} className="text-amber-700 shrink-0" />
+            <span className="truncate font-medium">Browsing Mode · Table ordering enabled when nearby</span>
+          </div>
+        </div>
+      )}
 
       {/* ── Search & Filter Bar ───────────────────────────────────────── */}
       <div className="px-4 pt-3 pb-1 bg-paper">

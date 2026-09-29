@@ -116,7 +116,7 @@ async function connectDatabase() {
   });
 
   if (dbConnected) {
-    setInterval(sweepExpiredTableSessions, 60_000);
+    setInterval(sweepExpiredTableSessions, 15_000);
   }
 })();
 
