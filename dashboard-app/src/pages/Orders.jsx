@@ -151,7 +151,10 @@ function OrderCard({ order, highlighted, isShaking, now, index, tableOrderCount 
 
   const itemSummary = order.items
     .slice(0, 2)
-    .map((i) => `${i.qty}× ${i.name}`)
+    .map((i) => {
+      const specText = (i.selectedSpecs || []).map((s) => s.optionName).join(' · ');
+      return `${i.qty}× ${i.name}${specText ? ` (${specText})` : ''}`;
+    })
     .join(', ');
   const extraItemsCount = order.items.length - 2;
 
@@ -273,11 +276,22 @@ function OrderCard({ order, highlighted, isShaking, now, index, tableOrderCount 
                   Order Items ({order.items.length})
                 </p>
                 {order.items.map((item, i) => (
-                  <div key={i} className="flex justify-between items-start text-ink">
-                    <div>
-                      <span className="font-medium text-ink">
-                        {item.qty}× {item.name}
-                      </span>
+                  <div key={i} className="flex justify-between items-start text-ink py-1 border-b border-ink/4 last:border-0">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-semibold text-ink">
+                          {item.qty}× {item.name}
+                        </span>
+                        {item.selectedSpecs?.map((spec, sIdx) => (
+                          <span
+                            key={sIdx}
+                            className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300 font-bold"
+                          >
+                            {spec.optionName}
+                          </span>
+                        ))}
+                      </div>
+
                       {item.selectedModifiers?.length > 0 && (
                         <div className="text-[11px] text-ink-muted pl-2 space-y-0.5">
                           {item.selectedModifiers.map((m, mIdx) => (
@@ -288,8 +302,27 @@ function OrderCard({ order, highlighted, isShaking, now, index, tableOrderCount 
                           ))}
                         </div>
                       )}
+
+                      {item.quickTags?.length > 0 && (
+                        <div className="flex items-center gap-1 flex-wrap pl-1">
+                          {item.quickTags.map((tag, tIdx) => (
+                            <span
+                              key={tIdx}
+                              className="text-[10px] px-1.5 py-0.2 rounded-full bg-teal-50 text-teal-800 border border-teal-200 font-medium"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {item.itemNotes && (
+                        <p className="text-[11px] text-amber-900 italic bg-amber-50/80 rounded px-1.5 py-0.5 border border-amber-200/60 inline-block">
+                          Note: "{item.itemNotes}"
+                        </p>
+                      )}
                     </div>
-                    <span className="font-medium text-ink shrink-0">
+                    <span className="font-medium text-ink shrink-0 pl-2">
                       <Currency value={item.subtotal || item.unitPrice * item.qty} />
                     </span>
                   </div>
@@ -526,9 +559,20 @@ function OrderRowDetails({ order, now, isExpanded, onToggle, tableOrderCount = 1
               Order Items ({order.items.length})
             </p>
             {order.items.map((item, i) => (
-              <div key={i} className="flex justify-between items-start text-ink">
-                <div>
-                  <span className="font-medium text-ink">{item.qty}× {item.name}</span>
+              <div key={i} className="flex justify-between items-start text-ink py-1 border-b border-ink/4 last:border-0">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-semibold text-ink">{item.qty}× {item.name}</span>
+                    {item.selectedSpecs?.map((spec, sIdx) => (
+                      <span
+                        key={sIdx}
+                        className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300 font-bold"
+                      >
+                        {spec.optionName}
+                      </span>
+                    ))}
+                  </div>
+
                   {item.selectedModifiers?.length > 0 && (
                     <div className="text-[11px] text-ink-muted pl-2 space-y-0.5">
                       {item.selectedModifiers.map((m, mIdx) => (
@@ -536,8 +580,27 @@ function OrderRowDetails({ order, now, isExpanded, onToggle, tableOrderCount = 1
                       ))}
                     </div>
                   )}
+
+                  {item.quickTags?.length > 0 && (
+                    <div className="flex items-center gap-1 flex-wrap pl-1">
+                      {item.quickTags.map((tag, tIdx) => (
+                        <span
+                          key={tIdx}
+                          className="text-[10px] px-1.5 py-0.2 rounded-full bg-teal-50 text-teal-800 border border-teal-200 font-medium"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {item.itemNotes && (
+                    <p className="text-[11px] text-amber-900 italic bg-amber-50/80 rounded px-1.5 py-0.5 border border-amber-200/60 inline-block">
+                      Note: "{item.itemNotes}"
+                    </p>
+                  )}
                 </div>
-                <Currency value={item.subtotal || item.unitPrice * item.qty} className="font-medium text-ink shrink-0" />
+                <Currency value={item.subtotal || item.unitPrice * item.qty} className="font-medium text-ink shrink-0 pl-2" />
               </div>
             ))}
           </div>
@@ -1057,7 +1120,10 @@ export default function Orders() {
                                       )}
                                     </div>
                                     <p className="text-xs text-ink-muted truncate mt-1">
-                                      {order.items.slice(0, 2).map((i) => `${i.qty}× ${i.name}`).join(', ')}
+                                      {order.items.slice(0, 2).map((i) => {
+                                        const specText = (i.selectedSpecs || []).map((s) => s.optionName).join(' · ');
+                                        return `${i.qty}× ${i.name}${specText ? ` (${specText})` : ''}`;
+                                      }).join(', ')}
                                       {order.items.length > 2 ? ` +${order.items.length - 2} more` : ''}
                                     </p>
                                   </div>

@@ -111,6 +111,212 @@ function OptionsFieldArray({ groupIndex, control, register }) {
   );
 }
 
+// ── Ethiopian Specs Sub-form ──────────────────────────────────────────────────
+function SpecOptionsFieldArray({ specIndex, control, register }) {
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: `specs.${specIndex}.options`,
+  });
+
+  return (
+    <div className="mt-2 space-y-1.5">
+      {fields.map((field, optIdx) => (
+        <div key={field.id} className="flex items-center gap-1.5">
+          <input
+            {...register(`specs.${specIndex}.options.${optIdx}.name`)}
+            placeholder="Option (e.g. Tikur (Dark) / ጥቁር)"
+            className="flex-1 px-2.5 py-1 text-xs border border-ink/12 rounded-lg focus:outline-none focus:border-teal"
+          />
+          <div className="flex items-center">
+            <span className="text-xs text-ink-muted px-1">+Br</span>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              {...register(`specs.${specIndex}.options.${optIdx}.priceDelta`, { valueAsNumber: true })}
+              placeholder="0.00"
+              className="w-14 px-1.5 py-1 text-xs border border-ink/12 rounded-lg focus:outline-none focus:border-teal"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => remove(optIdx)}
+            className="p-1 text-ink/30 hover:text-danger rounded"
+          >
+            <X size={13} />
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={() => append({ name: '', nameAmharic: '', priceDelta: 0 })}
+        className="text-xs text-teal hover:text-teal/80 font-medium flex items-center gap-1 mt-1"
+      >
+        <Plus size={11} /> Add option
+      </button>
+    </div>
+  );
+}
+
+function SpecsSection({ control, register }) {
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: 'specs',
+  });
+
+  return (
+    <div className="border-t border-ink/8 pt-4">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <div className="flex items-center gap-1.5">
+            <p className="text-sm font-semibold text-ink">Ethiopian Dining Specs</p>
+            <span className="text-[10px] bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded font-bold">የምግብ ምርጫዎች</span>
+          </div>
+          <p className="text-xs text-ink-muted">e.g. Coffee ratio (Tikur/Nech), Tibs fat, Kitfo doneness, Fasting switch</p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() =>
+            append({
+              name: '',
+              nameAmharic: '',
+              required: true,
+              options: [{ name: '', nameAmharic: '', priceDelta: 0 }],
+            })
+          }
+        >
+          <Plus size={13} /> Add spec
+        </Button>
+      </div>
+
+      {fields.length === 0 ? (
+        <p className="text-xs text-ink/40 text-center py-3 border border-dashed border-ink/12 rounded-lg">
+          No specs configured — will be auto-filled if selected from recommended items.
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {fields.map((spec, sIdx) => (
+            <div key={spec.id} className="border border-amber-500/25 rounded-xl p-3 bg-amber-500/5">
+              <div className="flex items-start gap-2 mb-2">
+                <input
+                  {...register(`specs.${sIdx}.name`)}
+                  placeholder="Spec name (e.g. Milk-to-Coffee Ratio)"
+                  className="flex-1 px-2.5 py-1.5 text-xs font-semibold border border-ink/12 rounded-lg focus:outline-none focus:border-teal bg-white"
+                />
+                <input
+                  {...register(`specs.${sIdx}.nameAmharic`)}
+                  placeholder="Amharic (e.g. የወተትና ቡና መጠን)"
+                  className="w-32 px-2.5 py-1.5 text-xs border border-ink/12 rounded-lg focus:outline-none focus:border-teal bg-white"
+                />
+                <button
+                  type="button"
+                  onClick={() => remove(sIdx)}
+                  className="p-1.5 text-ink/30 hover:text-danger rounded-lg"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2 mb-2">
+                <label className="flex items-center gap-1.5 text-xs text-ink-muted cursor-pointer">
+                  <input
+                    type="checkbox"
+                    {...register(`specs.${sIdx}.required`)}
+                    className="accent-teal"
+                  />
+                  Required for customer to choose
+                </label>
+              </div>
+
+              <div className="border-t border-ink/6 pt-2">
+                <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider mb-1">
+                  Spec Choices
+                </p>
+                <SpecOptionsFieldArray specIndex={sIdx} control={control} register={register} />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function QuickTagsSection({ control, register, watch, setValue }) {
+  const [newTag, setNewTag] = useState('');
+  const tags = watch('quickTags') || [];
+
+  const handleAddTag = () => {
+    const trimmed = newTag.trim();
+    if (!trimmed) return;
+    if (!tags.includes(trimmed)) {
+      setValue('quickTags', [...tags, trimmed], { shouldDirty: true });
+    }
+    setNewTag('');
+  };
+
+  const handleRemoveTag = (tagToRemove) => {
+    setValue('quickTags', tags.filter((t) => t !== tagToRemove), { shouldDirty: true });
+  };
+
+  return (
+    <div className="border-t border-ink/8 pt-4">
+      <div className="flex items-center justify-between mb-2">
+        <div>
+          <div className="flex items-center gap-1.5">
+            <p className="text-sm font-semibold text-ink">Quick Verbal Tags</p>
+            <span className="text-[10px] bg-teal/10 text-teal px-1.5 py-0.5 rounded font-bold">የቃል ምርጫዎች</span>
+          </div>
+          <p className="text-xs text-ink-muted">Shorthand tags spoken verbally (e.g. + ሚጥሚጣ, + ሎሚ, ያለ ቃሪያ)</p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 mb-2">
+        <input
+          type="text"
+          value={newTag}
+          onChange={(e) => setNewTag(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              handleAddTag();
+            }
+          }}
+          placeholder="Type a tag (e.g. + ሚጥሚጣ) & press Add"
+          className="flex-1 px-2.5 py-1.5 text-xs border border-ink/12 rounded-lg focus:outline-none focus:border-teal"
+        />
+        <Button type="button" size="sm" variant="outline" onClick={handleAddTag}>
+          Add
+        </Button>
+      </div>
+
+      <div className="flex flex-wrap gap-1.5">
+        {tags.length === 0 ? (
+          <p className="text-xs text-ink/40 italic">No verbal tags configured.</p>
+        ) : (
+          tags.map((tag, idx) => (
+            <span
+              key={idx}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-teal/8 text-teal border border-teal/20"
+            >
+              <span>{tag}</span>
+              <button
+                type="button"
+                onClick={() => handleRemoveTag(tag)}
+                className="hover:text-danger ml-0.5"
+              >
+                <X size={11} />
+              </button>
+            </span>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Browse Recommended Products Modal ─────────────────────────────────────────
 function BrowseRecommendedModal({ open, onClose, categoryName, onSelect }) {
   const [search, setSearch] = useState('');
@@ -201,6 +407,8 @@ function ProductPanel({ product, selectedCategory, restaurantId, onClose, onSave
           imageUrl: product.imageUrl ?? '',
           isAvailable: product.isAvailable,
           modifierGroups: product.modifierGroups ?? [],
+          specs: product.specs ?? [],
+          quickTags: product.quickTags ?? [],
         }
       : {
           name: '',
@@ -209,6 +417,8 @@ function ProductPanel({ product, selectedCategory, restaurantId, onClose, onSave
           imageUrl: '',
           isAvailable: true,
           modifierGroups: [],
+          specs: [],
+          quickTags: [],
         },
   });
 
@@ -263,8 +473,14 @@ function ProductPanel({ product, selectedCategory, restaurantId, onClose, onSave
   const handleSelectSuggestion = (item) => {
     setValue('name', item.name, { shouldDirty: true, shouldValidate: true });
     setValue('description', item.description, { shouldDirty: true });
+    if (item.specs && item.specs.length > 0) {
+      setValue('specs', item.specs, { shouldDirty: true });
+    }
+    if (item.quickTags && item.quickTags.length > 0) {
+      setValue('quickTags', item.quickTags, { shouldDirty: true });
+    }
     setShowAutocomplete(false);
-    toast.success(`Autofilled "${item.name}"`);
+    toast.success(`Autofilled "${item.name}" with Ethiopian dining specs`);
   };
 
   const saveMutation = useMutation({
@@ -295,6 +511,8 @@ function ProductPanel({ product, selectedCategory, restaurantId, onClose, onSave
       ...data,
       price: Number(data.price),
       imageUrl: data.imageUrl?.trim() || null,
+      specs: data.specs || [],
+      quickTags: data.quickTags || [],
     });
 
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -508,6 +726,12 @@ function ProductPanel({ product, selectedCategory, restaurantId, onClose, onSave
               id="product-available"
             />
           </div>
+
+          {/* Ethiopian Dining Specs */}
+          <SpecsSection control={control} register={register} />
+
+          {/* Quick Verbal Tags */}
+          <QuickTagsSection control={control} register={register} watch={watch} setValue={setValue} />
 
           {/* Modifier groups */}
           <div className="border-t border-ink/8 pt-4">

@@ -97,6 +97,12 @@ export default function Checkout() {
         groupName:  m.groupName,
         optionName: m.optionName,
       })),
+      selectedSpecs:     (item.selectedSpecs ?? []).map((s) => ({
+        specName:   s.specName,
+        optionName: s.optionName,
+      })),
+      quickTags:         item.quickTags ?? [],
+      itemNotes:         item.itemNotes ? item.itemNotes.trim() : '',
     }));
 
     placeMutation.mutate({
@@ -186,12 +192,41 @@ export default function Checkout() {
             <div key={idx} className="flex items-start gap-3 px-4 py-4 border-b border-ink/4 last:border-0">
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-ink text-sm">{item.name}</p>
+                {item.selectedSpecs?.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {item.selectedSpecs.map((s, sIdx) => (
+                      <span
+                        key={sIdx}
+                        className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200/80 font-medium"
+                      >
+                        {s.optionName}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 {item.selectedModifiers?.length > 0 && (
-                  <p className="text-xs text-ink-muted mt-0.5 leading-relaxed">
+                  <p className="text-xs text-ink-muted mt-1 leading-relaxed">
                     {item.selectedModifiers.map((m) => m.optionName).join(', ')}
                   </p>
                 )}
-                <p className="text-xs text-ink-muted mt-1"><Currency value={item.unitPrice} /> each</p>
+                {item.quickTags?.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {item.quickTags.map((tag, tIdx) => (
+                      <span
+                        key={tIdx}
+                        className="text-[10px] px-1.5 py-0.5 rounded-md bg-teal/10 text-teal font-medium"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {item.itemNotes && (
+                  <p className="text-[11px] text-ink-muted italic bg-ink/3 rounded px-2 py-0.5 mt-1 border border-ink/6">
+                    "{item.itemNotes}"
+                  </p>
+                )}
+                <p className="text-xs text-ink-muted mt-1.5"><Currency value={item.unitPrice} /> each</p>
               </div>
 
               {/* Qty stepper */}

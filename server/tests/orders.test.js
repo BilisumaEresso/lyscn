@@ -66,6 +66,66 @@ describe('Orders API', () => {
       expect(res.body.success).toBe(false);
     });
 
+    it('should create an order with Ethiopian dining specs, quickTags, and itemNotes with priceDelta', async () => {
+      // Create a spec-enabled product (e.g. Macchiato with Double Shot option)
+      const specProdRes = await request(app)
+        .post('/api/products')
+        .set('Authorization', `Bearer ${chainData.accessToken}`)
+        .send({
+          categoryId: chainData.category._id,
+          name: 'Special Macchiato',
+          price: 50,
+          specs: [
+            {
+              name: 'Milk-to-Coffee Ratio',
+              nameAmharic: 'የወተትና ቡና መጠን',
+              required: true,
+              options: [
+                { name: 'Tikur (Dark)', nameAmharic: 'ጥቁር', priceDelta: 0 },
+                { name: 'Double Shot', nameAmharic: 'ድርብ', priceDelta: 25 },
+              ]
+            }
+          ],
+          quickTags: ['+ ጤና አዳም', 'የፈላ'],
+        });
+      expect(specProdRes.status).toBe(201);
+      const specProduct = specProdRes.body.product;
+
+      const payload = {
+        tableId: chainData.table._id,
+        restaurantId: chainData.restaurant._id,
+        branchId: chainData.branch._id,
+        sessionId: chainData.sessionId,
+        sessionToken: chainData.sessionToken,
+        guestName: 'Almaz',
+        clientOrderId: crypto.randomUUID(),
+        items: [
+          {
+            productId: specProduct._id,
+            qty: 2,
+            selectedSpecs: [
+              { specName: 'Milk-to-Coffee Ratio', optionName: 'Double Shot' }
+            ],
+            quickTags: ['+ ጤና አዳም', 'የፈላ'],
+            itemNotes: 'Bring sugar on side please',
+          }
+        ]
+      };
+
+      const res = await request(app).post('/api/orders/public').send(payload);
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      const order = res.body.order;
+      // Unit price = 50 + 25 = 75, qty = 2 -> total = 150
+      expect(order.totalAmount).toBe(150);
+      expect(order.items[0].selectedSpecs).toHaveLength(1);
+      expect(order.items[0].selectedSpecs[0].specName).toBe('Milk-to-Coffee Ratio');
+      expect(order.items[0].selectedSpecs[0].optionName).toBe('Double Shot');
+      expect(order.items[0].selectedSpecs[0].priceDelta).toBe(25);
+      expect(order.items[0].quickTags).toEqual(['+ ጤና አዳም', 'የፈላ']);
+      expect(order.items[0].itemNotes).toBe('Bring sugar on side please');
+    });
+
     it('should handle idempotency correctly (same clientOrderId)', async () => {
       const clientOrderId = crypto.randomUUID();
       const payload = {

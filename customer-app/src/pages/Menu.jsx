@@ -17,6 +17,8 @@ import {
   UtensilsCrossed,
   SlidersHorizontal,
   Compass,
+  Check,
+  MessageSquare,
 } from 'lucide-react';
 import clsx from 'clsx';
 import api from '../lib/api';
@@ -40,6 +42,22 @@ function ProductSheet({ product, categoryName, onClose }) {
 
   if (!product) return null;
   const groups = product.modifierGroups ?? [];
+  const specs = product.specs ?? [];
+  const quickTagsList = product.quickTags ?? [];
+
+  // Default required specs to first option for an effortless Ethiopian ordering flow
+  const [selectedSpecs, setSelectedSpecs] = useState(() => {
+    const initial = {};
+    for (const s of specs) {
+      if (s.required && s.options?.length > 0) {
+        initial[s.name] = s.options[0].name;
+      }
+    }
+    return initial;
+  });
+
+  const [selectedTags, setSelectedTags] = useState([]);
+  const [itemNotes, setItemNotes] = useState('');
 
   const getSelectedOptions = () => {
     const mods = [];
@@ -53,13 +71,36 @@ function ProductSheet({ product, categoryName, onClose }) {
     return mods;
   };
 
+  const getSelectedSpecsList = () => {
+    const list = [];
+    for (const s of specs) {
+      const chosenName = selectedSpecs[s.name];
+      if (chosenName) {
+        const opt = (s.options || []).find((o) => o.name === chosenName);
+        list.push({
+          specName: s.name,
+          optionName: chosenName,
+          priceDelta: opt ? (Number(opt.priceDelta) || 0) : 0,
+        });
+      }
+    }
+    return list;
+  };
+
   const modifierExtra = getSelectedOptions().reduce((s, m) => s + m.priceDelta, 0);
-  const unitPrice = product.price + modifierExtra;
+  const specExtra = getSelectedSpecsList().reduce((s, m) => s + m.priceDelta, 0);
+  const unitPrice = product.price + modifierExtra + specExtra;
   const total = unitPrice * qty;
 
-  const allRequiredMet = groups
+  const allRequiredModifiersMet = groups
     .filter((g) => g.required)
     .every((g) => (selected[g.name]?.length ?? 0) > 0);
+
+  const allRequiredSpecsMet = specs
+    .filter((s) => s.required)
+    .every((s) => !!selectedSpecs[s.name]);
+
+  const allRequiredMet = allRequiredModifiersMet && allRequiredSpecsMet;
 
   const handleSelect = (groupName, optionName, maxSelect) => {
     setSelected((prev) => {
@@ -77,6 +118,21 @@ function ProductSheet({ product, categoryName, onClose }) {
     });
   };
 
+  const handleSpecSelect = (specName, optionName, isRequired) => {
+    setSelectedSpecs((prev) => {
+      if (prev[specName] === optionName) {
+        return isRequired ? prev : { ...prev, [specName]: null };
+      }
+      return { ...prev, [specName]: optionName };
+    });
+  };
+
+  const handleToggleTag = (tag) => {
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+  };
+
   const handleAdd = () => {
     addItem({
       productId: product._id,
@@ -84,6 +140,9 @@ function ProductSheet({ product, categoryName, onClose }) {
       unitPrice,
       qty,
       selectedModifiers: getSelectedOptions(),
+      selectedSpecs: getSelectedSpecsList(),
+      quickTags: selectedTags,
+      itemNotes: itemNotes.trim(),
       subtotal: total,
     });
     toast.success(`Added ${qty}× ${product.name}`);
@@ -151,6 +210,116 @@ function ProductSheet({ product, categoryName, onClose }) {
               <p className="text-ink-muted text-sm leading-relaxed mb-5">
                 {product.description}
               </p>
+            )}
+
+            {/* ── Ethiopian Dining Specs (e.g. Ratio, Fat, Doneness, Fasting) ── */}
+            {specs.length > 0 && (
+              <div className="mb-6 space-y-4">
+                {specs.map((spec) => {
+                  const currentSelected = selectedSpecs[spec.name];
+                  return (
+                    <div key={spec.name} className="p-3.5 rounded-2xl bg-amber-500/5 border border-amber-500/20">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-display font-semibold text-sm text-ink">{spec.name}</span>
+                          {spec.nameAmharic && (
+                            <span className="text-xs text-amber-900 font-medium px-1.5 py-0.5 rounded bg-amber-500/15">
+                              {spec.nameAmharic}
+                            </span>
+                          )}
+                        </div>
+                        <span
+                          className={clsx(
+                            'text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider',
+                            spec.required
+                              ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                              : 'bg-ink/5 text-ink-muted'
+                          )}
+                        >
+                          {spec.required ? 'Required' : 'Optional'}
+                        </span>
+                      </div>
+
+                      {/* Option Pills */}
+                      <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                        {spec.options.map((opt) => {
+                          const isSelected = currentSelected === opt.name;
+                          return (
+                            <button
+                              key={opt.name}
+                              type="button"
+                              onClick={() => handleSpecSelect(spec.name, opt.name, spec.required)}
+                              className={clsx(
+                                'flex items-center justify-between px-3 py-2.5 rounded-xl border text-left text-xs transition-all active:scale-[0.98]',
+                                isSelected
+                                  ? 'border-teal bg-teal/10 text-ink font-semibold shadow-xs'
+                                  : 'border-ink/10 bg-white hover:border-ink/20 text-ink/80'
+                              )}
+                              style={isSelected ? { borderColor: 'var(--color-primary)' } : {}}
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div
+                                  className={clsx(
+                                    'w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-colors',
+                                    isSelected
+                                      ? 'border-teal bg-teal text-white'
+                                      : 'border-ink/30 bg-white'
+                                  )}
+                                  style={isSelected ? { backgroundColor: 'var(--color-primary)', borderColor: 'var(--color-primary)' } : {}}
+                                >
+                                  {isSelected && <Check size={11} strokeWidth={3} className="text-white" />}
+                                </div>
+                                <span className="truncate">{opt.name}</span>
+                              </div>
+                              {opt.priceDelta > 0 && (
+                                <span className="text-[11px] font-bold text-teal shrink-0 ml-1.5">
+                                  +<Currency value={opt.priceDelta} />
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* ── Quick Verbal Requests (Cultural Shorthand) ── */}
+            {quickTagsList.length > 0 && (
+              <div className="mb-6 p-3.5 rounded-2xl bg-teal/5 border border-teal/20">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <Sparkles size={13} className="text-teal shrink-0" />
+                    <span className="font-display font-semibold text-xs text-ink">Quick Verbal Requests</span>
+                    <span className="text-[11px] text-teal font-medium">የቃል ምርጫዎች</span>
+                  </div>
+                  <span className="text-[10px] text-ink-muted">Tap to toggle</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {quickTagsList.map((tag) => {
+                    const isChecked = selectedTags.includes(tag);
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => handleToggleTag(tag)}
+                        className={clsx(
+                          'px-2.5 py-1.5 rounded-full text-xs font-medium border transition-all flex items-center gap-1 active:scale-95',
+                          isChecked
+                            ? 'bg-teal text-white border-teal shadow-xs'
+                            : 'bg-white text-ink/80 border-ink/12 hover:border-ink/25'
+                        )}
+                        style={isChecked ? { backgroundColor: 'var(--color-primary)', borderColor: 'var(--color-primary)' } : {}}
+                      >
+                        {isChecked && <Check size={11} strokeWidth={3} />}
+                        <span>{tag}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             )}
 
             {/* Modifier groups */}
@@ -223,6 +392,25 @@ function ProductSheet({ product, categoryName, onClose }) {
                 </div>
               );
             })}
+
+            {/* ── Verbal Request / Kitchen Notes ── */}
+            <div className="mb-6 p-3.5 rounded-2xl bg-ink/3 border border-ink/8">
+              <label htmlFor="itemNotes" className="flex items-center gap-1.5 text-xs font-semibold text-ink mb-1.5">
+                <MessageSquare size={13} className="text-ink-muted" />
+                <span>Special Request for Waiter / Kitchen (ማስታወሻ)</span>
+              </label>
+              <input
+                id="itemNotes"
+                type="text"
+                value={itemNotes}
+                onChange={(e) => setItemNotes(e.target.value.slice(0, 200))}
+                placeholder="e.g. Extra hot milk, don't mix, bring sugar bowl…"
+                className="w-full px-3 py-2 text-xs bg-white border border-ink/12 rounded-xl focus:outline-none focus:border-teal"
+              />
+              <p className="text-[10px] text-ink-muted text-right mt-1">
+                {itemNotes.length}/200
+              </p>
+            </div>
           </div>
         </div>
 

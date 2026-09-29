@@ -61,7 +61,16 @@ const placeOrder = async (req, res, next) => {
     if (recentDuplicate && recentDuplicate.items.length === items.length) {
       const itemsMatch = items.every((it, idx) => {
         const dupItem = recentDuplicate.items[idx];
-        return dupItem && String(dupItem.productId) === String(it.productId) && dupItem.qty === it.qty;
+        if (!dupItem || String(dupItem.productId) !== String(it.productId) || dupItem.qty !== it.qty) return false;
+        const itNote = (it.itemNotes || '').trim();
+        const dupNote = (dupItem.itemNotes || '').trim();
+        if (itNote !== dupNote) return false;
+        const itSpecs = (it.selectedSpecs || []).map((s) => `${s.specName}:${s.optionName}`).sort().join('|');
+        const dupSpecs = (dupItem.selectedSpecs || []).map((s) => `${s.specName}:${s.optionName}`).sort().join('|');
+        if (itSpecs !== dupSpecs) return false;
+        const itTags = (it.quickTags || []).slice().sort().join('|');
+        const dupTags = (dupItem.quickTags || []).slice().sort().join('|');
+        return itTags === dupTags;
       });
       if (itemsMatch) {
         return res.status(200).json({ success: true, order: recentDuplicate, reused: true });
@@ -103,7 +112,14 @@ const placeOrder = async (req, res, next) => {
     let totalAmount = 0;
 
     for (const item of items) {
-      const { productId, qty, selectedModifiers = [] } = item;
+      const {
+        productId,
+        qty,
+        selectedModifiers = [],
+        selectedSpecs = [],
+        quickTags = [],
+        itemNotes = '',
+      } = item;
 
       if (!productId || !qty || qty < 1) {
         return res.status(400).json({
@@ -126,7 +142,7 @@ const placeOrder = async (req, res, next) => {
       let extraCost = 0;
 
       for (const sel of selectedModifiers) {
-        const group = product.modifierGroups.find((g) => g.name === sel.groupName);
+        const group = (product.modifierGroups || []).find((g) => g.name === sel.groupName);
         if (!group) continue;
 
         const option = group.options.find((o) => o.name === sel.optionName);
@@ -140,6 +156,34 @@ const placeOrder = async (req, res, next) => {
         extraCost += option.priceDelta;
       }
 
+      // Resolve Ethiopian dining specs entirely from product definition (with fallback preservation)
+      const resolvedSpecs = [];
+      for (const sel of selectedSpecs) {
+        if (!sel || !sel.specName || !sel.optionName) continue;
+        const specGroup = (product.specs || []).find((s) => s.name === sel.specName);
+        if (specGroup) {
+          const opt = (specGroup.options || []).find((o) => o.name === sel.optionName);
+          const delta = opt ? (Number(opt.priceDelta) || 0) : 0;
+          resolvedSpecs.push({
+            specName:   specGroup.name,
+            optionName: opt ? opt.name : sel.optionName,
+            priceDelta: delta,
+          });
+          extraCost += delta;
+        } else {
+          resolvedSpecs.push({
+            specName:   String(sel.specName).trim(),
+            optionName: String(sel.optionName).trim(),
+            priceDelta: 0,
+          });
+        }
+      }
+
+      const safeQuickTags = Array.isArray(quickTags)
+        ? quickTags.filter((t) => typeof t === 'string' && t.trim().length > 0).map((t) => t.trim())
+        : [];
+      const safeItemNotes = typeof itemNotes === 'string' ? itemNotes.trim().slice(0, 300) : '';
+
       const unitPrice = product.price + extraCost;
       const subtotal  = Math.round(unitPrice * qty * 100) / 100;
       totalAmount    += subtotal;
@@ -150,6 +194,9 @@ const placeOrder = async (req, res, next) => {
         qty,
         unitPrice,
         selectedModifiers: resolvedModifiers,
+        selectedSpecs:     resolvedSpecs,
+        quickTags:         safeQuickTags,
+        itemNotes:         safeItemNotes,
         subtotal,
       });
     }

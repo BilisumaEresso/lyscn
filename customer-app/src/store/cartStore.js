@@ -13,22 +13,30 @@ export const useCartStore = create(
       /** Add an item or increment qty if an identical selection already exists. */
       addItem: (item) => {
         const { items } = get();
-        // Key: productId + sorted modifier selection — ensures identical configs merge
+        // Key: productId + sorted modifier selection + sorted specs + sorted tags + itemNotes
         const key = (it) =>
           it.productId +
           JSON.stringify(
             [...(it.selectedModifiers ?? [])].sort((a, b) =>
               `${a.groupName}${a.optionName}`.localeCompare(`${b.groupName}${b.optionName}`)
             )
-          );
+          ) +
+          JSON.stringify(
+            [...(it.selectedSpecs ?? [])].sort((a, b) =>
+              `${a.specName}${a.optionName}`.localeCompare(`${b.specName}${b.optionName}`)
+            )
+          ) +
+          JSON.stringify([...(it.quickTags ?? [])].sort()) +
+          (it.itemNotes ? it.itemNotes.trim() : '');
 
         const existing = items.findIndex((i) => key(i) === key(item));
         if (existing >= 0) {
           const updated = [...items];
+          const newQty = updated[existing].qty + (item.qty ?? 1);
           updated[existing] = {
             ...updated[existing],
-            qty:      updated[existing].qty + (item.qty ?? 1),
-            subtotal: updated[existing].unitPrice * (updated[existing].qty + (item.qty ?? 1)),
+            qty:      newQty,
+            subtotal: updated[existing].unitPrice * newQty,
           };
           set({ items: updated });
         } else {

@@ -566,14 +566,43 @@ export default function OrderTracking() {
                         <span className="text-primary font-bold mr-1.5">{item.qty}×</span>
                         {item.name}
                       </p>
+                      {item.selectedSpecs?.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {item.selectedSpecs.map((s, sIdx) => (
+                            <span
+                              key={sIdx}
+                              className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200/80 font-medium"
+                            >
+                              {s.optionName}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       {item.selectedModifiers?.length > 0 && (
                         <p className="text-xs text-ink-muted mt-0.5">
                           {item.selectedModifiers.map((m) => m.optionName).join(', ')}
                         </p>
                       )}
+                      {item.quickTags?.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {item.quickTags.map((tag, tIdx) => (
+                            <span
+                              key={tIdx}
+                              className="text-[10px] px-1.5 py-0.5 rounded-md bg-teal/10 text-teal font-medium"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {item.itemNotes && (
+                        <p className="text-[11px] text-ink-muted italic bg-ink/3 rounded px-2 py-0.5 mt-1 border border-ink/6">
+                          "{item.itemNotes}"
+                        </p>
+                      )}
                     </div>
                     <span className="font-display font-bold text-ink shrink-0">
-                      <Currency value={item.price * item.qty} />
+                      <Currency value={(item.unitPrice || item.price || 0) * item.qty} />
                     </span>
                   </div>
                 ))}

@@ -10,6 +10,15 @@ const selectedModifierSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const selectedSpecSchema = new mongoose.Schema(
+  {
+    specName:    { type: String },
+    optionName:  { type: String },
+    priceDelta:  { type: Number, default: 0 },
+  },
+  { _id: false }
+);
+
 const orderItemSchema = new mongoose.Schema(
   {
     productId: {
@@ -21,6 +30,9 @@ const orderItemSchema = new mongoose.Schema(
     qty:       { type: Number, required: true, min: 1 },
     unitPrice: { type: Number, required: true },
     selectedModifiers: [selectedModifierSchema],
+    selectedSpecs:     [selectedSpecSchema],
+    quickTags:         [{ type: String, trim: true }],
+    itemNotes:         { type: String, trim: true, default: '' },
     subtotal:  { type: Number, required: true },
   },
   { _id: false }

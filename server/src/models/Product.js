@@ -20,6 +20,25 @@ const modifierGroupSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const specOptionSchema = new mongoose.Schema(
+  {
+    name:        { type: String, required: true },
+    nameAmharic: { type: String, default: '' },
+    priceDelta:  { type: Number, default: 0 },
+  },
+  { _id: false }
+);
+
+const specGroupSchema = new mongoose.Schema(
+  {
+    name:        { type: String, required: true },
+    nameAmharic: { type: String, default: '' },
+    required:    { type: Boolean, default: false },
+    options:     [specOptionSchema],
+  },
+  { _id: false }
+);
+
 // ── Main schema ───────────────────────────────────────────────────────────────
 const productSchema = new mongoose.Schema(
   {
@@ -42,6 +61,8 @@ const productSchema = new mongoose.Schema(
     isAvailable: { type: Boolean, default: true },
 
     modifierGroups: [modifierGroupSchema],
+    specs:          [specGroupSchema],
+    quickTags:      [{ type: String, trim: true }],
   },
   { timestamps: true }
 );
