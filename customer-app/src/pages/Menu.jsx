@@ -713,7 +713,9 @@ function TableOrdersFAB({ tableOrders, onClick, hasCart }) {
     <div
       className={clsx(
         'fixed left-1/2 -translate-x-1/2 w-[calc(100%-32px)] max-w-[528px] z-30 transition-all duration-300',
-        hasCart ? 'bottom-24' : 'bottom-6'
+        hasCart
+          ? 'bottom-[calc(max(5.75rem,calc(env(safe-area-inset-bottom)+4.75rem)))]'
+          : 'bottom-[max(1.5rem,calc(env(safe-area-inset-bottom)+0.5rem))]'
       )}
       style={{ animation: 'slide-up-spring 400ms ease-out' }}
     >
@@ -892,6 +894,16 @@ export default function Menu() {
     enabled: !!session.sessionToken,
     refetchInterval: 8_000,
   });
+
+  const hasCart = itemCount > 0;
+  const hasTableOrders = Boolean(tableOrders?.rounds?.length);
+
+  const bottomScrollPadding = useMemo(() => {
+    if (hasCart && hasTableOrders) return '220px';
+    if (hasCart) return '125px';
+    if (hasTableOrders) return '105px';
+    return '40px';
+  }, [hasCart, hasTableOrders]);
 
   const products = data?.products ?? [];
 
@@ -1130,7 +1142,7 @@ export default function Menu() {
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
         style={{
-          paddingBottom: itemCount > 0 ? '110px' : tableOrders?.rounds?.length > 0 ? '90px' : '30px',
+          paddingBottom: bottomScrollPadding,
         }}
       >
         {searchQuery && (
@@ -1189,6 +1201,13 @@ export default function Menu() {
                 />
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Assistance trigger banner in menu bottom */}
+        {table?._id && (
+          <div className="mt-8 mb-2">
+            <AssistanceButton variant="card" />
           </div>
         )}
 
