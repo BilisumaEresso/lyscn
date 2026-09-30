@@ -36,7 +36,11 @@ router.post(
       return true;
     }),
     body('email').optional({ values: 'falsy' }).isEmail().withMessage('Valid email is required'),
-    body('role').isIn(['manager', 'kitchen', 'waiter']).withMessage('Invalid role'),
+    body('role').isIn(['manager', 'coordinator', 'kitchen', 'waiter']).withMessage('Invalid role'),
+    body('pin').optional({ values: 'falsy' }).matches(/^\d{4}$/).withMessage('PIN must be exactly 4 digits'),
+    body('station').optional().isIn(['all', 'kitchen', 'bar']).withMessage('Station must be all, kitchen, or bar'),
+    body('assignedTables').optional().isArray().withMessage('assignedTables must be an array'),
+    body('isOnDuty').optional().isBoolean().withMessage('isOnDuty must be a boolean'),
     validate,
   ],
   createUser

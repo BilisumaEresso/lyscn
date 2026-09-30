@@ -1,10 +1,16 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { LayoutDashboard, UtensilsCrossed, QrCode, ClipboardList, Settings } from 'lucide-react';
+import {
+  LayoutDashboard, UtensilsCrossed, QrCode, ClipboardList, Settings,
+  ChefHat, Utensils
+} from 'lucide-react';
 import api from '../../lib/api';
+import { useAuthStore } from '../../store/authStore';
 
 export default function BottomTabBar() {
+  const { user } = useAuthStore();
+
   const { data: ordersData } = useQuery({
     queryKey: ['orders-kanban'],
     queryFn: () => api.get('/orders').then((r) => r.data),
@@ -18,17 +24,44 @@ export default function BottomTabBar() {
   });
 
   const placedOrdersCount = ordersData?.orders?.filter((o) => o.status === 'placed').length || 0;
+  const acceptedOrdersCount = ordersData?.orders?.filter((o) => o.status === 'accepted' || o.status === 'preparing').length || 0;
+  const readyOrdersCount = ordersData?.orders?.filter((o) => o.status === 'ready').length || 0;
   const pendingAssistanceCount = assistanceData?.assistance?.filter(
     (a) => a.status === 'pending' || a.status === 'acknowledged'
   ).length || 0;
 
-  const navItems = [
-    { to: '/', icon: LayoutDashboard, label: 'Dashboard', end: true },
-    { to: '/menu', icon: UtensilsCrossed, label: 'Menu' },
-    { to: '/tables', icon: QrCode, label: 'Tables', badge: pendingAssistanceCount },
-    { to: '/orders', icon: ClipboardList, label: 'Orders', badge: placedOrdersCount },
-    { to: '/settings', icon: Settings, label: 'Settings' },
-  ];
+  const role = user?.role || 'owner';
+  let navItems = [];
+
+  if (role === 'kitchen') {
+    navItems = [
+      { to: '/kds', icon: ChefHat, label: 'KDS', badge: acceptedOrdersCount },
+      { to: '/orders', icon: ClipboardList, label: 'Orders' },
+    ];
+  } else if (role === 'waiter') {
+    navItems = [
+      { to: '/waiter', icon: Utensils, label: 'Floor', badge: readyOrdersCount },
+      { to: '/tables', icon: QrCode, label: 'Tables', badge: pendingAssistanceCount },
+      { to: '/orders', icon: ClipboardList, label: 'Orders' },
+    ];
+  } else if (role === 'coordinator') {
+    navItems = [
+      { to: '/', icon: LayoutDashboard, label: 'Desk', end: true },
+      { to: '/orders', icon: ClipboardList, label: 'Orders', badge: placedOrdersCount },
+      { to: '/tables', icon: QrCode, label: 'Tables', badge: pendingAssistanceCount },
+      { to: '/kds', icon: ChefHat, label: 'KDS' },
+      { to: '/waiter', icon: Utensils, label: 'Floor' },
+    ];
+  } else {
+    // owner or manager
+    navItems = [
+      { to: '/', icon: LayoutDashboard, label: 'Dashboard', end: true },
+      { to: '/tables', icon: QrCode, label: 'Tables', badge: pendingAssistanceCount },
+      { to: '/orders', icon: ClipboardList, label: 'Orders', badge: placedOrdersCount },
+      { to: '/kds', icon: ChefHat, label: 'KDS' },
+      { to: '/waiter', icon: Utensils, label: 'Floor' },
+    ];
+  }
 
   return (
     <nav

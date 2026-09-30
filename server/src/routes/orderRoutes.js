@@ -6,6 +6,7 @@ const {
   getOrderStatus,
   getTableOrders,
   updateOrderStatus,
+  assignOrder,
   updateOrderPayment,
   updateTablePayment,
   submitOrderFeedback,
@@ -26,6 +27,7 @@ router.use(protect, resolveTenantFromAuth);
 
 router.get('/',                            listOrders);
 router.patch('/:id/status',                updateOrderStatus);
+router.patch('/:id/assign',                assignOrder);
 router.patch('/:id/payment',               updateOrderPayment);
 router.patch('/table/:tableId/payment',    updateTablePayment);
 

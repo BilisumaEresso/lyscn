@@ -207,6 +207,11 @@ function OrderCard({ order, highlighted, isShaking, now, index, tableOrderCount 
                     <User size={10} /> {order.guestName}
                   </span>
                 )}
+                {order.assignedWaiterName && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200 shrink-0">
+                    Server: {order.assignedWaiterName}
+                  </span>
+                )}
               </div>
 
               {/* Elapsed Time Badge */}
@@ -363,22 +368,38 @@ function OrderCard({ order, highlighted, isShaking, now, index, tableOrderCount 
                     Settles all {tableOrderCount} rounds for this table at once
                   </p>
                 )}
-                <div className="flex gap-1.5">
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); payMutation.mutate('telebirr'); }}
+                    disabled={payMutation.isPending}
+                    className="py-1.5 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-xs flex items-center justify-center gap-1"
+                  >
+                    Telebirr
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); payMutation.mutate('cbebirr'); }}
+                    disabled={payMutation.isPending}
+                    className="py-1.5 rounded-lg text-xs font-semibold text-white bg-purple-600 hover:bg-purple-700 shadow-xs flex items-center justify-center gap-1"
+                  >
+                    CBE Birr
+                  </button>
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); payMutation.mutate('cash'); }}
                     disabled={payMutation.isPending}
-                    className="flex-1 py-2 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-1"
+                    className="py-1.5 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs flex items-center justify-center gap-1"
                   >
-                    <DollarSign size={13} /> {tableOrderCount > 1 ? 'Pay All (Cash)' : 'Paid (Cash)'}
+                    <DollarSign size={13} /> {tableOrderCount > 1 ? 'All (Cash)' : 'Cash'}
                   </button>
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); payMutation.mutate('pos'); }}
                     disabled={payMutation.isPending}
-                    className="flex-1 py-2 rounded-lg text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 shadow-sm transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-1"
+                    className="py-1.5 rounded-lg text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 shadow-xs flex items-center justify-center gap-1"
                   >
-                    <CreditCard size={13} /> {tableOrderCount > 1 ? 'Pay All (POS)' : 'Paid (POS)'}
+                    <CreditCard size={13} /> {tableOrderCount > 1 ? 'All (POS)' : 'POS'}
                   </button>
                 </div>
               </div>

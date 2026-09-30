@@ -257,20 +257,102 @@ const logout = async (req, res, next) => {
   }
 };
 
+// ── POST /api/auth/pin-login ──────────────────────────────────────────────────
+// Fast 4-digit PIN login for kitchen and floor staff
+const pinLogin = async (req, res, next) => {
+  try {
+    const { identifier, userId, pin } = req.body;
+
+    if (!pin || !/^\d{4}$/.test(String(pin))) {
+      return res.status(400).json({
+        success: false,
+        message: 'A 4-digit PIN is required.',
+      });
+    }
+
+    let userQuery = null;
+    if (userId) {
+      userQuery = { _id: userId };
+    } else if (identifier) {
+      const cleanIdentifier = String(identifier).trim();
+      const isEmail = cleanIdentifier.includes('@');
+      const normalizedPhone = normalizePhone(cleanIdentifier);
+      userQuery = isEmail
+        ? { email: cleanIdentifier.toLowerCase() }
+        : {
+            $or: [
+              { phone: normalizedPhone },
+              { phone: cleanIdentifier },
+              { email: cleanIdentifier.toLowerCase() },
+            ],
+          };
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'identifier (email or phone) or userId is required.',
+      });
+    }
+
+    const user = await User.findOne(userQuery).select('+pinHash');
+
+    if (!user || !user.isActive) {
+      return res.status(401).json({ success: false, message: 'Invalid credentials or inactive account.' });
+    }
+
+    if (!user.pinHash) {
+      return res.status(400).json({
+        success: false,
+        message: 'No PIN is configured for this account. Please use password login or contact your manager.',
+      });
+    }
+
+    const isMatch = await user.comparePin(pin);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, message: 'Invalid PIN.' });
+    }
+
+    const restaurant = await Restaurant.findById(user.restaurantId);
+
+    const accessToken  = signAccessToken(user);
+    const refreshToken = signRefreshToken(user);
+    await persistRefreshToken(user._id, refreshToken);
+
+    const userObj = user.toObject();
+    userObj.hasPin = true;
+    delete userObj.passwordHash;
+    delete userObj.pinHash;
+
+    return res.json({
+      success: true,
+      user:         userObj,
+      restaurant,
+      accessToken,
+      refreshToken,
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
 // ── GET /api/auth/me ──────────────────────────────────────────────────────────
 const me = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user.userId);
+    const user = await User.findById(req.user.userId).populate('assignedTables', 'label');
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found.' });
     }
 
     const restaurant = await Restaurant.findById(user.restaurantId);
 
-    return res.json({ success: true, user, restaurant });
+    const userObj = user.toObject();
+    userObj.hasPin = Boolean(user.pinHash);
+    delete userObj.passwordHash;
+    delete userObj.pinHash;
+
+    return res.json({ success: true, user: userObj, restaurant });
   } catch (err) {
     return next(err);
   }
 };
 
-module.exports = { register, login, refresh, logout, me };
+module.exports = { register, login, pinLogin, refresh, logout, me };

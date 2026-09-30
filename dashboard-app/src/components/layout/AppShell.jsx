@@ -15,6 +15,8 @@ const PATH_LABELS = {
   '/menu': 'Menu',
   '/tables': 'Tables',
   '/orders': 'Orders',
+  '/kds': 'Kitchen KDS',
+  '/waiter': 'Floor Service',
   '/staff': 'Staff',
   '/settings': 'Settings',
 };

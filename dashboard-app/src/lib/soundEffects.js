@@ -166,3 +166,18 @@ export function playSoundByType(type, volume = 0.7) {
       playOrderChime(volume);
   }
 }
+
+/**
+ * Generic sound trigger helper for convenient dispatch across components
+ */
+export function playSound(type = 'notification', volume = 0.7) {
+  if (type === 'success' || type === 'order_ready') {
+    playFoodReadyFanfare(volume);
+  } else if (type === 'assistance') {
+    playAssistanceBeep(volume);
+  } else if (type === 'cancelled') {
+    playOrderCancelledTone(volume);
+  } else {
+    playOrderChime(volume);
+  }
+}

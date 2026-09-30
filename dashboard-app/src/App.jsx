@@ -9,15 +9,17 @@ import ErrorBoundary from './components/ErrorBoundary';
 import AppShell from './components/layout/AppShell';
 
 // ── Code-split pages ──────────────────────────────────────────────────────────
-const Login    = lazy(() => import('./pages/Login'));
-const Register = lazy(() => import('./pages/Register'));
-const Dashboard = lazy(() => import('./pages/Dashboard'));
-const Menu     = lazy(() => import('./pages/Menu'));
-const Tables   = lazy(() => import('./pages/Tables'));
-const Orders   = lazy(() => import('./pages/Orders'));
-const Staff    = lazy(() => import('./pages/Staff'));
-const Settings = lazy(() => import('./pages/Settings'));
-const NotFound = lazy(() => import('./pages/NotFound'));
+const Login      = lazy(() => import('./pages/Login'));
+const Register   = lazy(() => import('./pages/Register'));
+const Dashboard  = lazy(() => import('./pages/Dashboard'));
+const Menu       = lazy(() => import('./pages/Menu'));
+const Tables     = lazy(() => import('./pages/Tables'));
+const Orders     = lazy(() => import('./pages/Orders'));
+const KDS        = lazy(() => import('./pages/KDS'));
+const WaiterView = lazy(() => import('./pages/WaiterView'));
+const Staff      = lazy(() => import('./pages/Staff'));
+const Settings   = lazy(() => import('./pages/Settings'));
+const NotFound   = lazy(() => import('./pages/NotFound'));
 
 // ── Skeleton fallbacks ────────────────────────────────────────────────────────
 function KanbanSkeleton() {
@@ -51,7 +53,7 @@ const queryClient = new QueryClient({
   },
 });
 
-// ── Auth guards ───────────────────────────────────────────────────────────────
+// ── Auth guards & Role Redirection ────────────────────────────────────────────
 function PrivateRoute() {
   const { accessToken } = useAuthStore();
   return accessToken ? <Outlet /> : <Navigate to="/login" replace />;
@@ -60,6 +62,17 @@ function PrivateRoute() {
 function PublicOnlyRoute() {
   const { accessToken } = useAuthStore();
   return accessToken ? <Navigate to="/" replace /> : <Outlet />;
+}
+
+function DashboardHome() {
+  const { user } = useAuthStore();
+  if (user?.role === 'kitchen') {
+    return <Navigate to="/kds" replace />;
+  }
+  if (user?.role === 'waiter') {
+    return <Navigate to="/waiter" replace />;
+  }
+  return <Dashboard />;
 }
 
 export default function App() {
@@ -78,10 +91,12 @@ export default function App() {
               {/* Protected routes */}
               <Route element={<PrivateRoute />}>
                 <Route element={<AppShell />}>
-                  <Route path="/"         element={<Dashboard />} />
+                  <Route path="/"         element={<DashboardHome />} />
                   <Route path="/menu"     element={<Suspense fallback={<PageSkeleton />}><Menu /></Suspense>} />
                   <Route path="/tables"   element={<Suspense fallback={<PageSkeleton />}><Tables /></Suspense>} />
                   <Route path="/orders"   element={<Suspense fallback={<KanbanSkeleton />}><Orders /></Suspense>} />
+                  <Route path="/kds"      element={<Suspense fallback={<PageSkeleton />}><KDS /></Suspense>} />
+                  <Route path="/waiter"   element={<Suspense fallback={<PageSkeleton />}><WaiterView /></Suspense>} />
                   <Route path="/staff"    element={<Suspense fallback={<PageSkeleton />}><Staff /></Suspense>} />
                   <Route path="/settings" element={<Suspense fallback={<PageSkeleton />}><Settings /></Suspense>} />
                 </Route>

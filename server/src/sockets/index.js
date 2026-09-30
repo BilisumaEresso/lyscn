@@ -38,14 +38,17 @@ function initSockets(io) {
 
   // ── Connection handler ────────────────────────────────────────────────────────
   io.on('connection', (socket) => {
-    // Staff: auto-join their restaurant's room and personal user room
+    // Staff: auto-join their restaurant's room, personal user room, and role room
     if (socket.data.restaurantId) {
       const room = `restaurant:${socket.data.restaurantId}`;
       socket.join(room);
       if (socket.data.userId) {
         socket.join(`user:${socket.data.userId}`);
       }
-      logger.debug({ socketId: socket.id, room, userId: socket.data.userId }, 'Staff socket connected');
+      if (socket.data.role) {
+        socket.join(`restaurant:${socket.data.restaurantId}:role:${socket.data.role}`);
+      }
+      logger.debug({ socketId: socket.id, room, userId: socket.data.userId, role: socket.data.role }, 'Staff socket connected');
     } else {
       logger.debug({ socketId: socket.id }, 'Customer socket connected');
     }

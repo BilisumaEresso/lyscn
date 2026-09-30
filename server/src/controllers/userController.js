@@ -8,9 +8,17 @@ const listUsers = async (req, res, next) => {
   try {
     const users = await User.find({ restaurantId: req.tenantId })
       .select('-passwordHash')
+      .populate('assignedTables', 'label')
       .sort({ createdAt: -1 });
 
-    return res.json({ success: true, users });
+    const sanitizedUsers = users.map((u) => {
+      const obj = u.toObject();
+      obj.hasPin = Boolean(obj.pinHash);
+      delete obj.pinHash;
+      return obj;
+    });
+
+    return res.json({ success: true, users: sanitizedUsers });
   } catch (err) {
     return next(err);
   }
@@ -19,9 +27,9 @@ const listUsers = async (req, res, next) => {
 // ── POST /api/users ────────────────────────────────────────────────────────────
 const createUser = async (req, res, next) => {
   try {
-    const { name, phone, email, role, password } = req.body;
+    const { name, phone, email, role, password, pin, station, assignedTables, isOnDuty } = req.body;
 
-    const ALLOWED_ROLES = ['manager', 'kitchen', 'waiter'];
+    const ALLOWED_ROLES = ['manager', 'coordinator', 'kitchen', 'waiter'];
     if (!role || !ALLOWED_ROLES.includes(role)) {
       return res.status(400).json({
         success: false,
@@ -69,17 +77,34 @@ const createUser = async (req, res, next) => {
     // Default to provided password or generate an 8-byte hex temp password
     const userPassword = password || crypto.randomBytes(8).toString('hex');
 
-    const user = await User.create({
+    const userData = {
       restaurantId: req.tenantId,
       name,
       phone: normalizedPhone,
       email: cleanEmail,
       role,
       passwordHash: userPassword,
-    });
+    };
+
+    if (pin && /^\d{4}$/.test(String(pin))) {
+      userData.pinHash = String(pin);
+    }
+    if (station && ['all', 'kitchen', 'bar'].includes(station)) {
+      userData.station = station;
+    }
+    if (Array.isArray(assignedTables)) {
+      userData.assignedTables = assignedTables;
+    }
+    if (typeof isOnDuty === 'boolean') {
+      userData.isOnDuty = isOnDuty;
+    }
+
+    const user = await User.create(userData);
 
     const userObj = user.toObject();
+    userObj.hasPin = Boolean(userObj.pinHash);
     delete userObj.passwordHash;
+    delete userObj.pinHash;
 
     return res.status(201).json({
       success: true,
@@ -94,7 +119,7 @@ const createUser = async (req, res, next) => {
 // ── PATCH /api/users/:id ───────────────────────────────────────────────────────
 const updateUser = async (req, res, next) => {
   try {
-    const { role, isActive, name, phone } = req.body;
+    const { role, isActive, name, phone, pin, station, assignedTables, isOnDuty, password } = req.body;
 
     const targetUser = await User.findOne({
       _id: req.params.id,
@@ -121,8 +146,29 @@ const updateUser = async (req, res, next) => {
       }
       targetUser.phone = normalizePhone(phone);
     }
-    if (role && ['manager', 'kitchen', 'waiter'].includes(role)) {
+    if (role && ['manager', 'coordinator', 'kitchen', 'waiter'].includes(role)) {
       targetUser.role = role;
+    }
+    if (pin !== undefined) {
+      if (!pin) {
+        targetUser.pinHash = null;
+      } else if (/^\d{4}$/.test(String(pin))) {
+        targetUser.pinHash = String(pin);
+      } else {
+        return res.status(400).json({ success: false, message: 'PIN must be a 4-digit number.' });
+      }
+    }
+    if (station && ['all', 'kitchen', 'bar'].includes(station)) {
+      targetUser.station = station;
+    }
+    if (Array.isArray(assignedTables)) {
+      targetUser.assignedTables = assignedTables;
+    }
+    if (typeof isOnDuty === 'boolean') {
+      targetUser.isOnDuty = isOnDuty;
+    }
+    if (password && String(password).length >= 6) {
+      targetUser.passwordHash = password;
     }
     if (typeof isActive === 'boolean') {
       targetUser.isActive = isActive;
@@ -145,7 +191,9 @@ const updateUser = async (req, res, next) => {
     await targetUser.save();
 
     const userObj = targetUser.toObject();
+    userObj.hasPin = Boolean(userObj.pinHash);
     delete userObj.passwordHash;
+    delete userObj.pinHash;
 
     return res.json({ success: true, user: userObj });
   } catch (err) {

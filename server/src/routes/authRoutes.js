@@ -1,7 +1,7 @@
 const express = require('express');
 const { body } = require('express-validator');
 const router = express.Router();
-const { register, login, refresh, logout, me } = require('../controllers/authController');
+const { register, login, pinLogin, refresh, logout, me } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
 const { authLimiter, refreshLimiter } = require('../middleware/rateLimit');
 const { validate } = require('../middleware/validator');
@@ -54,6 +54,16 @@ router.post(
     validate,
   ],
   login
+);
+
+router.post(
+  '/pin-login',
+  authLimiter,
+  [
+    body('pin').matches(/^\d{4}$/).withMessage('A 4-digit PIN is required'),
+    validate,
+  ],
+  pinLogin
 );
 
 router.post('/refresh', refreshLimiter, refresh);

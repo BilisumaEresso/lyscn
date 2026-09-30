@@ -3,7 +3,8 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   LayoutDashboard, UtensilsCrossed, QrCode,
-  ClipboardList, Settings, LogOut, X, Download, MapPin, Users, AlertTriangle
+  ClipboardList, Settings, LogOut, X, Download, MapPin, Users, AlertTriangle,
+  ChefHat, Utensils
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '../../store/authStore';
@@ -35,32 +36,90 @@ export default function Sidebar({ isOpen, onClose }) {
   });
 
   const placedOrdersCount = ordersData?.orders?.filter((o) => o.status === 'placed').length || 0;
+  const acceptedOrdersCount = ordersData?.orders?.filter((o) => o.status === 'accepted' || o.status === 'preparing').length || 0;
+  const readyOrdersCount = ordersData?.orders?.filter((o) => o.status === 'ready').length || 0;
   const pendingAssistanceCount = assistanceData?.assistance?.filter(
     (a) => a.status === 'pending' || a.status === 'acknowledged'
   ).length || 0;
 
-  const navItems = [
-    { to: '/',        icon: LayoutDashboard, label: 'Dashboard', end: true },
-    { to: '/menu',    icon: UtensilsCrossed, label: 'Menu' },
-    {
-      to: '/tables',
-      icon: QrCode,
-      label: 'Tables',
-      badge: pendingAssistanceCount,
-      badgeColor: 'bg-rose-500/20 text-rose-300 border-rose-500/30'
-    },
-    {
-      to: '/orders',
-      icon: ClipboardList,
-      label: 'Orders',
-      badge: placedOrdersCount,
-      badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-    },
-    ...(user?.role === 'owner' || user?.role === 'manager'
-      ? [{ to: '/staff', icon: Users, label: 'Staff' }]
-      : []),
-    { to: '/settings',icon: Settings,        label: 'Settings' },
-  ];
+  const role = user?.role || 'owner';
+  let navItems = [];
+
+  if (role === 'kitchen') {
+    navItems = [
+      {
+        to: '/kds',
+        icon: ChefHat,
+        label: 'Kitchen KDS',
+        badge: acceptedOrdersCount,
+        badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+      },
+      { to: '/orders', icon: ClipboardList, label: 'Order History' },
+    ];
+  } else if (role === 'waiter') {
+    navItems = [
+      {
+        to: '/waiter',
+        icon: Utensils,
+        label: 'Floor Service',
+        badge: readyOrdersCount,
+        badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+      },
+      {
+        to: '/tables',
+        icon: QrCode,
+        label: 'Tables & QR',
+        badge: pendingAssistanceCount,
+        badgeColor: 'bg-rose-500/20 text-rose-300 border-rose-500/30',
+      },
+      { to: '/orders', icon: ClipboardList, label: 'Order History' },
+    ];
+  } else if (role === 'coordinator') {
+    navItems = [
+      { to: '/', icon: LayoutDashboard, label: 'Dashboard', end: true },
+      {
+        to: '/orders',
+        icon: ClipboardList,
+        label: 'Orders',
+        badge: placedOrdersCount,
+        badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+      },
+      {
+        to: '/tables',
+        icon: QrCode,
+        label: 'Tables',
+        badge: pendingAssistanceCount,
+        badgeColor: 'bg-rose-500/20 text-rose-300 border-rose-500/30',
+      },
+      { to: '/kds', icon: ChefHat, label: 'Kitchen KDS' },
+      { to: '/waiter', icon: Utensils, label: 'Floor Service' },
+      { to: '/settings', icon: Settings, label: 'Settings' },
+    ];
+  } else {
+    // owner or manager
+    navItems = [
+      { to: '/', icon: LayoutDashboard, label: 'Dashboard', end: true },
+      { to: '/menu', icon: UtensilsCrossed, label: 'Menu' },
+      {
+        to: '/tables',
+        icon: QrCode,
+        label: 'Tables',
+        badge: pendingAssistanceCount,
+        badgeColor: 'bg-rose-500/20 text-rose-300 border-rose-500/30',
+      },
+      {
+        to: '/orders',
+        icon: ClipboardList,
+        label: 'Orders',
+        badge: placedOrdersCount,
+        badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+      },
+      { to: '/kds', icon: ChefHat, label: 'Kitchen KDS' },
+      { to: '/waiter', icon: Utensils, label: 'Floor Service' },
+      { to: '/staff', icon: Users, label: 'Staff' },
+      { to: '/settings', icon: Settings, label: 'Settings' },
+    ];
+  }
 
   // Close mobile drawer on route change
   useEffect(() => {

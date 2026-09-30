@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Users, UserPlus, Shield, ShieldCheck, ChefHat, Utensils,
-  Check, Copy, AlertCircle, UserX, UserCheck, KeyRound
+  Check, Copy, AlertCircle, UserX, UserCheck, KeyRound,
+  ClipboardCheck, Settings2, Hash, Power
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../lib/api';
@@ -10,7 +11,6 @@ import { useAuthStore } from '../store/authStore';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
-import Spinner from '../components/ui/Spinner';
 import LoadingIndicator from '../components/ui/LoadingIndicator';
 import EmptyState from '../components/ui/EmptyState';
 
@@ -18,26 +18,32 @@ const ROLE_CONFIG = {
   owner: {
     label: 'Owner',
     icon: ShieldCheck,
-    bg: 'bg-purple-500/10 text-purple-400 border border-purple-500/20',
+    bg: 'bg-purple-500/10 text-purple-600 border border-purple-500/20',
     description: 'Full restaurant ownership & settings',
   },
   manager: {
     label: 'Manager',
     icon: Shield,
-    bg: 'bg-blue-500/10 text-blue-400 border border-blue-500/20',
+    bg: 'bg-blue-500/10 text-blue-600 border border-blue-500/20',
     description: 'Menu, tables, orders & staff oversight',
   },
+  coordinator: {
+    label: 'Desk Coordinator',
+    icon: ClipboardCheck,
+    bg: 'bg-indigo-500/10 text-indigo-600 border border-indigo-500/20',
+    description: 'Counter dispatch, accepts incoming orders & cashiering',
+  },
   kitchen: {
-    label: 'Kitchen',
+    label: 'Kitchen / Bar',
     icon: ChefHat,
-    bg: 'bg-amber-500/10 text-amber-400 border border-amber-500/20',
-    description: 'Kitchen display system & order status',
+    bg: 'bg-amber-500/10 text-amber-700 border border-amber-500/20',
+    description: 'Kitchen display system & preparation status',
   },
   waiter: {
     label: 'Floor / Waiter',
     icon: Utensils,
-    bg: 'bg-teal-500/10 text-teal-400 border border-teal-500/20',
-    description: 'Order management & guest assistance',
+    bg: 'bg-teal-500/10 text-teal-700 border border-teal-500/20',
+    description: 'Table service, order delivery & bill settlement',
   },
 };
 
@@ -50,15 +56,20 @@ export default function Staff() {
   const canManage = isOwner || isManager;
 
   const [addModalOpen, setAddModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingStaff, setEditingStaff] = useState(null);
   const [createdCredentials, setCreatedCredentials] = useState(null);
   const [copied, setCopied] = useState(false);
 
-  // Form state
+  // Add form state
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
     role: 'waiter',
     password: '',
+    pin: '',
+    station: 'all',
+    assignedTables: [],
   });
 
   // Query users
@@ -68,7 +79,15 @@ export default function Staff() {
     enabled: canManage,
   });
 
+  // Query tables for waiter assignment
+  const { data: tablesData } = useQuery({
+    queryKey: ['tables'],
+    queryFn: () => api.get('/tables').then((r) => r.data),
+    enabled: canManage,
+  });
+
   const users = data?.users || [];
+  const tables = tablesData?.tables || [];
 
   // Create staff mutation
   const createMutation = useMutation({
@@ -77,26 +96,36 @@ export default function Staff() {
       qc.invalidateQueries({ queryKey: ['users'] });
       toast.success('Staff member created successfully!');
       setAddModalOpen(false);
-      if (res.tempPassword) {
+      if (res.tempPassword || formData.pin) {
         setCreatedCredentials({
           name: res.user.name,
           phone: res.user.phone || res.user.email,
           password: res.tempPassword,
+          pin: formData.pin || null,
         });
       }
-      setFormData({ name: '', phone: '', role: 'waiter', password: '' });
+      setFormData({
+        name: '',
+        phone: '',
+        role: 'waiter',
+        password: '',
+        pin: '',
+        station: 'all',
+        assignedTables: [],
+      });
     },
     onError: (err) => {
       toast.error(err.response?.data?.message || 'Failed to create staff member.');
     },
   });
 
-  // Update role/status mutation
+  // Update staff mutation
   const updateMutation = useMutation({
     mutationFn: ({ id, updates }) => api.patch(`/users/${id}`, updates).then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['users'] });
       toast.success('Staff member updated.');
+      setEditModalOpen(false);
     },
     onError: (err) => {
       toast.error(err.response?.data?.message || 'Update failed.');
@@ -129,7 +158,11 @@ export default function Staff() {
 
   const handleCopyCredentials = () => {
     if (!createdCredentials) return;
-    const text = `LayoScan Login Credentials:\nPhone: ${createdCredentials.phone}\nTemporary Password: ${createdCredentials.password}\nLogin URL: ${window.location.origin}/login`;
+    let text = `LayoScan Login Credentials:\nPhone: ${createdCredentials.phone}`;
+    if (createdCredentials.password) text += `\nPassword: ${createdCredentials.password}`;
+    if (createdCredentials.pin) text += `\nQuick PIN: ${createdCredentials.pin}`;
+    text += `\nLogin URL: ${window.location.origin}/login`;
+
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -142,11 +175,58 @@ export default function Staff() {
       toast.error('Name and phone number are required.');
       return;
     }
+    if (formData.pin && !/^\d{4}$/.test(formData.pin.trim())) {
+      toast.error('PIN must be exactly 4 digits.');
+      return;
+    }
+
     createMutation.mutate({
       name: formData.name.trim(),
       phone: formData.phone.trim(),
       role: formData.role,
       ...(formData.password.trim() && { password: formData.password.trim() }),
+      ...(formData.pin.trim() && { pin: formData.pin.trim() }),
+      ...(formData.role === 'kitchen' && { station: formData.station }),
+      ...(formData.role === 'waiter' && { assignedTables: formData.assignedTables }),
+    });
+  };
+
+  const handleOpenEdit = (staff) => {
+    setEditingStaff({
+      _id: staff._id,
+      name: staff.name,
+      role: staff.role,
+      phone: staff.phone || '',
+      pin: '',
+      station: staff.station || 'all',
+      assignedTables: (staff.assignedTables || []).map((t) => (t._id ? t._id : t)),
+      isOnDuty: staff.isOnDuty !== false,
+    });
+    setEditModalOpen(true);
+  };
+
+  const handleEditSubmit = (e) => {
+    e.preventDefault();
+    if (!editingStaff) return;
+    if (editingStaff.pin && !/^\d{4}$/.test(editingStaff.pin.trim())) {
+      toast.error('PIN must be exactly 4 digits.');
+      return;
+    }
+
+    const updates = {
+      name: editingStaff.name.trim(),
+      role: editingStaff.role,
+      isOnDuty: editingStaff.isOnDuty,
+      station: editingStaff.station,
+      assignedTables: editingStaff.assignedTables,
+    };
+    if (editingStaff.pin.trim()) {
+      updates.pin = editingStaff.pin.trim();
+    }
+
+    updateMutation.mutate({
+      id: editingStaff._id,
+      updates,
     });
   };
 
@@ -155,9 +235,9 @@ export default function Staff() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-ink/8">
         <div>
-          <h1 className="font-display font-bold text-2xl text-ink">Staff & Team</h1>
+          <h1 className="font-display font-bold text-2xl text-ink">Staff & RBAC Team</h1>
           <p className="text-sm text-ink-muted mt-1">
-            Manage your kitchen, floor, and management team access.
+            Manage your coordinators, kitchen brigade, floor servers, and access permissions.
           </p>
         </div>
         <Button onClick={() => setAddModalOpen(true)} className="flex items-center gap-2">
@@ -167,7 +247,7 @@ export default function Staff() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
         {[
           { label: 'Total Team', count: users.length, icon: Users, color: 'text-ink' },
           {
@@ -177,19 +257,25 @@ export default function Staff() {
             color: 'text-blue-500',
           },
           {
-            label: 'Kitchen Crew',
+            label: 'Coordinators',
+            count: users.filter((u) => u.role === 'coordinator').length,
+            icon: ClipboardCheck,
+            color: 'text-indigo-500',
+          },
+          {
+            label: 'Kitchen / Bar',
             count: users.filter((u) => u.role === 'kitchen').length,
             icon: ChefHat,
             color: 'text-amber-500',
           },
           {
-            label: 'Floor Staff',
+            label: 'Floor Waiters',
             count: users.filter((u) => u.role === 'waiter').length,
             icon: Utensils,
             color: 'text-teal',
           },
         ].map(({ label, count, icon: Icon, color }) => (
-          <div key={label} className="bg-white rounded-xl p-4 border border-ink/8 shadow-xs">
+          <div key={label} className="bg-white rounded-xl p-3.5 border border-ink/8 shadow-xs">
             <div className="flex items-center justify-between text-ink-muted mb-1.5">
               <span className="text-xs font-medium">{label}</span>
               <Icon size={16} className={color} />
@@ -201,15 +287,21 @@ export default function Staff() {
 
       {/* Credentials Banner */}
       {createdCredentials && (
-        <div className="bg-teal/10 border border-teal/20 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="bg-teal/10 border border-teal/20 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fade-in">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-teal text-white flex items-center justify-center shrink-0">
               <KeyRound size={18} />
             </div>
             <div>
-              <p className="text-sm font-semibold text-ink">Temporary Login Credentials Generated</p>
+              <p className="text-sm font-semibold text-ink">Staff Credentials Configured</p>
               <p className="text-xs text-ink-muted font-mono mt-0.5">
-                Phone: <span className="font-semibold text-ink">{createdCredentials.phone}</span> • Password: <span className="bg-black/5 px-1.5 py-0.5 rounded font-semibold text-ink">{createdCredentials.password}</span>
+                Phone: <span className="font-semibold text-ink">{createdCredentials.phone}</span>
+                {createdCredentials.password && (
+                  <> • Password: <span className="bg-black/5 px-1.5 py-0.5 rounded font-semibold text-ink">{createdCredentials.password}</span></>
+                )}
+                {createdCredentials.pin && (
+                  <> • Quick PIN: <span className="bg-black/5 px-1.5 py-0.5 rounded font-semibold text-teal font-mono">{createdCredentials.pin}</span></>
+                )}
               </p>
             </div>
           </div>
@@ -242,7 +334,7 @@ export default function Staff() {
           <EmptyState
             icon={Users}
             title="No staff members yet"
-            description="Add your first manager, kitchen cook, or waiter to start delegating orders."
+            description="Add your desk coordinator, kitchen cook, or waiters to start delegating orders."
             action={() => setAddModalOpen(true)}
             actionLabel="Add Staff Member"
           />
@@ -253,8 +345,9 @@ export default function Staff() {
                 <tr className="border-b border-ink/8 bg-ink/2 text-ink-muted text-xs uppercase font-medium">
                   <th className="py-3 px-6">Member</th>
                   <th className="py-3 px-6">Role</th>
+                  <th className="py-3 px-6">Duty & Station</th>
+                  <th className="py-3 px-6">Quick PIN</th>
                   <th className="py-3 px-6">Status</th>
-                  <th className="py-3 px-6">Joined</th>
                   <th className="py-3 px-6 text-right">Actions</th>
                 </tr>
               </thead>
@@ -266,6 +359,8 @@ export default function Staff() {
                   const canManageMember =
                     (isOwner && !isStaffOwner && !isCurrentAccount) ||
                     (isManager && !isStaffOwner && staff.role !== 'manager' && !isCurrentAccount);
+
+                  const assignedCount = staff.assignedTables?.length || 0;
 
                   return (
                     <tr key={staff._id} className="hover:bg-ink/1 transition-colors">
@@ -308,7 +403,8 @@ export default function Staff() {
                             className="text-xs font-medium bg-ink/4 hover:bg-ink/8 border border-ink/8 rounded-lg px-2.5 py-1 text-ink focus:outline-none focus:ring-2 focus:ring-teal"
                           >
                             <option value="manager">Manager</option>
-                            <option value="kitchen">Kitchen</option>
+                            <option value="coordinator">Desk Coordinator</option>
+                            <option value="kitchen">Kitchen / Bar</option>
                             <option value="waiter">Floor / Waiter</option>
                           </select>
                         ) : (
@@ -316,6 +412,45 @@ export default function Staff() {
                             <roleMeta.icon size={13} />
                             {roleMeta.label}
                           </span>
+                        )}
+                      </td>
+
+                      {/* Duty & Coverage */}
+                      <td className="py-4 px-6">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              className={`w-2 h-2 rounded-full ${
+                                staff.isOnDuty !== false ? 'bg-emerald-500' : 'bg-ink/30'
+                              }`}
+                            />
+                            <span className="text-xs font-medium text-ink">
+                              {staff.isOnDuty !== false ? 'On Duty' : 'Off Duty'}
+                            </span>
+                          </div>
+                          {staff.role === 'kitchen' && (
+                            <span className="text-[11px] text-ink-muted capitalize">
+                              Station: {staff.station || 'All'}
+                            </span>
+                          )}
+                          {staff.role === 'waiter' && (
+                            <span className="text-[11px] text-ink-muted">
+                              {assignedCount > 0
+                                ? `${assignedCount} assigned table${assignedCount > 1 ? 's' : ''}`
+                                : 'Covers all open tables'}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Quick PIN */}
+                      <td className="py-4 px-6">
+                        {staff.hasPin ? (
+                          <span className="inline-flex items-center gap-1 text-xs text-teal font-medium bg-teal/10 px-2 py-0.5 rounded-md border border-teal/20">
+                            <Hash size={11} /> 4-digit PIN Set
+                          </span>
+                        ) : (
+                          <span className="text-xs text-ink-muted italic">None</span>
                         )}
                       </td>
 
@@ -334,21 +469,18 @@ export default function Staff() {
                         )}
                       </td>
 
-                      {/* Joined Date */}
-                      <td className="py-4 px-6 text-xs text-ink-muted">
-                        {staff.createdAt
-                          ? new Date(staff.createdAt).toLocaleDateString(undefined, {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric',
-                            })
-                          : '—'}
-                      </td>
-
                       {/* Actions */}
                       <td className="py-4 px-6 text-right">
                         {canManageMember && (
-                          <div className="flex items-center justify-end gap-1">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEdit(staff)}
+                              className="p-1.5 text-ink-muted hover:text-ink hover:bg-ink/5 rounded-lg transition-colors"
+                              title="Configure PIN, station, or tables"
+                            >
+                              <Settings2 size={16} />
+                            </button>
                             {staff.isActive ? (
                               <button
                                 type="button"
@@ -399,7 +531,7 @@ export default function Staff() {
         <form onSubmit={handleCreateSubmit} className="space-y-4">
           <Input
             label="Full Name"
-            placeholder="Chef Mario"
+            placeholder="e.g. Almaz Bekele"
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             required
@@ -411,19 +543,20 @@ export default function Staff() {
             placeholder="0911223344 or 0711223344"
             value={formData.phone}
             onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-            helperText="Mobile number used by the staff member to sign in to the dashboard."
+            helperText="Mobile number used to sign in to the app."
             required
           />
 
           <div>
             <label className="block text-xs font-medium text-ink mb-1.5">
-              Role & Permissions
+              Role & Operational Responsibilities
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {[
                 { id: 'manager', label: 'Manager', icon: Shield },
-                { id: 'kitchen', label: 'Kitchen', icon: ChefHat },
-                { id: 'waiter', label: 'Waiter', icon: Utensils },
+                { id: 'coordinator', label: 'Coordinator', icon: ClipboardCheck },
+                { id: 'kitchen', label: 'Kitchen / Bar', icon: ChefHat },
+                { id: 'waiter', label: 'Floor Waiter', icon: Utensils },
               ].map(({ id, label, icon: Icon }) => (
                 <button
                   type="button"
@@ -440,16 +573,98 @@ export default function Staff() {
                 </button>
               ))}
             </div>
+            <p className="text-[11px] text-ink-muted mt-1.5">
+              {ROLE_CONFIG[formData.role]?.description}
+            </p>
           </div>
 
-          <Input
-            label="Initial Password (Optional)"
-            type="password"
-            placeholder="Leave blank to auto-generate"
-            value={formData.password}
-            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-            helperText="If blank, a secure temporary password will be generated for you to share."
-          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              label="Quick 4-Digit PIN (Optional)"
+              type="password"
+              maxLength={4}
+              placeholder="e.g. 1234"
+              value={formData.pin}
+              onChange={(e) => setFormData({ ...formData, pin: e.target.value.replace(/\D/g, '') })}
+              helperText="Enables instant shift login on shared counter/kitchen tablets."
+            />
+
+            <Input
+              label="Password (Optional)"
+              type="password"
+              placeholder="Leave blank to auto-generate"
+              value={formData.password}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              helperText="Auto-generates if blank."
+            />
+          </div>
+
+          {/* Conditional Station selection for Kitchen */}
+          {formData.role === 'kitchen' && (
+            <div>
+              <label className="block text-xs font-medium text-ink mb-1">
+                Kitchen Workstation
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: 'all', label: 'All Orders' },
+                  { id: 'kitchen', label: 'Food / Grill' },
+                  { id: 'bar', label: 'Barista / Bar' },
+                ].map((st) => (
+                  <button
+                    key={st.id}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, station: st.id })}
+                    className={`py-2 px-3 rounded-lg border text-xs font-medium ${
+                      formData.station === st.id
+                        ? 'border-amber-500 bg-amber-50 text-amber-900'
+                        : 'border-ink/8 text-ink-muted hover:border-ink/20'
+                    }`}
+                  >
+                    {st.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Conditional Table Zone Coverage for Waiter */}
+          {formData.role === 'waiter' && tables.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-ink mb-1">
+                Assigned Table Coverage (Optional)
+              </label>
+              <p className="text-[11px] text-ink-muted mb-2">
+                Leave unselected to automatically handle any open table in the dining room.
+              </p>
+              <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-2 border border-ink/8 rounded-xl bg-ink/2">
+                {tables.map((t) => {
+                  const isSelected = formData.assignedTables.includes(t._id);
+                  return (
+                    <button
+                      key={t._id}
+                      type="button"
+                      onClick={() => {
+                        setFormData((prev) => ({
+                          ...prev,
+                          assignedTables: isSelected
+                            ? prev.assignedTables.filter((id) => id !== t._id)
+                            : [...prev.assignedTables, t._id],
+                        }));
+                      }}
+                      className={`text-xs px-2.5 py-1 rounded-lg border font-medium transition-colors ${
+                        isSelected
+                          ? 'bg-teal text-white border-teal'
+                          : 'bg-white text-ink border-ink/10 hover:border-ink/20'
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="pt-2 flex justify-end gap-2">
             <Button
@@ -469,6 +684,163 @@ export default function Staff() {
           </div>
         </form>
       </Modal>
+
+      {/* Edit Staff Settings Modal */}
+      {editingStaff && (
+        <Modal
+          open={editModalOpen}
+          onClose={() => setEditModalOpen(false)}
+          title={`Configure ${editingStaff.name}`}
+          size="md"
+        >
+          <form onSubmit={handleEditSubmit} className="space-y-4">
+            <Input
+              label="Full Name"
+              value={editingStaff.name}
+              onChange={(e) => setEditingStaff({ ...editingStaff, name: e.target.value })}
+              required
+            />
+
+            <div>
+              <label className="block text-xs font-medium text-ink mb-1.5">
+                Role
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {[
+                  { id: 'manager', label: 'Manager', icon: Shield },
+                  { id: 'coordinator', label: 'Coordinator', icon: ClipboardCheck },
+                  { id: 'kitchen', label: 'Kitchen / Bar', icon: ChefHat },
+                  { id: 'waiter', label: 'Floor Waiter', icon: Utensils },
+                ].map(({ id, label, icon: Icon }) => (
+                  <button
+                    type="button"
+                    key={id}
+                    onClick={() => setEditingStaff({ ...editingStaff, role: id })}
+                    className={`p-2.5 rounded-xl border text-center flex flex-col items-center gap-1 transition-all ${
+                      editingStaff.role === id
+                        ? 'border-teal bg-teal/10 text-teal font-medium shadow-xs'
+                        : 'border-ink/8 text-ink-muted hover:border-ink/20 hover:text-ink'
+                    }`}
+                  >
+                    <Icon size={18} />
+                    <span className="text-xs">{label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between p-3 rounded-xl border border-ink/8 bg-ink/2">
+              <div className="flex items-center gap-2">
+                <Power size={16} className={editingStaff.isOnDuty ? 'text-emerald-600' : 'text-ink-muted'} />
+                <div>
+                  <p className="text-xs font-semibold text-ink">Active Shift Duty</p>
+                  <p className="text-[11px] text-ink-muted">When On Duty, system automatically dispatches ready orders.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingStaff({ ...editingStaff, isOnDuty: !editingStaff.isOnDuty })}
+                className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
+                  editingStaff.isOnDuty
+                    ? 'bg-emerald-500 text-white'
+                    : 'bg-ink/15 text-ink-muted'
+                }`}
+              >
+                {editingStaff.isOnDuty ? 'On Duty' : 'Off Duty'}
+              </button>
+            </div>
+
+            <Input
+              label="Update Quick 4-Digit PIN (Optional)"
+              type="password"
+              maxLength={4}
+              placeholder="Leave blank to keep current PIN"
+              value={editingStaff.pin}
+              onChange={(e) => setEditingStaff({ ...editingStaff, pin: e.target.value.replace(/\D/g, '') })}
+              helperText="Enter 4 digits to reset or change the shift PIN."
+            />
+
+            {editingStaff.role === 'kitchen' && (
+              <div>
+                <label className="block text-xs font-medium text-ink mb-1">
+                  Kitchen Workstation
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: 'all', label: 'All Orders' },
+                    { id: 'kitchen', label: 'Food / Grill' },
+                    { id: 'bar', label: 'Barista / Bar' },
+                  ].map((st) => (
+                    <button
+                      key={st.id}
+                      type="button"
+                      onClick={() => setEditingStaff({ ...editingStaff, station: st.id })}
+                      className={`py-2 px-3 rounded-lg border text-xs font-medium ${
+                        editingStaff.station === st.id
+                          ? 'border-amber-500 bg-amber-50 text-amber-900'
+                          : 'border-ink/8 text-ink-muted hover:border-ink/20'
+                      }`}
+                    >
+                      {st.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {editingStaff.role === 'waiter' && tables.length > 0 && (
+              <div>
+                <label className="block text-xs font-medium text-ink mb-1">
+                  Assigned Tables
+                </label>
+                <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-2 border border-ink/8 rounded-xl bg-ink/2">
+                  {tables.map((t) => {
+                    const isSelected = editingStaff.assignedTables.includes(t._id);
+                    return (
+                      <button
+                        key={t._id}
+                        type="button"
+                        onClick={() => {
+                          setEditingStaff((prev) => ({
+                            ...prev,
+                            assignedTables: isSelected
+                              ? prev.assignedTables.filter((id) => id !== t._id)
+                              : [...prev.assignedTables, t._id],
+                          }));
+                        }}
+                        className={`text-xs px-2.5 py-1 rounded-lg border font-medium transition-colors ${
+                          isSelected
+                            ? 'bg-teal text-white border-teal'
+                            : 'bg-white text-ink border-ink/10 hover:border-ink/20'
+                        }`}
+                      >
+                        {t.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div className="pt-2 flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                loading={updateMutation.isPending}
+                loadingText="Saving…"
+              >
+                Save Changes
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </div>
   );
 }

@@ -83,9 +83,17 @@ const orderSchema = new mongoose.Schema(
     // null until staff marks order as paid
     paymentMethod: {
       type: String,
-      enum: ['cash', 'pos'],
+      enum: ['cash', 'pos', 'telebirr', 'cbebirr', 'other'],
       default: null,
     },
+
+    // Distributed workflow audit tracking
+    acceptedBy:         { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    preparedBy:         { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    servedBy:           { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    assignedWaiterId:   { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
+    assignedWaiterName: { type: String, default: null },
+    cancelReason:       { type: String, trim: true, default: null },
 
     totalAmount: { type: Number, required: true },
 

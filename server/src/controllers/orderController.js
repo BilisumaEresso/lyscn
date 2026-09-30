@@ -2,6 +2,7 @@ const Order   = require('../models/Order');
 const Product = require('../models/Product');
 const Table   = require('../models/Table');
 const Branch  = require('../models/Branch');
+const User    = require('../models/User');
 
 const VALID_STATUSES = ['placed', 'accepted', 'preparing', 'ready', 'served', 'cancelled'];
 
@@ -26,6 +27,72 @@ const suggestTableReadyToClear = async (req, tableId, restaurantId) => {
 
   const io = req.app.get('io');
   if (io) io.to(`restaurant:${restaurantId}`).emit('table:readyToClear', { tableId });
+};
+
+/**
+ * Automatically assign an on-duty waiter when an order reaches 'ready' state.
+ * Priority 1: On-duty waiter covering order.tableId
+ * Priority 2: On-duty waiter with fewest active 'ready' unserved orders
+ * Fallback: null (open claim)
+ */
+const autoAssignWaiter = async (order) => {
+  try {
+    const targetTableId = order.tableId?._id || order.tableId;
+
+    const tableAssignedWaiter = await User.findOne({
+      restaurantId: order.restaurantId,
+      role: 'waiter',
+      isActive: true,
+      isOnDuty: true,
+      assignedTables: targetTableId,
+    });
+
+    if (tableAssignedWaiter) {
+      return tableAssignedWaiter;
+    }
+
+    const activeWaiters = await User.find({
+      restaurantId: order.restaurantId,
+      role: 'waiter',
+      isActive: true,
+      isOnDuty: true,
+    });
+
+    if (!activeWaiters || activeWaiters.length === 0) {
+      return null;
+    }
+
+    const readyCounts = await Order.aggregate([
+      {
+        $match: {
+          restaurantId: order.restaurantId,
+          status: 'ready',
+          assignedWaiterId: { $in: activeWaiters.map((w) => w._id) },
+        },
+      },
+      {
+        $group: {
+          _id: '$assignedWaiterId',
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const countMap = new Map();
+    for (const item of readyCounts) {
+      countMap.set(String(item._id), item.count);
+    }
+
+    activeWaiters.sort((a, b) => {
+      const ca = countMap.get(String(a._id)) || 0;
+      const cb = countMap.get(String(b._id)) || 0;
+      return ca - cb;
+    });
+
+    return activeWaiters[0];
+  } catch (_err) {
+    return null;
+  }
 };
 
 // ── POST /api/orders/public ───────────────────────────────────────────────────
@@ -453,10 +520,86 @@ const submitOrderFeedback = async (req, res, next) => {
   }
 };
 
+// ── PATCH /api/orders/:id/assign ──────────────────────────────────────────────
+// Floor staff claims order or manager/coordinator delegates order to waiter
+const assignOrder = async (req, res, next) => {
+  try {
+    const { waiterId } = req.body;
+    const userRole = req.user?.role || 'owner';
+    const userId = req.user?.userId;
+
+    if (!['owner', 'manager', 'coordinator', 'waiter'].includes(userRole)) {
+      return res.status(403).json({
+        success: false,
+        message: 'You do not have permission to assign or claim orders.',
+      });
+    }
+
+    const order = await Order.findOne({
+      _id: req.params.id,
+      restaurantId: req.tenantId,
+    });
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found.' });
+    }
+
+    let assignedUser = null;
+    if (userRole === 'waiter') {
+      assignedUser = await User.findOne({
+        _id: userId,
+        restaurantId: req.tenantId,
+        isActive: true,
+      });
+    } else {
+      if (!waiterId) {
+        return res.status(400).json({ success: false, message: 'waiterId is required for delegation.' });
+      }
+      assignedUser = await User.findOne({
+        _id: waiterId,
+        restaurantId: req.tenantId,
+        role: 'waiter',
+        isActive: true,
+      });
+      if (!assignedUser) {
+        return res.status(404).json({ success: false, message: 'Waiter not found in this venue.' });
+      }
+    }
+
+    if (!assignedUser) {
+      return res.status(400).json({ success: false, message: 'Unable to assign waiter.' });
+    }
+
+    order.assignedWaiterId = assignedUser._id;
+    order.assignedWaiterName = assignedUser.name;
+    await order.save();
+
+    const populated = await Order.findById(order._id)
+      .populate('tableId', 'label')
+      .populate('branchId', 'name')
+      .populate('assignedWaiterId', 'name phone');
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`restaurant:${order.restaurantId}`).emit('order:updated', populated);
+      io.to(`order:${order._id}`).emit('order:updated', populated);
+      const targetTableId = order.tableId?._id || order.tableId;
+      if (targetTableId) {
+        io.to(`table:${targetTableId}`).emit('order:updated', populated);
+      }
+      io.to(`user:${assignedUser._id}`).emit('order:assigned', populated);
+    }
+
+    return res.json({ success: true, order: populated });
+  } catch (err) {
+    return next(err);
+  }
+};
+
 // ── PATCH /api/orders/:id/status — protected, staff ───────────────────────────
 const updateOrderStatus = async (req, res, next) => {
   try {
-    const { status } = req.body;
+    const { status, cancelReason } = req.body;
 
     if (!status || !VALID_STATUSES.includes(status)) {
       return res.status(400).json({
@@ -465,26 +608,86 @@ const updateOrderStatus = async (req, res, next) => {
       });
     }
 
-    const order = await Order.findOneAndUpdate(
-      { _id: req.params.id, restaurantId: req.tenantId },
-      { status },
-      { new: true }
-    )
-      .populate('tableId', 'label')
-      .populate('branchId', 'name');
+    const order = await Order.findOne({
+      _id: req.params.id,
+      restaurantId: req.tenantId,
+    });
 
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found.' });
     }
 
-    // ── Realtime: broadcast to restaurant room, order room, and table room ───
+    const userRole = req.user?.role || 'owner';
+    const userId = req.user?.userId;
+
+    // RBAC validation
+    if (userRole === 'kitchen') {
+      if (!['preparing', 'ready'].includes(status)) {
+        return res.status(403).json({
+          success: false,
+          message: 'Kitchen staff can only advance orders to "preparing" or "ready".',
+        });
+      }
+    } else if (userRole === 'waiter') {
+      if (status !== 'served') {
+        return res.status(403).json({
+          success: false,
+          message: 'Waiters can only mark orders as "served" once delivered to the table.',
+        });
+      }
+    }
+
+    order.status = status;
+
+    if (status === 'accepted') {
+      order.acceptedBy = userId;
+    } else if (status === 'preparing') {
+      order.preparedBy = userId;
+    } else if (status === 'ready') {
+      if (!order.preparedBy) order.preparedBy = userId;
+
+      // Auto-assign an on-duty waiter if none is assigned yet
+      if (!order.assignedWaiterId) {
+        const assignedWaiter = await autoAssignWaiter(order);
+        if (assignedWaiter) {
+          order.assignedWaiterId = assignedWaiter._id;
+          order.assignedWaiterName = assignedWaiter.name;
+        }
+      }
+    } else if (status === 'served') {
+      order.servedBy = userId;
+      if (userRole === 'waiter' && !order.assignedWaiterId) {
+        order.assignedWaiterId = userId;
+        const currentStaff = await User.findById(userId).select('name');
+        if (currentStaff) order.assignedWaiterName = currentStaff.name;
+      }
+    } else if (status === 'cancelled') {
+      if (cancelReason) {
+        order.cancelReason = String(cancelReason).trim();
+      }
+    }
+
+    await order.save();
+
+    const populated = await Order.findById(order._id)
+      .populate('tableId', 'label')
+      .populate('branchId', 'name')
+      .populate('assignedWaiterId', 'name phone');
+
+    // ── Realtime: broadcast to restaurant room, order room, table room, and waiter
     const io = req.app.get('io');
     if (io) {
-      io.to(`restaurant:${order.restaurantId}`).emit('order:updated', order);
-      io.to(`order:${order._id}`).emit('order:updated', order);
+      io.to(`restaurant:${order.restaurantId}`).emit('order:updated', populated);
+      io.to(`order:${order._id}`).emit('order:updated', populated);
       const targetTableId = order.tableId?._id || order.tableId;
       if (targetTableId) {
-        io.to(`table:${targetTableId}`).emit('order:updated', order);
+        io.to(`table:${targetTableId}`).emit('order:updated', populated);
+      }
+      if (status === 'ready') {
+        if (order.assignedWaiterId) {
+          io.to(`user:${order.assignedWaiterId}`).emit('order:readyForPickup', populated);
+        }
+        io.to(`restaurant:${order.restaurantId}:role:waiter`).emit('order:readyForPickup', populated);
       }
     }
 
@@ -493,7 +696,7 @@ const updateOrderStatus = async (req, res, next) => {
         .catch((err) => (req.log || console).error({ err }, 'Unable to evaluate table clear suggestion'));
     }
 
-    return res.json({ success: true, order });
+    return res.json({ success: true, order: populated });
   } catch (err) {
     return next(err);
   }
@@ -502,13 +705,21 @@ const updateOrderStatus = async (req, res, next) => {
 // ── PATCH /api/orders/:id/payment — protected, staff ─────────────────────────
 const updateOrderPayment = async (req, res, next) => {
   try {
+    const userRole = req.user?.role || 'owner';
+    if (userRole === 'kitchen') {
+      return res.status(403).json({
+        success: false,
+        message: 'Kitchen staff cannot process payments.',
+      });
+    }
+
     const { paymentMethod } = req.body;
-    const VALID_METHODS = ['cash', 'pos'];
+    const VALID_METHODS = ['cash', 'pos', 'telebirr', 'cbebirr', 'other'];
 
     if (!paymentMethod || !VALID_METHODS.includes(paymentMethod)) {
       return res.status(400).json({
         success: false,
-        message: 'paymentMethod must be "cash" or "pos".',
+        message: `paymentMethod must be one of: ${VALID_METHODS.join(', ')}.`,
       });
     }
 
@@ -518,7 +729,8 @@ const updateOrderPayment = async (req, res, next) => {
       { new: true }
     )
       .populate('tableId', 'label')
-      .populate('branchId', 'name');
+      .populate('branchId', 'name')
+      .populate('assignedWaiterId', 'name phone');
 
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found.' });
@@ -548,7 +760,8 @@ const updateOrderPayment = async (req, res, next) => {
           _id: { $in: siblingUnpaid.map((o) => o._id) },
         })
           .populate('tableId', 'label')
-          .populate('branchId', 'name');
+          .populate('branchId', 'name')
+          .populate('assignedWaiterId', 'name phone');
 
         if (io) {
           for (const sib of updatedSiblings) {
@@ -585,13 +798,21 @@ const updateOrderPayment = async (req, res, next) => {
 // Fulfillment status (placed, accepted, preparing, ready, served) stays as it is!
 const updateTablePayment = async (req, res, next) => {
   try {
+    const userRole = req.user?.role || 'owner';
+    if (userRole === 'kitchen') {
+      return res.status(403).json({
+        success: false,
+        message: 'Kitchen staff cannot process payments.',
+      });
+    }
+
     const { paymentMethod } = req.body;
-    const VALID_METHODS = ['cash', 'pos'];
+    const VALID_METHODS = ['cash', 'pos', 'telebirr', 'cbebirr', 'other'];
 
     if (!paymentMethod || !VALID_METHODS.includes(paymentMethod)) {
       return res.status(400).json({
         success: false,
-        message: 'paymentMethod must be "cash" or "pos".',
+        message: `paymentMethod must be one of: ${VALID_METHODS.join(', ')}.`,
       });
     }
 
@@ -627,7 +848,8 @@ const updateTablePayment = async (req, res, next) => {
       _id: { $in: unpaidOrders.map((o) => o._id) },
     })
       .populate('tableId', 'label')
-      .populate('branchId', 'name');
+      .populate('branchId', 'name')
+      .populate('assignedWaiterId', 'name phone');
 
     // ── Realtime: broadcast to restaurant room, table room, and order rooms ───
     const io = req.app.get('io');
@@ -659,6 +881,7 @@ module.exports = {
   getOrderStatus,
   getTableOrders,
   updateOrderStatus,
+  assignOrder,
   updateOrderPayment,
   updateTablePayment,
   submitOrderFeedback,
