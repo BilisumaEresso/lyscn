@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { WifiOff, Navigation, AlertTriangle, ShieldCheck, Compass, RefreshCw } from 'lucide-react';
 import api from '../lib/api';
 import { useSessionStore } from '../store/sessionStore';
+import { useCartStore } from '../store/cartStore';
 import { applyBrandColor } from '../lib/theme';
 import { saveVisitedRestaurant } from '../lib/visitedRestaurants';
 import LoadingIndicator from '../components/ui/LoadingIndicator';
@@ -187,15 +188,28 @@ export default function Resolve() {
 
       const destination = orderStillActive ? `/order/${myActiveOrderId}` : '/menu';
 
-      // Prefetch public products into React Query cache for zero-delay menu transition
-      if (data.restaurant?._id) {
-        queryClient.prefetchQuery({
-          queryKey: ['public-products', data.restaurant._id],
-          queryFn: () =>
-            api.get('/products/public', { params: { restaurantId: data.restaurant._id } }).then((r) => r.data),
-          staleTime: 60_000,
-        });
-      }
+      // ── Enforce Cart Lifecycle Rules ──────────────────────────────────────
+      // 1. Cross-restaurant isolation (cleared if restaurant changed)
+      // 2. Physical table change (cleared if different table/qrToken)
+      // 3. TTL expiry / fresh session (cleared if inactivity > 2h or bill was paid)
+      // 4. In-session continuity (preserved if same table within 2h)
+      useCartStore.getState().syncWithSession({
+        restaurantId: data.restaurant?._id,
+        branchId:     data.branch?._id,
+        tableId:      data.table?._id,
+        qrToken,
+        freshSession: !orderStillActive,
+      });
+
+      // Prefetch public products into React Query cache
+      const menuFetchPromise = data.restaurant?._id
+        ? queryClient.prefetchQuery({
+            queryKey: ['public-products', data.restaurant._id],
+            queryFn: () =>
+              api.get('/products/public', { params: { restaurantId: data.restaurant._id } }).then((r) => r.data),
+            staleTime: 60_000,
+          })
+        : Promise.resolve();
 
       setSession({
         qrToken,
@@ -206,10 +220,13 @@ export default function Resolve() {
         freshSession: !orderStillActive,
       });
 
+      let cancelled = false;
+
       const proceed = () => {
+        if (cancelled) return;
         setSplashPhase('ready');
         setTimeout(() => {
-          navigate(destination, { replace: true });
+          if (!cancelled) navigate(destination, { replace: true });
         }, 400);
       };
 
@@ -217,28 +234,45 @@ export default function Resolve() {
         Number.isFinite(data.branch?.location?.lat) && Number.isFinite(data.branch?.location?.lng);
       const isStrict = Boolean(data.branch?.locationStrictMode);
 
-      // Advance through splash story: Connected (Step 2) -> Loading Menu (Step 3) -> Ready (Step 4 & 5)
+      const handleReadyOrGps = () => {
+        if (hasConfiguredGps && data.table?.sessionLocationVerified !== true) {
+          if (isStrict) {
+            requestGeolocation(data.sessionToken, data.branch, proceed, null);
+          } else {
+            requestGeolocation(data.sessionToken, data.branch, proceed, proceed);
+          }
+        } else {
+          proceed();
+        }
+      };
+
+      // ── Step 2: Show Connection Confirmation ─────────────────────────────
       setSplashPhase('connected');
 
-      const timer1 = setTimeout(() => {
+      // ── Step 3: Wait until menu data is actually loaded in React Query ────
+      const timer1 = setTimeout(async () => {
+        if (cancelled) return;
         setSplashPhase('loading-menu');
 
-        const timer2 = setTimeout(() => {
-          if (hasConfiguredGps && data.table?.sessionLocationVerified !== true) {
-            if (isStrict) {
-              requestGeolocation(data.sessionToken, data.branch, proceed, null);
-            } else {
-              requestGeolocation(data.sessionToken, data.branch, proceed, proceed);
-            }
-          } else {
-            proceed();
+        // Minimum visual pacing so fast Wi-Fi doesn't flash Step 3 in 20ms
+        const minPacingDelay = new Promise((res) => setTimeout(res, 600));
+
+        try {
+          await Promise.all([menuFetchPromise, minPacingDelay]);
+          if (!cancelled) {
+            handleReadyOrGps();
           }
-        }, 700);
+        } catch {
+          if (!cancelled) {
+            setSplashPhase('error');
+          }
+        }
+      }, 500);
 
-        return () => clearTimeout(timer2);
-      }, 600);
-
-      return () => clearTimeout(timer1);
+      return () => {
+        cancelled = true;
+        clearTimeout(timer1);
+      };
     }
   }, [data, qrToken, setSession, navigate, queryClient]);
 

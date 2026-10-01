@@ -106,9 +106,15 @@ export default function KDS() {
   const preparingOrders = activeKdsOrders.filter((o) => o.status === 'preparing');
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
+    <div
+      className="min-h-screen bg-slate-950 text-slate-100 flex flex-col"
+      style={{ backgroundColor: '#020617', color: '#f1f5f9' }}
+    >
       {/* Top KDS Control Header */}
-      <header className="px-5 py-3 bg-slate-900 border-b border-slate-800 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-30 shadow-lg">
+      <header
+        className="px-5 py-3 bg-slate-900 border-b border-slate-800 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-30 shadow-lg"
+        style={{ backgroundColor: '#0f172a', borderColor: '#1e293b' }}
+      >
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30 shrink-0">
             <ChefHat size={22} />
@@ -226,6 +232,7 @@ export default function KDS() {
                       ? 'bg-slate-900/90 border-teal-500/50 ring-1 ring-teal-500/30'
                       : 'bg-slate-900 border-slate-800'
                   }`}
+                  style={{ backgroundColor: '#0f172a', borderColor: isPreparing ? 'rgba(20, 184, 166, 0.5)' : '#1e293b' }}
                 >
                   {/* Ticket Header */}
                   <div

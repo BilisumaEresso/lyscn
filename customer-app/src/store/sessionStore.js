@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
+import { useCartStore } from './cartStore';
 
 /**
  * Session store — holds the resolved table context (restaurant, branch, table).
@@ -62,14 +63,20 @@ export const useSessionStore = create(
 
       /**
        * Starts a fresh session on the current table (for a new meal/order visit).
-       * Clears past round history and generates a new sessionId.
+       * Clears past round history, resets customer cart, and generates a new sessionId.
        */
-      startFreshSession: () =>
-        set({
+      startFreshSession: () => {
+        try {
+          useCartStore.getState().clearCart();
+        } catch (e) {
+          console.warn('Failed to clear cart during startFreshSession:', e);
+        }
+        return set({
           sessionId:     uuidv4(),
           activeOrderId: null,
           orderHistory:  [],
-        }),
+        });
+      },
 
       /**
        * Dismisses/removes a specific order round from the customer's history.
@@ -89,8 +96,13 @@ export const useSessionStore = create(
 
       clearActiveOrder: () => set({ activeOrderId: null }),
 
-      clearSession: () =>
-        set({
+      clearSession: () => {
+        try {
+          useCartStore.getState().clearCart();
+        } catch (e) {
+          console.warn('Failed to clear cart during clearSession:', e);
+        }
+        return set({
           qrToken:          null,
           sessionId:        null,
           sessionToken:     null,
@@ -100,7 +112,8 @@ export const useSessionStore = create(
           activeOrderId:    null,
           orderHistory:     [],
           locationVerified: false,
-        }),
+        });
+      },
     }),
     { name: 'layoscan-session' }
   )

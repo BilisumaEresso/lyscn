@@ -692,17 +692,25 @@ function PopularCarousel({ products, onOpen }) {
 }
 
 // ── Floating Action Button: Go to Table Orders ────────────────────────────────
-function TableOrdersFAB({ tableOrders, onClick, hasCart }) {
+function TableOrdersFAB({ tableOrders, ongoingRounds, onClick, hasCart }) {
   if (!tableOrders || !tableOrders.rounds || tableOrders.rounds.length === 0) return null;
 
-  const roundCount = tableOrders.rounds.length;
-  const activeCount = tableOrders.summary?.activeCount ?? 0;
-  const latestRound = tableOrders.rounds[tableOrders.rounds.length - 1];
-  const totalAmount = tableOrders.summary?.totalAmount ?? 0;
-  const isAllServed = tableOrders.summary?.allServed;
-  const isReady = latestRound?.status === 'ready';
-  const isPreparing = latestRound?.status === 'preparing';
-  const isAccepted = latestRound?.status === 'accepted';
+  // Only show floating indicator if there are ongoing rounds (not yet served & paid)
+  const activeList = ongoingRounds ?? tableOrders.rounds.filter(
+    (r) => !(r.paymentStatus === 'paid' && r.status === 'served')
+  );
+  if (activeList.length === 0) return null;
+
+  const roundCount = activeList.length;
+  const latestRound = activeList[activeList.length - 1];
+  const unpaidTotal = activeList
+    .filter((r) => r.paymentStatus !== 'paid')
+    .reduce((sum, r) => sum + (r.totalAmount || 0), 0);
+  const totalAmount = unpaidTotal > 0 ? unpaidTotal : latestRound?.totalAmount || 0;
+  const isAllServed = activeList.every((r) => r.status === 'served');
+  const isReady = activeList.some((r) => r.status === 'ready');
+  const isPreparing = activeList.some((r) => r.status === 'preparing');
+  const isAccepted = activeList.some((r) => r.status === 'accepted');
 
   let statusText = isAllServed ? 'All Served' : latestRound?.status;
   if (isReady) statusText = 'Ready! Waiter delivering 🍽️';
@@ -756,7 +764,7 @@ function TableOrdersFAB({ tableOrders, onClick, hasCart }) {
           </div>
           <div className="text-left">
             <p className="font-display font-bold text-sm leading-tight flex items-center gap-1.5">
-              <span>{roundCount === 1 ? 'Round 1' : `Table Orders (${roundCount} Rounds)`}</span>
+              <span>{roundCount === 1 ? (latestRound?.roundNumber ? `Round ${latestRound.roundNumber}` : 'Round 1') : `Active Orders (${roundCount} Rounds)`}</span>
               <span
                 className={clsx(
                   'text-[11px] font-medium',
@@ -885,25 +893,40 @@ export default function Menu() {
   });
 
   // Query table orders for active rounds & floating action button
+  const hasActiveOrderOrHistory = Boolean(
+    session.activeOrderId || (session.orderHistory && session.orderHistory.length > 0)
+  );
+
   const { data: tableOrders } = useQuery({
-    queryKey: ['table-orders', session.sessionToken],
+    queryKey: ['table-orders', session.sessionToken, session.sessionId],
     queryFn: () =>
       api.get('/orders/public/table/orders', {
-        params: { sessionToken: session.sessionToken },
+        params: {
+          sessionToken: session.sessionToken,
+          sessionId: session.sessionId,
+          orderIds: session.orderHistory?.join(','),
+        },
       }).then((r) => r.data),
-    enabled: !!session.sessionToken,
+    enabled: Boolean(session.sessionToken && hasActiveOrderOrHistory),
     refetchInterval: 8_000,
   });
 
+  const ongoingRounds = useMemo(() => {
+    if (!hasActiveOrderOrHistory || !tableOrders?.rounds) return [];
+    return tableOrders.rounds.filter(
+      (r) => !(r.paymentStatus === 'paid' && r.status === 'served')
+    );
+  }, [hasActiveOrderOrHistory, tableOrders]);
+
   const hasCart = itemCount > 0;
-  const hasTableOrders = Boolean(tableOrders?.rounds?.length);
+  const hasOngoingOrders = ongoingRounds.length > 0;
 
   const bottomScrollPadding = useMemo(() => {
-    if (hasCart && hasTableOrders) return '220px';
+    if (hasCart && hasOngoingOrders) return '220px';
     if (hasCart) return '125px';
-    if (hasTableOrders) return '105px';
+    if (hasOngoingOrders) return '105px';
     return '40px';
-  }, [hasCart, hasTableOrders]);
+  }, [hasCart, hasOngoingOrders]);
 
   const products = data?.products ?? [];
 
@@ -1218,10 +1241,11 @@ export default function Menu() {
       {/* ── Floating Action Button: Go to Table Orders ────────────────── */}
       <TableOrdersFAB
         tableOrders={tableOrders}
+        ongoingRounds={ongoingRounds}
         hasCart={itemCount > 0}
         onClick={() => {
-          const latest = tableOrders?.rounds?.[tableOrders.rounds.length - 1];
-          navigate(latest ? `/order/${latest.id}` : '/orders');
+          const target = ongoingRounds[ongoingRounds.length - 1] || tableOrders?.rounds?.[tableOrders.rounds.length - 1];
+          navigate(target ? `/order/${target.id}` : '/orders');
         }}
       />
 

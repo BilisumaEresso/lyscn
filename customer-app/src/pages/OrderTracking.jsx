@@ -23,6 +23,7 @@ import api from '../lib/api';
 import socket from '../lib/socket';
 import { applyBrandColor } from '../lib/theme';
 import { useSessionStore } from '../store/sessionStore';
+import { useCartStore } from '../store/cartStore';
 import { useCustomerNotificationStore } from '../store/customerNotificationStore';
 import AssistanceButton from '../components/AssistanceButton';
 import PermissionsPrompt from '../components/PermissionsPrompt';
@@ -119,6 +120,25 @@ export default function OrderTracking() {
   const [logoImgError, setLogoImgError] = useState(false);
 
   const { soundEnabled, setSoundEnabled } = useCustomerNotificationStore();
+
+  const handleStartFreshOrder = () => {
+    // 1. Immediately empty the cart so fresh order starts with a clean slate
+    try {
+      useCartStore.getState().clearCart();
+    } catch (e) {
+      console.warn('Failed to clear cart:', e);
+    }
+
+    // 2. Clear session active order & history and generate a new sessionId
+    session.startFreshSession();
+
+    // 3. Purge React Query caches for table orders and active order
+    qc.removeQueries({ queryKey: ['table-orders'] });
+    qc.removeQueries({ queryKey: ['active-order'] });
+
+    toast.success('Session reset! You can now place a brand new order.');
+    navigate('/menu');
+  };
 
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
@@ -691,11 +711,7 @@ export default function OrderTracking() {
             All rounds have been served and paid for. Finished rounds have been cleared from your active table tracker. Ready to start a brand new order at this table?
           </p>
           <button
-            onClick={() => {
-              session.startFreshSession();
-              toast.success('Session reset! You can now place a brand new order.');
-              navigate('/menu');
-            }}
+            onClick={handleStartFreshOrder}
             className="w-full py-3.5 px-5 rounded-2xl font-display font-bold text-sm text-white shadow-md active:scale-95 transition-all flex items-center justify-center gap-2"
             style={{ background: 'var(--color-primary)' }}
           >
@@ -818,11 +834,7 @@ export default function OrderTracking() {
 
         <button
           type="button"
-          onClick={() => {
-            session.startFreshSession();
-            toast.success('Session reset for a fresh order');
-            navigate('/menu');
-          }}
+          onClick={handleStartFreshOrder}
           className="w-full py-2 text-xs font-semibold text-ink-muted hover:text-ink transition-colors flex items-center justify-center gap-1.5 pt-1"
         >
           <RotateCcw size={13} />

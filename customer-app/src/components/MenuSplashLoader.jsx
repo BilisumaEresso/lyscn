@@ -205,12 +205,9 @@ export default function MenuSplashLoader({
 
       {/* ── TOP HEADER / BRAND BAR ────────────────────────────────────────── */}
       <header className="w-full pt-10 px-6 flex items-center justify-between z-20">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full animate-ping" style={{ backgroundColor: theme.accentGradient[0] }} />
-          <span className="text-[11px] font-mono tracking-widest uppercase text-white/50">
-            LayoScan Dining
-          </span>
-        </div>
+        <span className="text-[11px] font-mono tracking-widest uppercase text-white/50">
+          LayoScan Dining
+        </span>
         <span className="text-[11px] font-medium text-white/40">
           {tableLabel}
         </span>

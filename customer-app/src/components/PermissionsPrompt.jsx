@@ -98,7 +98,7 @@ export default function PermissionsPrompt({ variant = 'tracking' }) {
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 mb-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500 text-white">
+            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
               Action Required
             </span>
             <span className="text-xs font-bold text-amber-900">Food Ready Alerts</span>
