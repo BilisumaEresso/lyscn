@@ -98,8 +98,8 @@ export async function renderCafeArtisanPortrait(ctx, {
   ctx.fillText(tagline, width / 2, 292, width - 220);
   ctx.restore();
 
-  // 5. QR Code Card Container (balanced 510px size gives vertical air)
-  const qrBoxSize = 510;
+  // 5. QR Code Card Container (reduced to 440px for better proportions)
+  const qrBoxSize = 440;
   const qrBoxX = width / 2 - qrBoxSize / 2;
   const qrBoxY = 345;
   const qrBoxRadius = 32;
@@ -130,7 +130,7 @@ export async function renderCafeArtisanPortrait(ctx, {
   // 6. Table Pill Badge (clean separation below QR box)
   const pillW = 360;
   const pillH = 64;
-  const pillY = qrBoxY + qrBoxSize + 40; // ~895
+  const pillY = qrBoxY + qrBoxSize + 60; // ~845
   drawPillBadge(ctx, {
     x: width / 2 - pillW / 2,
     y: pillY,
@@ -153,8 +153,8 @@ export async function renderCafeArtisanPortrait(ctx, {
     borderWidth: 1.8,
     textColor: brandDark,
     labelColor: textMuted,
-    width: 460,
-    height: 50,
+    width: 420,
+    height: 42,
     radius: 14,
     shadow: true,
   });
@@ -179,7 +179,7 @@ export async function renderCafeArtisanPortrait(ctx, {
   ctx.textBaseline = 'middle';
   ctx.fillStyle = brandDark;
   ctx.font = 'italic 700 44px "Caveat", "Brush Script MT", Georgia, cursive, serif';
-  ctx.fillText('Good Food, Good Vibes', width / 2, scriptY);
+  ctx.fillText(restaurant?.slogan || 'Good Food, Good Vibes', width / 2, scriptY);
   ctx.restore();
 
   // 10. Bottom Hero Coffee Art Visual & Sweeping Green Wave
@@ -328,25 +328,9 @@ export async function renderCafeArtisanLandscape(ctx, {
     font: '700 36px "Playfair Display", Georgia, serif',
   });
 
-  // Prominent Table CODE Capsule Badge on Left (Under Table 1 Badge)
-  const codeY = pillY + pillH + 30; // ~396
-  drawThemedCodeBadge(ctx, {
-    cx: leftCenterX,
-    cy: codeY,
-    code: tableCodeFormatted,
-    bgColor: '#FFFFFF',
-    borderColor: 'rgba(27, 56, 43, 0.35)',
-    borderWidth: 1.8,
-    textColor: brandDark,
-    labelColor: textMuted,
-    width: 440,
-    height: 48,
-    radius: 14,
-    shadow: true,
-  });
 
-  // 3-Step Flow Nodes (generous spacing below code badge)
-  const stepsY = codeY + 68; // ~464
+  // 3-Step Flow Nodes (generous spacing below pill badge)
+  const stepsY = pillY + pillH + 40; // below pill badge
   drawStepFlowNodes(ctx, {
     cx: leftCenterX,
     cy: stepsY,
@@ -405,19 +389,8 @@ export async function renderCafeArtisanLandscape(ctx, {
     ctx.restore();
   }
 
-  // Left Footer
-  await drawLayoScanFooter(ctx, {
-    cx: 320,
-    cy: height - 55,
-    badgeW: 360,
-    badgeH: 52,
-    templateId: 'cafe_artisan',
-    theme: 'light',
-    accentColor: brandDark,
-  });
-
   // 4. Right Section: Large QR Code Presentation (x: 980 -> 1800)
-  const rightCenterX = 1380;
+  const rightCenterX = 1390;
   const qrBoxSize = 560;
   const qrBoxX = rightCenterX - qrBoxSize / 2;
   const qrBoxY = 110;
@@ -450,7 +423,7 @@ export async function renderCafeArtisanLandscape(ctx, {
   ctx.textBaseline = 'middle';
   ctx.fillStyle = brandDark;
   ctx.font = '700 22px "Space Grotesk", Inter, sans-serif';
-  ctx.fillText('POINT CAMERA TO SCAN OR ORDER', rightCenterX, qrBoxY + qrBoxSize + 36);
+  ctx.fillText('Point your camera here to order', rightCenterX, qrBoxY + qrBoxSize + 36);
   ctx.restore();
 
   // Under QR: Prominent Manual Table Code Box
@@ -667,9 +640,9 @@ export async function renderCafeArtisanMenuBoard(ctx, {
     priceColor: brandDark,
     tagBg: 'rgba(27, 56, 43, 0.08)',
     tagText: brandDark,
-    headerFont: '700 38px "Playfair Display", Georgia, serif',
-    itemFont: '700 30px "Playfair Display", Georgia, serif',
-    priceFont: '800 30px "Space Grotesk", monospace',
+    headerFont: '700 54px "Playfair Display", Georgia, serif',
+    itemFont: '700 32px "Playfair Display", Georgia, serif',
+    priceFont: '800 32px "Space Grotesk", monospace',
     priceStyle: 'dots',
     dividerColor: brandDark,
   });

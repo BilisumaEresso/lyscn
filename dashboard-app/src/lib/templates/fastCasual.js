@@ -394,8 +394,8 @@ export async function renderFastCasualPortrait(ctx, {
   ctx.fillText(tagline, width / 2, 292, width - 220);
   ctx.restore();
 
-  // 6. QR Code Card Container (balanced 510px size gives vertical air)
-  const qrBoxSize = 510;
+  // 6. QR Code Card Container (reduced to 440px for better proportions)
+  const qrBoxSize = 440;
   const qrBoxX = width / 2 - qrBoxSize / 2;
   const qrBoxY = 345;
   const qrBoxRadius = 32;
@@ -426,7 +426,7 @@ export async function renderFastCasualPortrait(ctx, {
   // 7. Table Pill Badge: Radiant Golden Amber
   const pillW = 360;
   const pillH = 64;
-  const pillY = qrBoxY + qrBoxSize + 40; // ~895
+  const pillY = qrBoxY + qrBoxSize + 60; // ~845
   drawPillBadge(ctx, {
     x: width / 2 - pillW / 2,
     y: pillY,
@@ -449,8 +449,8 @@ export async function renderFastCasualPortrait(ctx, {
     borderWidth: 2.4,
     textColor: '#141416',
     labelColor: '#4B5563',
-    width: 460,
-    height: 52,
+    width: 420,
+    height: 42,
     radius: 14,
     shadow: true,
     shadowColor: 'rgba(255, 168, 0, 0.4)',
@@ -592,26 +592,9 @@ export async function renderFastCasualLandscape(ctx, {
     font: '800 36px "Space Grotesk", Montserrat, sans-serif',
   });
 
-  // Prominent Table CODE Capsule Badge on Left (Under Table 1 Badge - high-contrast white card!)
-  const codeY = pillY + pillH + 30; // ~396
-  drawThemedCodeBadge(ctx, {
-    cx: leftCenterX,
-    cy: codeY,
-    code: tableCodeFormatted,
-    bgColor: '#FFFFFF',
-    borderColor: yellow,
-    borderWidth: 2.4,
-    textColor: '#141416',
-    labelColor: '#4B5563',
-    width: 440,
-    height: 48,
-    radius: 14,
-    shadow: true,
-    shadowColor: 'rgba(255, 168, 0, 0.4)',
-  });
 
-  // 3-Step Flow Nodes (generous spacing below code badge)
-  const stepsY = codeY + 68; // ~464
+  // 3-Step Flow Nodes (generous spacing below pill badge)
+  const stepsY = pillY + pillH + 40; // below pill badge
   drawFastCasualStepFlow(ctx, {
     cx: leftCenterX,
     cy: stepsY,
@@ -656,23 +639,8 @@ export async function renderFastCasualLandscape(ctx, {
     ctx.restore();
   }
 
-  // Left Footer (High-contrast solid dark pill on yellow ribbon wave)
-  await drawLayoScanFooter(ctx, {
-    cx: 320,
-    cy: height - 55,
-    badgeW: 360,
-    badgeH: 52,
-    templateId: 'fast_casual',
-    theme: 'solid-dark',
-    bgColor: '#141416',
-    borderColor: 'rgba(255, 168, 0, 0.65)',
-    textColor: '#FFFFFF',
-    accentColor: yellow,
-    shadowColor: 'rgba(0, 0, 0, 0.4)',
-  });
-
   // 5. Right Section: Large QR Code Presentation (x: 980 -> 1800)
-  const rightCenterX = 1380;
+  const rightCenterX = 1390;
   const qrBoxSize = 560;
   const qrBoxX = rightCenterX - qrBoxSize / 2;
   const qrBoxY = 110;
@@ -705,7 +673,7 @@ export async function renderFastCasualLandscape(ctx, {
   ctx.textBaseline = 'middle';
   ctx.fillStyle = yellow;
   ctx.font = '700 22px "Space Grotesk", Inter, sans-serif';
-  ctx.fillText('POINT CAMERA TO SCAN OR ORDER', rightCenterX, qrBoxY + qrBoxSize + 36);
+  ctx.fillText('Point your camera here to order', rightCenterX, qrBoxY + qrBoxSize + 36);
   ctx.restore();
 
   // Under QR: Prominent Manual Table Code Box (High-Contrast White Card with Amber Border & Dark Monospace Text)
@@ -930,9 +898,9 @@ export async function renderFastCasualMenuBoard(ctx, {
     priceColor: yellow,
     tagBg: 'rgba(255, 75, 38, 0.22)',
     tagText: '#FFA800',
-    headerFont: '800 38px "Space Grotesk", sans-serif',
-    itemFont: '700 30px "Space Grotesk", sans-serif',
-    priceFont: '800 30px "Space Grotesk", monospace',
+    headerFont: '800 54px "Space Grotesk", sans-serif',
+    itemFont: '700 32px "Space Grotesk", sans-serif',
+    priceFont: '800 32px "Space Grotesk", monospace',
     priceStyle: 'pill',
     dividerColor: yellow,
   });

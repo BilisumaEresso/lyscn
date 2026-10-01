@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { WifiOff, Navigation, AlertTriangle, ShieldCheck, Compass, RefreshCw } from 'lucide-react';
 import api from '../lib/api';
 import { useSessionStore } from '../store/sessionStore';
 import { applyBrandColor } from '../lib/theme';
 import { saveVisitedRestaurant } from '../lib/visitedRestaurants';
 import LoadingIndicator from '../components/ui/LoadingIndicator';
+import MenuSplashLoader from '../components/MenuSplashLoader';
 import logo from '../assets/logo.png';
 import cafeLogoPlaceholder from '../assets/cafe_logo_placeholder.png';
 import toast from 'react-hot-toast';
@@ -19,6 +20,7 @@ import toast from 'react-hot-toast';
 export default function Resolve() {
   const { qrToken } = useParams();
   const navigate    = useNavigate();
+  const queryClient = useQueryClient();
   const setSession          = useSessionStore((s) => s.setSession);
   const setLocationVerified = useSessionStore((s) => s.setLocationVerified);
 
@@ -29,6 +31,7 @@ export default function Resolve() {
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [isVerifyingLoc, setIsVerifyingLoc]   = useState(false);
   const [confirmMigrate, setConfirmMigrate]   = useState(false);
+  const [splashPhase, setSplashPhase]         = useState('scanning'); // 'scanning' | 'connected' | 'loading-menu' | 'ready'
 
   const existing = useSessionStore.getState();
 
@@ -184,6 +187,16 @@ export default function Resolve() {
 
       const destination = orderStillActive ? `/order/${myActiveOrderId}` : '/menu';
 
+      // Prefetch public products into React Query cache for zero-delay menu transition
+      if (data.restaurant?._id) {
+        queryClient.prefetchQuery({
+          queryKey: ['public-products', data.restaurant._id],
+          queryFn: () =>
+            api.get('/products/public', { params: { restaurantId: data.restaurant._id } }).then((r) => r.data),
+          staleTime: 60_000,
+        });
+      }
+
       setSession({
         qrToken,
         restaurant:   data.restaurant,
@@ -194,26 +207,40 @@ export default function Resolve() {
       });
 
       const proceed = () => {
-        navigate(destination, { replace: true });
+        setSplashPhase('ready');
+        setTimeout(() => {
+          navigate(destination, { replace: true });
+        }, 400);
       };
 
       const hasConfiguredGps =
         Number.isFinite(data.branch?.location?.lat) && Number.isFinite(data.branch?.location?.lng);
       const isStrict = Boolean(data.branch?.locationStrictMode);
 
-      if (hasConfiguredGps && data.table?.sessionLocationVerified !== true) {
-        if (isStrict) {
-          // Strict mode: location must be verified before proceeding
-          requestGeolocation(data.sessionToken, data.branch, proceed, null);
-        } else {
-          // Non-strict mode: try to verify, but allow bypass to menu
-          requestGeolocation(data.sessionToken, data.branch, proceed, proceed);
-        }
-      } else {
-        proceed();
-      }
+      // Advance through splash story: Connected (Step 2) -> Loading Menu (Step 3) -> Ready (Step 4 & 5)
+      setSplashPhase('connected');
+
+      const timer1 = setTimeout(() => {
+        setSplashPhase('loading-menu');
+
+        const timer2 = setTimeout(() => {
+          if (hasConfiguredGps && data.table?.sessionLocationVerified !== true) {
+            if (isStrict) {
+              requestGeolocation(data.sessionToken, data.branch, proceed, null);
+            } else {
+              requestGeolocation(data.sessionToken, data.branch, proceed, proceed);
+            }
+          } else {
+            proceed();
+          }
+        }, 700);
+
+        return () => clearTimeout(timer2);
+      }, 600);
+
+      return () => clearTimeout(timer1);
     }
-  }, [data, qrToken, setSession, navigate]);
+  }, [data, qrToken, setSession, navigate, queryClient]);
 
   /* ── 1. Explicit Offline Notification Screen ─────────────────────── */
   if (isOffline) {
@@ -407,28 +434,21 @@ export default function Resolve() {
 
   if (isError) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-8 text-center bg-paper">
-        <div className="w-16 h-16 rounded-2xl gradient-brand flex items-center justify-center mb-6 shadow-lg overflow-hidden">
-          <img src={logo} alt="LayoScan" className="w-16 h-16 object-cover" loading="eager" />
-        </div>
-        <h1 className="font-display font-bold text-2xl text-ink mb-3">
-          Table not available
-        </h1>
-        <p className="text-ink-muted text-base max-w-xs leading-relaxed">
-          This table isn't available right now — ask a staff member for help.
-        </p>
-      </div>
+      <MenuSplashLoader
+        phase="error"
+        errorMessage="This table isn't available right now — please ask a staff member or try scanning again."
+        onRetry={refetch}
+      />
     );
   }
 
   /* ── 4. Loading / Resolving State ────────────────────────────────── */
   return (
-    <LoadingIndicator
-      variant="full"
-      size="xl"
-      backdrop="light"
-      text="Setting up your table…"
-      description="Connecting to LayoScan digital menu"
+    <MenuSplashLoader
+      phase={splashPhase}
+      restaurant={data?.restaurant}
+      table={data?.table}
+      onRetry={refetch}
     />
   );
 }

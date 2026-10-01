@@ -838,8 +838,8 @@ export async function renderCulturalHeritagePortrait(ctx, {
   ctx.fillText(tagline, width / 2, 292, width - 220);
   ctx.restore();
 
-  // 5. QR Code Card Container (balanced 510px size gives vertical air)
-  const qrBoxSize = 510;
+  // 5. QR Code Card Container (reduced to 440px for better proportions)
+  const qrBoxSize = 440;
   const qrBoxX = width / 2 - qrBoxSize / 2;
   const qrBoxY = 350;
   const qrBoxRadius = 32;
@@ -885,7 +885,7 @@ export async function renderCulturalHeritagePortrait(ctx, {
   // 6. Table Pill Badge: Royal Ethiopian Burgundy with Gold Accent Rule
   const pillW = 360;
   const pillH = 64;
-  const pillY = qrBoxY + qrBoxSize + 40; // ~900
+  const pillY = qrBoxY + qrBoxSize + 60; // ~860
   drawPillBadge(ctx, {
     x: width / 2 - pillW / 2,
     y: pillY,
@@ -910,8 +910,8 @@ export async function renderCulturalHeritagePortrait(ctx, {
     borderWidth: 2.4,
     textColor: ETH_BURGUNDY,
     labelColor: ETH_UMBER,
-    width: 460,
-    height: 52,
+    width: 420,
+    height: 42,
     radius: 14,
     shadow: true,
     shadowColor: 'rgba(120, 24, 18, 0.25)',
@@ -1391,9 +1391,9 @@ export async function renderCulturalHeritageMenuBoard(ctx, {
     priceColor: ETH_BURGUNDY,
     tagBg: 'rgba(120, 24, 18, 0.08)',
     tagText: ETH_BURGUNDY,
-    headerFont: '700 38px "Playfair Display", Georgia, serif',
-    itemFont: '700 30px "Playfair Display", Georgia, serif',
-    priceFont: '800 30px "Space Grotesk", monospace',
+    headerFont: '700 54px "Playfair Display", Georgia, serif',
+    itemFont: '700 32px "Playfair Display", Georgia, serif',
+    priceFont: '800 32px "Space Grotesk", monospace',
     priceStyle: 'dots',
     dividerColor: ETH_GOLD,
   });

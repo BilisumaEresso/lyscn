@@ -341,13 +341,17 @@ export function drawCartIcon(ctx, cx, cy, size, color) {
  * 3-Step Instruction Flow Node Row
  * Renders: (Phone) Scan  >  (Menu) View Menu  >  (Order) Order
  */
+/**
+ * 3-Step Instruction Flow Node Row — Numbered Filled Circles
+ * Renders: ①Scan  ②View Menu  ③Order (dashed connector line between circles)
+ */
 export function drawStepFlowNodes(ctx, {
   cx,
   cy,
   color = '#1B382B',
   textColor = '#4F5D55',
-  circleRadius = 28,
-  spacing = 210,
+  circleRadius = 34,
+  spacing = 220,
   orderIconType = 'cloche',
   labels = ['Scan', 'View Menu', 'Order'],
 }) {
@@ -355,57 +359,71 @@ export function drawStepFlowNodes(ctx, {
   const startX = cx - ((nodeCount - 1) * spacing) / 2;
 
   const icons = [
-    (x, y) => drawPhoneIcon(ctx, x, y, circleRadius * 1.05, color),
-    (x, y) => drawMenuIcon(ctx, x, y, circleRadius * 1.05, color),
+    (x, y) => drawPhoneIcon(ctx, x, y, circleRadius * 0.75, '#FFFFFF'),
+    (x, y) => drawMenuIcon(ctx, x, y, circleRadius * 0.75, '#FFFFFF'),
     (x, y) => {
       if (orderIconType === 'cart') {
-        drawCartIcon(ctx, x, y, circleRadius * 1.05, color);
+        drawCartIcon(ctx, x, y, circleRadius * 0.75, '#FFFFFF');
       } else {
-        drawClocheIcon(ctx, x, y, circleRadius * 1.05, color);
+        drawClocheIcon(ctx, x, y, circleRadius * 0.75, '#FFFFFF');
       }
     },
   ];
+
+  // Draw dashed connector line between first and last node centers
+  ctx.save();
+  ctx.setLineDash([6, 8]);
+  ctx.beginPath();
+  ctx.moveTo(startX + circleRadius, cy);
+  ctx.lineTo(startX + (nodeCount - 1) * spacing - circleRadius, cy);
+  ctx.lineWidth = 2.2;
+  ctx.strokeStyle = typeof color === 'string' && color.startsWith('rgba') ? color : `${color}80`;
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
 
   for (let i = 0; i < nodeCount; i++) {
     const nx = startX + i * spacing;
     const ny = cy;
 
-    // Outer Circle
+    // Filled Circle
     ctx.save();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2.4;
     ctx.beginPath();
     ctx.arc(nx, ny, circleRadius, 0, Math.PI * 2);
-    ctx.stroke();
+    ctx.fillStyle = color;
+    ctx.shadowColor = 'rgba(0,0,0,0.18)';
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetY = 4;
+    ctx.fill();
     ctx.restore();
 
-    // Draw the icon
+    // Icon inside
     icons[i](nx, ny);
 
-    // Label below
+    // Step number (top-right corner dot)
+    ctx.save();
+    const dotR = circleRadius * 0.33;
+    const dotX = nx + circleRadius * 0.68;
+    const dotY = ny - circleRadius * 0.68;
+    ctx.beginPath();
+    ctx.arc(dotX, dotY, dotR, 0, Math.PI * 2);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fill();
+    ctx.fillStyle = color;
+    ctx.font = `800 ${Math.round(dotR * 1.4)}px "Space Grotesk", Inter, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(i + 1), dotX, dotY + 1);
+    ctx.restore();
+
+    // Label below circle
     ctx.save();
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     ctx.fillStyle = textColor;
-    ctx.font = '700 22px "Space Grotesk", Inter, sans-serif';
-    ctx.fillText(labels[i], nx, ny + circleRadius + 12);
+    ctx.font = `700 22px "Space Grotesk", Inter, sans-serif`;
+    ctx.fillText(labels[i], nx, ny + circleRadius + 14);
     ctx.restore();
-
-    // Draw connecting arrow '>' between circles
-    if (i < nodeCount - 1) {
-      const arrowX = nx + spacing / 2;
-      ctx.save();
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 2.6;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.beginPath();
-      ctx.moveTo(arrowX - 7, ny - 9);
-      ctx.lineTo(arrowX + 4, ny);
-      ctx.lineTo(arrowX - 7, ny + 9);
-      ctx.stroke();
-      ctx.restore();
-    }
   }
 }
 
@@ -1185,7 +1203,7 @@ export function drawMenuBridgeBar(ctx, {
     ctx.textBaseline = 'middle';
     ctx.fillStyle = subtitleColor || (theme === 'dark' || theme === 'solid-dark' ? '#94A3B8' : '#5A626A');
     ctx.font = '700 15px "Space Grotesk", sans-serif';
-    ctx.fillText('TABLE CODE FOR MANUAL ORDERING:', rightX + rightBoxW / 2, codeY + 28);
+    ctx.fillText('MANUAL ENTRY CODE:', rightX + rightBoxW / 2, codeY + 28);
 
     ctx.fillStyle = accentColor;
     ctx.font = '800 28px "Space Grotesk", monospace';
@@ -1205,17 +1223,26 @@ export function drawMenuBridgeBar(ctx, {
   // Primary Callout Title
   ctx.font = '700 32px "Space Grotesk", Inter, sans-serif';
   ctx.fillStyle = resolvedTitle;
-  ctx.fillText('📱 Scan QR to View Full Menu & Order', textX, y + 68);
+  ctx.fillText('Scan QR to View Full Menu & Order', textX, y + 68);
 
-  // Digital Web Address
+  // Digital Web Address with underline decoration
   ctx.font = '700 24px "Space Grotesk", monospace';
   ctx.fillStyle = accentColor;
   ctx.fillText('layoscancustomer.vercel.app', textX, y + 128);
+  const urlWidth = ctx.measureText('layoscancustomer.vercel.app').width;
+  ctx.beginPath();
+  ctx.moveTo(textX, y + 140);
+  ctx.lineTo(textX + urlWidth, y + 140);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = accentColor;
+  ctx.globalAlpha = 0.55;
+  ctx.stroke();
+  ctx.globalAlpha = 1.0;
 
-  // Subtitle Explanation
+  // Subtitle Explanation (shorter)
   ctx.font = '500 21px Inter, sans-serif';
   ctx.fillStyle = resolvedSub;
-  ctx.fillText('Browse full interactive menu, customize dishes & pay from your phone', textX, y + 184);
+  ctx.fillText('Browse the full menu & pay from your phone', textX, y + 184);
 
   ctx.restore();
   ctx.restore();
@@ -1241,9 +1268,9 @@ export function drawDynamicMenuGrid(ctx, {
   priceColor = null,
   tagBg = null,
   tagText = null,
-  headerFont = '700 38px "Playfair Display", Georgia, serif',
-  itemFont = '700 30px "Playfair Display", Georgia, serif',
-  priceFont = '800 30px "Space Grotesk", monospace',
+  headerFont = '700 54px "Playfair Display", Georgia, serif',
+  itemFont = '700 32px "Playfair Display", Georgia, serif',
+  priceFont = '800 32px "Space Grotesk", monospace',
   priceStyle = 'dots', // 'dots' | 'pill' | 'discreet'
   showDivider = true,
   dividerColor = null,
@@ -1293,7 +1320,7 @@ export function drawDynamicMenuGrid(ctx, {
     const totalCategories = colCats.length;
     const totalItems = colCats.reduce((sum, c) => sum + (c.items?.length || 0), 0);
 
-    const headerBudget = totalCategories * 76; // Title + divider
+    const headerBudget = totalCategories * 96; // Title + divider
     const remainingForItems = availH - headerBudget - Math.max(0, totalCategories - 1) * 70;
     const computedRowH = totalItems > 0 ? remainingForItems / totalItems : 70;
     const rowHeight = Math.min(84, Math.max(54, computedRowH));
@@ -1316,8 +1343,8 @@ export function drawDynamicMenuGrid(ctx, {
       ctx.font = headerFont;
       ctx.fillStyle = resolvedTitle;
       const headerText = cat.icon ? `${cat.icon}  ${cat.name}` : cat.name;
-      ctx.fillText(headerText, colX, currentY + 22);
-      currentY += 46;
+      ctx.fillText(headerText, colX, currentY + 28);
+      currentY += 62;
 
       // Divider Line
       if (showDivider) {
@@ -1327,7 +1354,7 @@ export function drawDynamicMenuGrid(ctx, {
         ctx.lineWidth = 2.5;
         ctx.strokeStyle = dividerColor || accentColor;
         ctx.stroke();
-        currentY += 28;
+        currentY += 36;
       } else {
         currentY += 16;
       }
@@ -1570,3 +1597,58 @@ export function drawMenuCategorySection(ctx, {
   return currentY;
 }
 
+
+/**
+ * Bottom Brand Block for Menu Board - fills dead whitespace at the bottom
+ * with a decorated branded zone (tinted band + tagline + dot accents).
+ * Call this AFTER drawDynamicMenuGrid and BEFORE drawLayoScanFooter.
+ */
+export function drawMenuBoardBottomBrand(ctx, {
+  x = 140,
+  y = 3170,
+  width = 2120,
+  height = 90,
+  accentColor = '#1B382B',
+  theme = 'light',
+  tagline = '',
+}) {
+  if (!tagline) return;
+  ctx.save();
+
+  // Subtle tinted band
+  ctx.beginPath();
+  ctx.roundRect(x, y, width, height, 28);
+  ctx.fillStyle = (theme === 'dark' || theme === 'solid-dark')
+    ? 'rgba(255,255,255,0.05)'
+    : 'rgba(0,0,0,0.04)';
+  ctx.fill();
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = accentColor;
+  ctx.globalAlpha = 0.15;
+  ctx.stroke();
+  ctx.globalAlpha = 1.0;
+
+  // Decorative dot groups left & right
+  const dotY = y + height / 2;
+  [0, 1, 2].forEach((d) => {
+    ctx.beginPath();
+    ctx.arc(x + 50 + d * 20, dotY, 4, 0, Math.PI * 2);
+    ctx.arc(x + width - 50 - d * 20, dotY, 4, 0, Math.PI * 2);
+    ctx.fillStyle = accentColor;
+    ctx.globalAlpha = 0.12 + d * 0.08;
+    ctx.fill();
+  });
+  ctx.globalAlpha = 1.0;
+
+  // Tagline centered
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = accentColor;
+  const fontSize = Math.round(height * 0.38);
+  ctx.font = `italic 600 ${fontSize}px "Playfair Display", "Caveat", Georgia, cursive, serif`;
+  ctx.globalAlpha = 0.55;
+  ctx.fillText(tagline, x + width / 2, y + height / 2);
+  ctx.globalAlpha = 1.0;
+
+  ctx.restore();
+}

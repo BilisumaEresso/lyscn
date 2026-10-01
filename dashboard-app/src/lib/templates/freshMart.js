@@ -141,8 +141,8 @@ export async function renderFreshMartPortrait(ctx, {
   ctx.fillText(tagline, width / 2, 292, width - 220);
   ctx.restore();
 
-  // 5. QR Code Card Container (balanced 510px size gives vertical air)
-  const qrBoxSize = 510;
+  // 5. QR Code Card Container (reduced to 440px for better proportions)
+  const qrBoxSize = 440;
   const qrBoxX = width / 2 - qrBoxSize / 2;
   const qrBoxY = 345;
   const qrBoxRadius = 32;
@@ -173,7 +173,7 @@ export async function renderFreshMartPortrait(ctx, {
   // 6. Table Pill Badge: Soft Pistachio Mint Green
   const pillW = 360;
   const pillH = 64;
-  const pillY = qrBoxY + qrBoxSize + 40; // ~895
+  const pillY = qrBoxY + qrBoxSize + 60; // ~845
   drawPillBadge(ctx, {
     x: width / 2 - pillW / 2,
     y: pillY,
@@ -196,8 +196,8 @@ export async function renderFreshMartPortrait(ctx, {
     borderWidth: 1.8,
     textColor: mintAccent,
     labelColor: textMuted,
-    width: 460,
-    height: 50,
+    width: 420,
+    height: 42,
     radius: 14,
     shadow: true,
     shadowColor: 'rgba(134, 239, 172, 0.25)',
@@ -673,9 +673,9 @@ export async function renderFreshMartMenuBoard(ctx, {
     priceColor: mintAccent,
     tagBg: 'rgba(134, 239, 172, 0.16)',
     tagText: mintAccent,
-    headerFont: '700 38px "Space Grotesk", sans-serif',
-    itemFont: '700 30px "Space Grotesk", sans-serif',
-    priceFont: '800 30px "Space Grotesk", monospace',
+    headerFont: '700 54px "Space Grotesk", sans-serif',
+    itemFont: '700 32px "Space Grotesk", sans-serif',
+    priceFont: '800 32px "Space Grotesk", monospace',
     priceStyle: 'dots',
     dividerColor: mintAccent,
   });

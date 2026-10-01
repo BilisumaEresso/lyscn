@@ -586,8 +586,8 @@ export async function renderLiquorBarPortrait(ctx, {
   ctx.fillText(tagline, width / 2, 264, width - 220);
   ctx.restore();
 
-  // 9. QR Code Container (510 x 510) in Cream/Ivory with Gold Bracket Framing
-  const qrBoxSize = 510;
+  // 9. QR Code Container (440 x 440) in Cream/Ivory with Gold Bracket Framing
+  const qrBoxSize = 440;
   const qrBoxX = width / 2 - qrBoxSize / 2;
   const qrBoxY = 320;
   const qrBoxRadius = 32;
@@ -645,8 +645,8 @@ export async function renderLiquorBarPortrait(ctx, {
     borderWidth: 1.8,
     textColor: '#F59E0B',
     labelColor: textMuted,
-    width: 460,
-    height: 50,
+    width: 420,
+    height: 42,
     radius: 14,
     shadow: true,
     shadowColor: 'rgba(229, 197, 131, 0.3)',
@@ -1170,9 +1170,9 @@ export async function renderLiquorBarMenuBoard(ctx, {
     priceColor: goldAccent,
     tagBg: 'rgba(245, 158, 11, 0.16)',
     tagText: amberAccent,
-    headerFont: '700 38px "Playfair Display", Georgia, serif',
-    itemFont: '700 30px "Playfair Display", Georgia, serif',
-    priceFont: '800 30px "Space Grotesk", monospace',
+    headerFont: '700 54px "Playfair Display", Georgia, serif',
+    itemFont: '700 32px "Playfair Display", Georgia, serif',
+    priceFont: '800 32px "Space Grotesk", monospace',
     priceStyle: 'dots',
     dividerColor: goldAccent,
   });
