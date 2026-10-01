@@ -9,6 +9,7 @@ import {
   formatTableCode,
   drawMenuBridgeBar,
   drawDynamicMenuGrid,
+  drawMenuBoardBottomBrand,
   drawMenuCategorySection,
 } from '../canvasHelpers';
 import { getMenuForCard } from '../menuDataHelpers';
@@ -647,7 +648,18 @@ export async function renderCafeArtisanMenuBoard(ctx, {
     dividerColor: brandDark,
   });
 
-  // 5. Official LayoScan Footer (Y: 3280, clean, no unasked clutter)
+  // 5. Bottom Brand Element (Fills void with elegant motto & framing)
+  drawMenuBoardBottomBrand(ctx, {
+    x: 140,
+    y: 3170,
+    width: 2120,
+    height: 80,
+    accentColor: brandDark,
+    theme: 'light',
+    tagline: restaurant?.slogan || restaurant?.description || 'Crafted with passion • Served with pride',
+  });
+
+  // 6. Official LayoScan Footer (Y: 3280, clean, no unasked clutter)
   await drawLayoScanFooter(ctx, {
     cx: 1200,
     cy: 3280,

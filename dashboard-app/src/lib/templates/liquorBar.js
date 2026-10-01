@@ -9,6 +9,7 @@ import {
   formatTableCode,
   drawMenuBridgeBar,
   drawDynamicMenuGrid,
+  drawMenuBoardBottomBrand,
   drawMenuCategorySection,
 } from '../canvasHelpers';
 import { getMenuForCard } from '../menuDataHelpers';
@@ -1177,7 +1178,18 @@ export async function renderLiquorBarMenuBoard(ctx, {
     dividerColor: goldAccent,
   });
 
-  // 5. Official LayoScan Footer (Y: 3280, clean, no unasked clutter)
+  // 5. Bottom Brand Element (Fills void with lounge motto & framing)
+  drawMenuBoardBottomBrand(ctx, {
+    x: 140,
+    y: 3170,
+    width: 2120,
+    height: 80,
+    accentColor: goldAccent,
+    theme: 'dark',
+    tagline: restaurant?.slogan || restaurant?.description || 'Crafted Spirits • Midnight Vibes • Exceptional Evenings',
+  });
+
+  // 6. Official LayoScan Footer (Y: 3280, clean, no unasked clutter)
   await drawLayoScanFooter(ctx, {
     cx: 1200,
     cy: 3280,

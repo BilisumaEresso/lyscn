@@ -125,10 +125,10 @@ export function drawThemedCodeBadge(ctx, {
   // Content rendering
   ctx.save();
   const labelText = 'TABLE CODE: ';
-  ctx.font = '700 20px "Space Grotesk", Inter, sans-serif';
+  ctx.font = '600 16px "Space Grotesk", Inter, sans-serif';
   const labelWidth = ctx.measureText(labelText).width;
 
-  ctx.font = '800 28px "Space Grotesk", monospace';
+  ctx.font = '700 22px "Space Grotesk", monospace';
   const codeWidth = ctx.measureText(code).width;
   const totalContentW = labelWidth + codeWidth;
   const startX = cx - totalContentW / 2;
@@ -137,12 +137,12 @@ export function drawThemedCodeBadge(ctx, {
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = labelColor;
-  ctx.font = '700 20px "Space Grotesk", Inter, sans-serif';
+  ctx.font = '600 16px "Space Grotesk", Inter, sans-serif';
   ctx.fillText(labelText, startX, cy + 1);
 
   // Draw Code
   ctx.fillStyle = textColor;
-  ctx.font = '800 28px "Space Grotesk", monospace';
+  ctx.font = '700 22px "Space Grotesk", monospace';
   ctx.fillText(code, startX + labelWidth, cy + 1);
 
   ctx.restore();
