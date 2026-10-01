@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
@@ -76,6 +76,25 @@ function QRModal({ table, open, onClose }) {
   const [isDownloading, setIsDownloading] = useState(false);
   const [confirmRegen, setConfirmRegen] = useState(false);
 
+  // Fetch live restaurant categories & products for Menu Board card
+  const { data: catData } = useQuery({
+    queryKey: ['categories'],
+    queryFn: () => api.get('/categories').then((r) => r.data).catch(() => ({ categories: [] })),
+    staleTime: 60_000,
+    enabled: open,
+  });
+  const { data: prodData } = useQuery({
+    queryKey: ['products-all'],
+    queryFn: () => api.get('/products').then((r) => r.data).catch(() => ({ products: [] })),
+    staleTime: 60_000,
+    enabled: open,
+  });
+
+  const menuData = useMemo(() => ({
+    categories: catData?.categories || [],
+    products: prodData?.products || [],
+  }), [catData, prodData]);
+
   // Sync default template from restaurant preferences when opening modal
   useEffect(() => {
     if (open && restaurant?.qrCardTemplate) {
@@ -94,6 +113,7 @@ function QRModal({ table, open, onClose }) {
       restaurant,
       templateId: selectedTemplate,
       orientation,
+      menuData,
     })
       .then((canvas) => {
         if (!isCancelled) {
@@ -109,7 +129,7 @@ function QRModal({ table, open, onClose }) {
     return () => {
       isCancelled = true;
     };
-  }, [open, table, restaurant, selectedTemplate, orientation]);
+  }, [open, table, restaurant, selectedTemplate, orientation, menuData]);
 
   const regenMutation = useMutation({
     mutationFn: () => api.post(`/tables/${table._id}/regenerate-qr`),
@@ -129,8 +149,10 @@ function QRModal({ table, open, onClose }) {
         restaurant,
         templateId: selectedTemplate,
         orientation,
+        menuData,
       });
-      toast.success(`Downloaded ${orientation === 'landscape' ? 'tent stand' : 'card'} PNG!`);
+      const formatName = orientation === 'menu_board' ? 'menu board' : (orientation === 'landscape' ? 'tent stand' : 'card');
+      toast.success(`Downloaded ${formatName} PNG!`);
     } catch (err) {
       console.error(err);
       toast.error('Failed to generate PNG card');
@@ -146,14 +168,16 @@ function QRModal({ table, open, onClose }) {
       toast.error('Pop-up blocked. Please allow pop-ups to print directly.');
       return;
     }
+    const pageOrientation = orientation === 'landscape' ? 'landscape' : 'portrait';
+    const printTitle = orientation === 'menu_board' ? 'Menu Board' : (orientation === 'landscape' ? 'Table Tent' : 'QR Stand');
     printWin.document.write(`
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Print QR Stand - ${table?.label || 'Table'}</title>
+          <title>Print ${printTitle} - ${table?.label || 'Table'}</title>
           <style>
             @page {
-              size: ${orientation === 'landscape' ? 'landscape' : 'portrait'};
+              size: ${pageOrientation};
               margin: 0;
             }
             body {
@@ -209,51 +233,79 @@ function QRModal({ table, open, onClose }) {
                   1. Print Format
                 </label>
                 <span className="text-[11px] font-medium text-ink-muted">
-                  {orientation === 'landscape' ? '150 × 100 mm' : '100 × 150 mm'}
+                  {orientation === 'menu_board'
+                    ? '240 × 340 mm (A4/A3)'
+                    : orientation === 'landscape'
+                    ? '150 × 100 mm'
+                    : '100 × 150 mm'}
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
                   onClick={() => setOrientation('portrait')}
-                  className={`p-2.5 rounded-2xl border-2 transition-all flex items-center gap-2.5 text-left active:scale-98 ${
+                  className={`p-2 rounded-2xl border-2 transition-all flex flex-col items-center gap-1.5 text-center active:scale-98 ${
                     orientation === 'portrait'
                       ? 'border-teal bg-teal/5 text-ink shadow-xs ring-2 ring-teal/20'
                       : 'border-ink/8 bg-white text-ink-muted hover:border-ink/20'
                   }`}
                 >
                   <div
-                    className={`w-6 h-9 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${
+                    className={`w-5 h-7 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${
                       orientation === 'portrait' ? 'border-teal bg-teal/20 text-teal' : 'border-ink/20 text-ink/30'
                     }`}
                   >
-                    <div className="w-2.5 h-2.5 rounded-xs bg-current opacity-70" />
+                    <div className="w-2 h-2 rounded-xs bg-current opacity-70" />
                   </div>
                   <div className="min-w-0">
-                    <p className="font-bold text-xs leading-tight text-ink">Vertical Stand</p>
-                    <p className="text-[10px] text-ink-muted truncate">A6 / Acrylic Frame</p>
+                    <p className="font-bold text-[11px] leading-tight text-ink">Stand</p>
+                    <p className="text-[9px] text-ink-muted truncate">A6 Acrylic</p>
                   </div>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setOrientation('landscape')}
-                  className={`p-2.5 rounded-2xl border-2 transition-all flex items-center gap-2.5 text-left active:scale-98 ${
+                  className={`p-2 rounded-2xl border-2 transition-all flex flex-col items-center gap-1.5 text-center active:scale-98 ${
                     orientation === 'landscape'
                       ? 'border-teal bg-teal/5 text-ink shadow-xs ring-2 ring-teal/20'
                       : 'border-ink/8 bg-white text-ink-muted hover:border-ink/20'
                   }`}
                 >
                   <div
-                    className={`w-9 h-6 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${
+                    className={`w-7 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${
                       orientation === 'landscape' ? 'border-teal bg-teal/20 text-teal' : 'border-ink/20 text-ink/30'
                     }`}
                   >
-                    <div className="w-2.5 h-2.5 rounded-xs bg-current opacity-70" />
+                    <div className="w-2 h-2 rounded-xs bg-current opacity-70" />
                   </div>
                   <div className="min-w-0">
-                    <p className="font-bold text-xs leading-tight text-ink">Table Tent</p>
-                    <p className="text-[10px] text-ink-muted truncate">Folded / Horizontal</p>
+                    <p className="font-bold text-[11px] leading-tight text-ink">Tent</p>
+                    <p className="text-[9px] text-ink-muted truncate">Folded Stand</p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setOrientation('menu_board')}
+                  className={`p-2 rounded-2xl border-2 transition-all flex flex-col items-center gap-1.5 text-center active:scale-98 ${
+                    orientation === 'menu_board'
+                      ? 'border-teal bg-teal/5 text-ink shadow-xs ring-2 ring-teal/20'
+                      : 'border-ink/8 bg-white text-ink-muted hover:border-ink/20'
+                  }`}
+                >
+                  <div
+                    className={`w-5 h-7 rounded-md border-2 flex flex-col items-center justify-center gap-0.5 shrink-0 transition-colors ${
+                      orientation === 'menu_board' ? 'border-teal bg-teal/20 text-teal' : 'border-ink/20 text-ink/30'
+                    }`}
+                  >
+                    <div className="w-2.5 h-0.5 bg-current opacity-70 rounded-full" />
+                    <div className="w-2.5 h-0.5 bg-current opacity-70 rounded-full" />
+                    <div className="w-2.5 h-0.5 bg-current opacity-70 rounded-full" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-bold text-[11px] leading-tight text-ink">Menu Board</p>
+                    <p className="text-[9px] text-teal font-semibold truncate">Menu + Prices</p>
                   </div>
                 </button>
               </div>
@@ -307,7 +359,11 @@ function QRModal({ table, open, onClose }) {
             <div className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span className="text-xs font-bold text-ink">
-                {orientation === 'landscape' ? 'Tent Stand Preview (1800 × 1200 px)' : 'Vertical Stand Preview (1200 × 1800 px)'}
+                {orientation === 'menu_board'
+                  ? 'Full Menu Board Preview (2400 × 3400 px)'
+                  : orientation === 'landscape'
+                  ? 'Tent Stand Preview (1800 × 1200 px)'
+                  : 'Vertical Stand Preview (1200 × 1800 px)'}
               </span>
             </div>
             <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-white text-ink border border-ink/8 shadow-2xs">
@@ -322,6 +378,8 @@ function QRModal({ table, open, onClose }) {
                 className={`relative transition-all duration-300 shadow-2xl rounded-2xl overflow-hidden border border-black/10 bg-white ${
                   orientation === 'landscape'
                     ? 'w-full max-w-[460px] aspect-[3/2]'
+                    : orientation === 'menu_board'
+                    ? 'w-full max-w-[310px] aspect-[24/34]'
                     : 'w-full max-w-[310px] aspect-[2/3]'
                 }`}
                 style={{
@@ -362,8 +420,14 @@ function QRModal({ table, open, onClose }) {
               <Download size={15} />
               <span>
                 {isDownloading
-                  ? 'Exporting card…'
-                  : `Download High-Res ${orientation === 'landscape' ? 'Tent PNG' : 'Card PNG'}`}
+                  ? 'Exporting…'
+                  : `Download High-Res ${
+                      orientation === 'menu_board'
+                        ? 'Menu Board PNG'
+                        : orientation === 'landscape'
+                        ? 'Tent PNG'
+                        : 'Card PNG'
+                    }`}
               </span>
             </Button>
 
@@ -372,10 +436,10 @@ function QRModal({ table, open, onClose }) {
               onClick={handlePrint}
               disabled={isGenerating || !previewUrl}
               className="w-full sm:w-auto px-4 py-3 rounded-xl border border-ink/15 bg-white hover:bg-ink/5 text-ink font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-2xs"
-              title="Print stand directly to your printer"
+              title="Print directly to your printer"
             >
               <Printer size={15} className="text-ink" />
-              <span>Print Stand</span>
+              <span>{orientation === 'menu_board' ? 'Print Menu' : 'Print Stand'}</span>
             </button>
 
             {confirmRegen ? (

@@ -97,10 +97,23 @@ const setAssistanceStatus = (status) => async (req, res, next) => {
   }
 };
 
+const updateAssistanceStatus = async (req, res, next) => {
+  try {
+    const { status } = req.body;
+    if (!['acknowledged', 'resolved'].includes(status)) {
+      return res.status(400).json({ success: false, message: 'Invalid assistance status. Must be acknowledged or resolved.' });
+    }
+    return setAssistanceStatus(status)(req, res, next);
+  } catch (err) {
+    return next(err);
+  }
+};
+
 module.exports = {
   requestAssistance,
   createAssistance: requestAssistance,
   listAssistance,
   acknowledgeAssistance: setAssistanceStatus('acknowledged'),
   resolveAssistance: setAssistanceStatus('resolved'),
+  updateAssistanceStatus,
 };

@@ -126,10 +126,19 @@ export default function WaiterView() {
   // Assistance status mutation
   const assistanceMutation = useMutation({
     mutationFn: ({ id, status }) =>
-      api.patch(`/assistance/${id}/status`, { status }).then((r) => r.data),
-    onSuccess: () => {
+      api
+        .patch(`/assistance/${id}/${status === 'acknowledged' ? 'acknowledge' : 'resolve'}`)
+        .then((r) => r.data),
+    onSuccess: (data, { status }) => {
       qc.invalidateQueries({ queryKey: ['assistance'] });
-      toast.success('Assistance request updated');
+      toast.success(
+        status === 'acknowledged'
+          ? 'Assistance call acknowledged'
+          : 'Assistance call resolved'
+      );
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.message || 'Failed to update assistance request');
     },
   });
 
@@ -183,14 +192,14 @@ export default function WaiterView() {
   return (
     <div className="min-h-screen bg-paper pb-20">
       {/* Top Waiter Floor Header */}
-      <header className="px-4 py-3.5 bg-ink text-white sticky top-0 z-30 shadow-md">
+      <header className="px-4 py-2.5 sm:py-3 bg-ink text-white sticky top-0 z-10 shadow-sm border-b border-white/10 lg:pr-24">
         <div className="max-w-xl mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-xl gradient-brand flex items-center justify-center shrink-0">
-              <Utensils size={18} className="text-white" />
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl gradient-brand flex items-center justify-center shrink-0">
+              <Utensils size={16} className="text-white" />
             </div>
             <div className="min-w-0">
-              <h1 className="font-display font-bold text-base text-white truncate">
+              <h1 className="font-display font-bold text-sm sm:text-base text-white truncate">
                 Floor Service
               </h1>
               <p className="text-[11px] text-white/60 truncate">
@@ -202,21 +211,25 @@ export default function WaiterView() {
           <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
-              onClick={() => refetchOrders()}
-              className="p-2 rounded-xl bg-white/10 hover:bg-white/15 text-white/80 transition-colors"
+              onClick={() => {
+                refetchOrders();
+                toast.success('Refreshing floor status…');
+              }}
+              className="p-1.5 sm:p-2 rounded-xl bg-white/10 hover:bg-white/15 text-white/80 transition-colors flex items-center gap-1.5 text-xs"
               title="Refresh Floor Orders"
             >
-              <RefreshCw size={16} />
+              <RefreshCw size={15} />
+              <span className="hidden sm:inline text-[11px]">Refresh</span>
             </button>
           </div>
         </div>
 
         {/* Waiter Navigation Tabs */}
-        <div className="max-w-xl mx-auto grid grid-cols-3 gap-1.5 mt-3 bg-white/10 p-1 rounded-xl">
+        <div className="max-w-xl mx-auto grid grid-cols-3 gap-1.5 mt-2 sm:mt-2.5 bg-white/10 p-1 rounded-xl">
           <button
             type="button"
             onClick={() => setActiveTab('ready')}
-            className={`py-1.5 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
+            className={`py-2 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 min-h-[36px] ${
               activeTab === 'ready'
                 ? 'bg-teal text-white shadow-sm'
                 : 'text-white/70 hover:text-white'
@@ -233,19 +246,24 @@ export default function WaiterView() {
           <button
             type="button"
             onClick={() => setActiveTab('tables')}
-            className={`py-1.5 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
+            className={`py-2 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 min-h-[36px] ${
               activeTab === 'tables'
                 ? 'bg-teal text-white shadow-sm'
                 : 'text-white/70 hover:text-white'
             }`}
           >
             <span>Tables & Bills</span>
+            {tablesWithOrders.filter((t) => t.hasUnpaid).length > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-400 text-ink">
+                {tablesWithOrders.filter((t) => t.hasUnpaid).length}
+              </span>
+            )}
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('calls')}
-            className={`py-1.5 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
+            className={`py-2 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 min-h-[36px] ${
               activeTab === 'calls'
                 ? 'bg-teal text-white shadow-sm'
                 : 'text-white/70 hover:text-white'
@@ -461,15 +479,34 @@ export default function WaiterView() {
               pendingCalls.map((item) => (
                 <div
                   key={item._id}
-                  className="bg-white rounded-2xl border border-rose-200 p-4 shadow-sm space-y-3"
+                  className={`bg-white rounded-2xl p-4 shadow-sm space-y-3 border transition-colors ${
+                    item.status === 'acknowledged'
+                      ? 'border-emerald-200 bg-emerald-50/20'
+                      : 'border-rose-200'
+                  }`}
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-display font-bold text-base text-ink">
                       {item.tableId?.label || 'Table'}
                     </span>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 font-bold border border-rose-200 animate-pulse">
-                      {item.type === 'bill' ? 'Bill Requested' : 'Assistance Needed'}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {item.status === 'acknowledged' && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold border border-emerald-200">
+                          Acknowledged
+                        </span>
+                      )}
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded-full font-bold border ${
+                          item.status === 'acknowledged'
+                            ? 'bg-ink/5 text-ink-muted border-ink/10'
+                            : 'bg-rose-50 text-rose-700 border-rose-200 animate-pulse'
+                        }`}
+                      >
+                        {item.type === 'bill' || item.type === 'request_bill'
+                          ? 'Bill Requested'
+                          : 'Assistance Needed'}
+                      </span>
+                    </div>
                   </div>
 
                   {item.notes && (
@@ -483,6 +520,7 @@ export default function WaiterView() {
                       <Button
                         variant="outline"
                         size="sm"
+                        disabled={assistanceMutation.isPending}
                         onClick={() =>
                           assistanceMutation.mutate({ id: item._id, status: 'acknowledged' })
                         }
@@ -493,6 +531,7 @@ export default function WaiterView() {
                     )}
                     <Button
                       size="sm"
+                      disabled={assistanceMutation.isPending}
                       onClick={() =>
                         assistanceMutation.mutate({ id: item._id, status: 'resolved' })
                       }

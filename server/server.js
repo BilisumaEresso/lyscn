@@ -102,12 +102,51 @@ async function connectDatabase() {
   }
 }
 
+async function ensureUserIndexes() {
+  if (mongoose.connection.readyState !== 1) return;
+  try {
+    const User = require("./src/models/User");
+
+    // 1. Unset legacy empty string or null values so they are completely absent from document
+    await User.collection.updateMany(
+      { email: { $in: [null, ""] } },
+      { $unset: { email: 1 } }
+    );
+    await User.collection.updateMany(
+      { phone: { $in: [null, ""] } },
+      { $unset: { phone: 1 } }
+    );
+
+    // 2. Check existing indexes on the collection
+    const indexes = await User.collection.indexes();
+    for (const idx of indexes) {
+      if (idx.name === "email_1" || idx.name === "phone_1") {
+        // Drop legacy index if it lacks partialFilterExpression
+        if (!idx.partialFilterExpression) {
+          logger.info(`Dropping legacy index ${idx.name} on users collection`);
+          await User.collection.dropIndex(idx.name);
+        }
+      }
+    }
+
+    // 3. Rebuild indexes with partialFilterExpression
+    await User.syncIndexes();
+    logger.info("User collection indexes synchronized with partialFilterExpression");
+  } catch (err) {
+    logger.warn({ err: err.message }, "Notice: User index verification encountered an issue");
+  }
+}
+
 (async () => {
   const dbConnected = await connectDatabase();
 
   if (isProduction() && !dbConnected) {
     logger.fatal("Cannot start in production without a working MongoDB connection");
     process.exit(1);
+  }
+
+  if (dbConnected) {
+    await ensureUserIndexes();
   }
 
   server.listen(PORT, () => {

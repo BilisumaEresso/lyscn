@@ -37,15 +37,8 @@ const createUser = async (req, res, next) => {
       });
     }
 
-    if (!phone && !email) {
-      return res.status(400).json({
-        success: false,
-        message: 'Phone number or email is required for staff members.',
-      });
-    }
-
     let normalizedPhone;
-    if (phone) {
+    if (phone && String(phone).trim()) {
       if (!isValidPhone(phone)) {
         return res.status(400).json({
           success: false,
@@ -63,7 +56,7 @@ const createUser = async (req, res, next) => {
     }
 
     let cleanEmail;
-    if (email) {
+    if (email && String(email).trim()) {
       cleanEmail = email.toLowerCase().trim();
       const existingEmailUser = await User.findOne({ email: cleanEmail });
       if (existingEmailUser) {
@@ -74,17 +67,29 @@ const createUser = async (req, res, next) => {
       }
     }
 
+    if (!normalizedPhone && !cleanEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'Phone number or email is required for staff members.',
+      });
+    }
+
     // Default to provided password or generate an 8-byte hex temp password
     const userPassword = password || crypto.randomBytes(8).toString('hex');
 
     const userData = {
       restaurantId: req.tenantId,
-      name,
-      phone: normalizedPhone,
-      email: cleanEmail,
+      name: name.trim(),
       role,
       passwordHash: userPassword,
     };
+
+    if (normalizedPhone) {
+      userData.phone = normalizedPhone;
+    }
+    if (cleanEmail) {
+      userData.email = cleanEmail;
+    }
 
     if (pin && /^\d{4}$/.test(String(pin))) {
       userData.pinHash = String(pin);
@@ -119,7 +124,7 @@ const createUser = async (req, res, next) => {
 // ── PATCH /api/users/:id ───────────────────────────────────────────────────────
 const updateUser = async (req, res, next) => {
   try {
-    const { role, isActive, name, phone, pin, station, assignedTables, isOnDuty, password } = req.body;
+    const { role, isActive, name, phone, email, pin, station, assignedTables, isOnDuty, password } = req.body;
 
     const targetUser = await User.findOne({
       _id: req.params.id,
@@ -139,12 +144,47 @@ const updateUser = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Cannot deactivate your own account.' });
     }
 
-    if (name) targetUser.name = name;
-    if (phone) {
-      if (!isValidPhone(phone)) {
-        return res.status(400).json({ success: false, message: 'Invalid phone format.' });
+    if (name) targetUser.name = name.trim();
+
+    if (phone !== undefined) {
+      if (!phone || !String(phone).trim()) {
+        targetUser.phone = undefined;
+      } else {
+        if (!isValidPhone(phone)) {
+          return res.status(400).json({ success: false, message: 'Invalid phone format.' });
+        }
+        const normPhone = normalizePhone(phone);
+        const existingPhoneUser = await User.findOne({
+          phone: normPhone,
+          _id: { $ne: targetUser._id },
+        });
+        if (existingPhoneUser) {
+          return res.status(409).json({
+            success: false,
+            message: 'A user with this phone number already exists.',
+          });
+        }
+        targetUser.phone = normPhone;
       }
-      targetUser.phone = normalizePhone(phone);
+    }
+
+    if (email !== undefined) {
+      if (!email || !String(email).trim()) {
+        targetUser.email = undefined;
+      } else {
+        const cleanEmail = email.toLowerCase().trim();
+        const existingEmailUser = await User.findOne({
+          email: cleanEmail,
+          _id: { $ne: targetUser._id },
+        });
+        if (existingEmailUser) {
+          return res.status(409).json({
+            success: false,
+            message: 'A user with this email address already exists.',
+          });
+        }
+        targetUser.email = cleanEmail;
+      }
     }
     if (role && ['manager', 'coordinator', 'kitchen', 'waiter'].includes(role)) {
       targetUser.role = role;

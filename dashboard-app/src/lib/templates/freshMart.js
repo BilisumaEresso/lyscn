@@ -6,7 +6,10 @@ import {
   drawLayoScanFooter,
   drawBotanicalSprig,
   formatTableCode,
+  drawMenuBridgeBar,
+  drawMenuCategorySection,
 } from '../canvasHelpers';
+import { getMenuForCard } from '../menuDataHelpers';
 
 /**
  * ─────────────────────────────────────────────────────────────────────────────
@@ -504,3 +507,238 @@ export async function renderFreshMartLandscape(ctx, {
     accentColor: mintAccent,
   });
 }
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * FULL MENU BOARD RENDERER (2400 x 3400) — Big Printed Table Card / Placemat
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+export async function renderFreshMartMenuBoard(ctx, {
+  table,
+  restaurant,
+  qrImage,
+  logoImage,
+  menuData,
+  width = 2400,
+  height = 3400,
+}) {
+  const deepEmerald = '#0B3B24';
+  const mintAccent = '#86EFAC';
+  const textMuted = 'rgba(255, 255, 255, 0.72)';
+  const tableLabel = table?.label || 'Table 1';
+  const tableCodeFormatted = formatTableCode(table?.qrToken);
+
+  // 1. Lush Organic Deep Emerald Gradient Background
+  const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
+  bgGrad.addColorStop(0, '#0E442B');
+  bgGrad.addColorStop(0.5, '#0B3B24');
+  bgGrad.addColorStop(1, '#052214');
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, width, height);
+
+  // Soft botanical leaf veins texture
+  ctx.save();
+  ctx.strokeStyle = 'rgba(134, 239, 172, 0.04)';
+  ctx.lineWidth = 1.5;
+  for (let x = 80; x < width; x += 160) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.bezierCurveTo(x + 80, height * 0.4, x - 80, height * 0.7, x + 40, height);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Fresh double border
+  ctx.save();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = 'rgba(134, 239, 172, 0.35)';
+  ctx.strokeRect(60, 60, width - 120, height - 120);
+
+  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = 'rgba(134, 239, 172, 0.18)';
+  ctx.strokeRect(74, 74, width - 148, height - 148);
+  ctx.restore();
+
+  // 2. Header Section (Y: 90 - 380)
+  const restName = (restaurant?.name || 'GreenMart Organics').toUpperCase();
+  const restTagline = restaurant?.tagline || 'ORGANIC HARVEST • ARTISAN DELI • COLD-PRESSED JUICES';
+
+  // Logo or Sprout Leaves Emblem
+  if (logoImage) {
+    const logoSize = 120;
+    const logoX = 1200 - logoSize / 2;
+    const logoY = 95;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(1200, logoY + logoSize / 2, logoSize / 2, 0, Math.PI * 2);
+    ctx.fillStyle = '#062B1A';
+    ctx.fill();
+    ctx.lineWidth = 2.8;
+    ctx.strokeStyle = mintAccent;
+    ctx.stroke();
+    ctx.clip();
+    ctx.drawImage(logoImage, logoX, logoY, logoSize, logoSize);
+    ctx.restore();
+  } else {
+    drawSproutLeavesLogo(ctx, 1200, 150, 110, mintAccent);
+  }
+
+  // Restaurant Name
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '700 68px "Space Grotesk", Inter, sans-serif';
+  ctx.fillText(restName, 1200, 240);
+
+  // Tagline
+  ctx.fillStyle = mintAccent;
+  ctx.font = '600 22px "Space Grotesk", sans-serif';
+  ctx.letterSpacing = '2px';
+  ctx.fillText(restTagline, 1200, 296);
+
+  // Table Label Pill
+  drawPillBadge(ctx, 1200, 350, 270, 50, tableLabel, mintAccent, deepEmerald);
+  ctx.restore();
+
+  // 3. Slim Digital Bridge Bar (Y: 410 - 550)
+  drawMenuBridgeBar(ctx, {
+    x: 140,
+    y: 410,
+    width: 2120,
+    height: 140,
+    qrImage,
+    tableCodeFormatted,
+    theme: 'dark',
+    accentColor: mintAccent,
+    bgColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(134, 239, 172, 0.4)',
+    titleColor: '#FFFFFF',
+    subtitleColor: '#A7F3D0',
+  });
+
+  // 4. Two-Column Menu Spread (Y: 590 - 3080)
+  const menu = getMenuForCard({
+    restaurant,
+    categories: menuData?.categories,
+    products: menuData?.products,
+    templateId: 'fresh_mart',
+  });
+
+  const colWidth = 980;
+  const col1X = 140;
+  const col2X = 1280;
+  const col1Y = 600;
+  const col2Y = 600;
+
+  // Center Decorative Vertical Line
+  ctx.save();
+  ctx.setLineDash([4, 7]);
+  ctx.beginPath();
+  ctx.moveTo(1200, 600);
+  ctx.lineTo(1200, 3050);
+  ctx.lineWidth = 1.8;
+  ctx.strokeStyle = 'rgba(134, 239, 172, 0.25)';
+  ctx.stroke();
+
+  // Center sprout icon
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.arc(1200, 1820, 22, 0, Math.PI * 2);
+  ctx.fillStyle = '#0B3B24';
+  ctx.fill();
+  ctx.lineWidth = 1.8;
+  ctx.strokeStyle = mintAccent;
+  ctx.stroke();
+
+  ctx.fillStyle = mintAccent;
+  ctx.font = '20px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('🌱', 1200, 1820);
+  ctx.restore();
+
+  const categories = menu.categories || [];
+  const cat0 = categories[0];
+  const cat1 = categories[1];
+  const cat2 = categories[2];
+  const cat3 = categories[3];
+
+  const commonStyles = {
+    currency: menu.currency,
+    theme: 'dark',
+    accentColor: mintAccent,
+    titleColor: '#FFFFFF',
+    bodyColor: textMuted,
+    priceColor: mintAccent,
+    tagBg: 'rgba(134, 239, 172, 0.16)',
+    tagText: mintAccent,
+    headerFont: '700 38px "Space Grotesk", sans-serif',
+    itemFont: '700 27px "Space Grotesk", sans-serif',
+    descFont: '400 20px Inter, sans-serif',
+    priceStyle: 'dots',
+    dividerColor: mintAccent,
+  };
+
+  // Left Column
+  if (cat0) {
+    const bottom0 = drawMenuCategorySection(ctx, {
+      x: col1X,
+      y: col1Y,
+      width: colWidth,
+      category: cat0,
+      ...commonStyles,
+    });
+    if (cat1) {
+      drawMenuCategorySection(ctx, {
+        x: col1X,
+        y: Math.max(bottom0 + 50, 1850),
+        width: colWidth,
+        category: cat1,
+        ...commonStyles,
+      });
+    }
+  }
+
+  // Right Column
+  if (cat2) {
+    const bottom2 = drawMenuCategorySection(ctx, {
+      x: col2X,
+      y: col2Y,
+      width: colWidth,
+      category: cat2,
+      ...commonStyles,
+    });
+    if (cat3) {
+      drawMenuCategorySection(ctx, {
+        x: col2X,
+        y: Math.max(bottom2 + 50, 1850),
+        width: colWidth,
+        category: cat3,
+        ...commonStyles,
+      });
+    }
+  }
+
+  // 5. Footer Section (Y: 3120 - 3400)
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = textMuted;
+  ctx.font = '500 21px Inter, sans-serif';
+  ctx.fillText('🥗 100% Certified Organic & Non-GMO • Dietary options: Vegan, Keto & Gluten-Free available.', 1200, 3140);
+  ctx.fillText('📶 Green Harvest Guest Wi-Fi • Ask any team member for access.', 1200, 3175);
+  ctx.restore();
+
+  // Signature "Powered by LayoScan" Footer Badge
+  await drawLayoScanFooter(ctx, {
+    cx: 1200,
+    cy: 3260,
+    badgeW: 460,
+    badgeH: 68,
+    templateId: 'fresh_mart',
+    theme: 'dark',
+    accentColor: mintAccent,
+  });
+}
+

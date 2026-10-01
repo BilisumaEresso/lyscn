@@ -7,7 +7,10 @@ import {
   drawStepFlowNodes,
   drawLayoScanFooter,
   formatTableCode,
+  drawMenuBridgeBar,
+  drawMenuCategorySection,
 } from '../canvasHelpers';
+import { getMenuForCard } from '../menuDataHelpers';
 
 /**
  * ─────────────────────────────────────────────────────────────────────────────
@@ -495,3 +498,239 @@ export async function renderCafeArtisanLandscape(ctx, {
     accentColor: brandDark,
   });
 }
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * FULL MENU BOARD RENDERER (2400 x 3400) — Big Printed Table Card / Placemat
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+export async function renderCafeArtisanMenuBoard(ctx, {
+  table,
+  restaurant,
+  qrImage,
+  logoImage,
+  menuData,
+  width = 2400,
+  height = 3400,
+}) {
+  const brandDark = '#1B382B'; // Deep Forest Olive
+  const brandSage = '#2D5A43';
+  const textMuted = '#4A5B51';
+  const tableLabel = table?.label || 'Table 1';
+  const tableCodeFormatted = formatTableCode(table?.qrToken);
+
+  // 1. Tactile Warm Linen Background
+  const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
+  bgGrad.addColorStop(0, '#FAF6EF');
+  bgGrad.addColorStop(0.5, '#F5EDE2');
+  bgGrad.addColorStop(1, '#ECE3D4');
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, width, height);
+
+  // Linen texture dots
+  ctx.save();
+  ctx.fillStyle = 'rgba(27, 56, 43, 0.022)';
+  for (let y = 16; y < height; y += 40) {
+    for (let x = 16; x < width; x += 40) {
+      ctx.fillRect(x + ((y * 7) % 13), y, 2.5, 2.5);
+    }
+  }
+  ctx.restore();
+
+  // Outer framing rule
+  ctx.save();
+  ctx.strokeStyle = 'rgba(27, 56, 43, 0.25)';
+  ctx.lineWidth = 2.5;
+  ctx.strokeRect(60, 60, width - 120, height - 120);
+
+  ctx.strokeStyle = 'rgba(27, 56, 43, 0.12)';
+  ctx.lineWidth = 1.2;
+  ctx.strokeRect(72, 72, width - 144, height - 144);
+  ctx.restore();
+
+  // Four Corner Botanical Sprigs
+  drawBotanicalSprig(ctx, 100, 100, 1.8, -0.15, 'rgba(27, 56, 43, 0.45)');
+  drawBotanicalSprig(ctx, width - 100, 100, 1.8, Math.PI / 2 + 0.15, 'rgba(27, 56, 43, 0.45)');
+  drawBotanicalSprig(ctx, 100, height - 100, 1.8, -Math.PI / 2 - 0.15, 'rgba(27, 56, 43, 0.45)');
+  drawBotanicalSprig(ctx, width - 100, height - 100, 1.8, Math.PI + 0.15, 'rgba(27, 56, 43, 0.45)');
+
+  // 2. Header Section (Y: 90 - 380)
+  const restName = (restaurant?.name || 'Elili Cafe').toUpperCase();
+  const restTagline = restaurant?.tagline || 'SPECIALTY ROASTERY • ARTISAN BAKERY • FRESH ALL-DAY BRUNCH';
+
+  // Logo or Artisan Coffee Emblem
+  if (logoImage) {
+    const logoSize = 120;
+    const logoX = 1200 - logoSize / 2;
+    const logoY = 100;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(1200, logoY + logoSize / 2, logoSize / 2, 0, Math.PI * 2);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fill();
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = brandDark;
+    ctx.stroke();
+    ctx.clip();
+    ctx.drawImage(logoImage, logoX, logoY, logoSize, logoSize);
+    ctx.restore();
+  } else {
+    drawCoffeeCupEmblem(ctx, 1200, 150, 85, brandDark);
+  }
+
+  // Restaurant Name
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = brandDark;
+  ctx.font = '700 68px "Playfair Display", Georgia, serif';
+  ctx.fillText(restName, 1200, 240);
+
+  // Tagline
+  ctx.fillStyle = textMuted;
+  ctx.font = '600 22px "Space Grotesk", Inter, sans-serif';
+  ctx.letterSpacing = '2px';
+  ctx.fillText(restTagline, 1200, 296);
+
+  // Table Label Pill
+  drawPillBadge(ctx, 1200, 350, 260, 48, tableLabel, brandDark, '#FFFFFF');
+  ctx.restore();
+
+  // 3. Slim Digital Bridge Bar (Y: 410 - 550)
+  drawMenuBridgeBar(ctx, {
+    x: 140,
+    y: 410,
+    width: 2120,
+    height: 140,
+    qrImage,
+    tableCodeFormatted,
+    theme: 'light',
+    accentColor: brandDark,
+    bgColor: '#FFFFFF',
+    borderColor: 'rgba(27, 56, 43, 0.25)',
+  });
+
+  // 4. Two-Column Menu Spread (Y: 590 - 3080)
+  const menu = getMenuForCard({
+    restaurant,
+    categories: menuData?.categories,
+    products: menuData?.products,
+    templateId: 'cafe_artisan',
+  });
+
+  const colWidth = 980;
+  const col1X = 140;
+  const col2X = 1280;
+  const col1Y = 600;
+  const col2Y = 600;
+
+  // Center Decorative Vertical Divider Line
+  ctx.save();
+  ctx.setLineDash([5, 8]);
+  ctx.beginPath();
+  ctx.moveTo(1200, 600);
+  ctx.lineTo(1200, 3050);
+  ctx.lineWidth = 1.8;
+  ctx.strokeStyle = 'rgba(27, 56, 43, 0.25)';
+  ctx.stroke();
+
+  // Center coffee bean emblem in middle of divider
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.arc(1200, 1820, 22, 0, Math.PI * 2);
+  ctx.fillStyle = '#FAF6EF';
+  ctx.fill();
+  ctx.lineWidth = 1.8;
+  ctx.strokeStyle = brandDark;
+  ctx.stroke();
+
+  ctx.fillStyle = brandDark;
+  ctx.beginPath();
+  ctx.ellipse(1200, 1820, 10, 6, Math.PI / 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  const categories = menu.categories || [];
+  const cat0 = categories[0];
+  const cat1 = categories[1];
+  const cat2 = categories[2];
+  const cat3 = categories[3];
+
+  const commonStyles = {
+    currency: menu.currency,
+    theme: 'light',
+    accentColor: brandDark,
+    titleColor: brandDark,
+    bodyColor: textMuted,
+    priceColor: brandDark,
+    tagBg: 'rgba(27, 56, 43, 0.08)',
+    tagText: brandDark,
+    headerFont: '700 38px "Playfair Display", Georgia, serif',
+    itemFont: '700 27px "Playfair Display", Georgia, serif',
+    descFont: '400 20px Inter, sans-serif',
+    priceStyle: 'dots',
+    dividerColor: brandDark,
+  };
+
+  // Left Column
+  if (cat0) {
+    const bottom0 = drawMenuCategorySection(ctx, {
+      x: col1X,
+      y: col1Y,
+      width: colWidth,
+      category: cat0,
+      ...commonStyles,
+    });
+    if (cat1) {
+      drawMenuCategorySection(ctx, {
+        x: col1X,
+        y: Math.max(bottom0 + 50, 1850),
+        width: colWidth,
+        category: cat1,
+        ...commonStyles,
+      });
+    }
+  }
+
+  // Right Column
+  if (cat2) {
+    const bottom2 = drawMenuCategorySection(ctx, {
+      x: col2X,
+      y: col2Y,
+      width: colWidth,
+      category: cat2,
+      ...commonStyles,
+    });
+    if (cat3) {
+      drawMenuCategorySection(ctx, {
+        x: col2X,
+        y: Math.max(bottom2 + 50, 1850),
+        width: colWidth,
+        category: cat3,
+        ...commonStyles,
+      });
+    }
+  }
+
+  // 5. Footer Section (Y: 3120 - 3400)
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = textMuted;
+  ctx.font = '500 21px Inter, sans-serif';
+  ctx.fillText('🌱 Milk Alternatives: Oat, Almond & Soy Available • Please notify our barista of any food allergies.', 1200, 3140);
+  ctx.fillText('📶 Complimentary Guest Wi-Fi • Ask server for the day’s network and access password.', 1200, 3175);
+  ctx.restore();
+
+  // Signature "Powered by LayoScan" Footer Badge
+  await drawLayoScanFooter(ctx, {
+    cx: 1200,
+    cy: 3260,
+    badgeW: 460,
+    badgeH: 68,
+    templateId: 'cafe_artisan',
+    theme: 'light',
+    accentColor: brandDark,
+  });
+}
+

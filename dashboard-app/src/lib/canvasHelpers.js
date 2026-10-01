@@ -1062,3 +1062,294 @@ export function getThemedQRIconDataUrl(templateId = 'cafe_artisan') {
 
   return canvas.toDataURL('image/png');
 }
+
+/**
+ * Cleanly wraps text into lines fitting within maxWidth
+ */
+export function wrapCanvasText(ctx, text, maxWidth) {
+  if (!text) return [];
+  const words = text.split(' ');
+  const lines = [];
+  let currentLine = '';
+
+  for (let i = 0; i < words.length; i++) {
+    const testLine = currentLine ? `${currentLine} ${words[i]}` : words[i];
+    const metrics = ctx.measureText(testLine);
+    if (metrics.width > maxWidth && currentLine) {
+      lines.push(currentLine);
+      currentLine = words[i];
+    } else {
+      currentLine = testLine;
+    }
+  }
+  if (currentLine) lines.push(currentLine);
+  return lines;
+}
+
+/**
+ * Slim Digital QR & Manual Table Code Bridge Bar for Full Menu Board
+ */
+export function drawMenuBridgeBar(ctx, {
+  x,
+  y,
+  width = 2120,
+  height = 140,
+  qrImage = null,
+  tableCodeFormatted = '',
+  theme = 'light',
+  accentColor = '#1B382B',
+  bgColor = null,
+  borderColor = null,
+  titleColor = null,
+  subtitleColor = null,
+}) {
+  ctx.save();
+  const radius = 24;
+
+  // Background Container
+  ctx.beginPath();
+  ctx.roundRect(x, y, width, height, radius);
+  if (bgColor) {
+    ctx.fillStyle = bgColor;
+  } else if (theme === 'dark') {
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+  } else if (theme === 'solid-dark') {
+    ctx.fillStyle = '#18181B';
+  } else {
+    ctx.fillStyle = '#FFFFFF';
+  }
+  ctx.fill();
+
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = borderColor || (theme === 'dark' || theme === 'solid-dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)');
+  ctx.stroke();
+
+  // QR Code on Left
+  const qrPad = 16;
+  const qrBoxSize = height - qrPad * 2; // ~108px
+  const qrX = x + qrPad + 8;
+  const qrY = y + qrPad;
+
+  ctx.beginPath();
+  ctx.roundRect(qrX, qrY, qrBoxSize, qrBoxSize, 14);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fill();
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = borderColor || 'rgba(0,0,0,0.12)';
+  ctx.stroke();
+
+  if (qrImage) {
+    const qrInner = qrBoxSize - 12;
+    ctx.drawImage(qrImage, qrX + 6, qrY + 6, qrInner, qrInner);
+  }
+
+  // Middle Text Block
+  const textX = qrX + qrBoxSize + 28;
+  const resolvedTitle = titleColor || (theme === 'dark' || theme === 'solid-dark' ? '#FFFFFF' : '#141416');
+  const resolvedSub = subtitleColor || (theme === 'dark' || theme === 'solid-dark' ? 'rgba(255, 255, 255, 0.65)' : '#5A626A');
+
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+
+  // Title with camera/phone icon
+  ctx.font = '700 28px "Space Grotesk", Inter, sans-serif';
+  ctx.fillStyle = resolvedTitle;
+  ctx.fillText('📱 Prefer ordering & paying directly from your phone?', textX, y + height * 0.36);
+
+  // Subtitle
+  ctx.font = '500 21px Inter, sans-serif';
+  ctx.fillStyle = resolvedSub;
+  ctx.fillText('Point camera at QR code or visit layoscancustomer.vercel.app with the table code', textX, y + height * 0.68);
+
+  // Table Code Pill on Right
+  if (tableCodeFormatted) {
+    const pillW = 320;
+    const pillH = 72;
+    const pillX = x + width - pillW - 24;
+    const pillY = y + (height - pillH) / 2;
+
+    ctx.beginPath();
+    ctx.roundRect(pillX, pillY, pillW, pillH, 18);
+    ctx.fillStyle = theme === 'dark' || theme === 'solid-dark' ? 'rgba(255, 255, 255, 0.1)' : '#F4F5F7';
+    ctx.fill();
+    ctx.lineWidth = 1.8;
+    ctx.strokeStyle = accentColor;
+    ctx.stroke();
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = resolvedSub;
+    ctx.font = '700 15px "Space Grotesk", sans-serif';
+    ctx.fillText('TABLE CODE:', pillX + pillW / 2, pillY + 22);
+
+    ctx.fillStyle = accentColor;
+    ctx.font = '800 27px "Space Grotesk", monospace';
+    ctx.fillText(tableCodeFormatted, pillX + pillW / 2, pillY + 50);
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Renders a full Category Section (Header + Items with Prices) for the Menu Board
+ */
+export function drawMenuCategorySection(ctx, {
+  x,
+  y,
+  width = 1000,
+  category,
+  currency = 'Br',
+  theme = 'light',
+  accentColor = '#1B382B',
+  titleColor = null,
+  bodyColor = null,
+  priceColor = null,
+  tagBg = null,
+  tagText = null,
+  headerFont = '700 36px "Space Grotesk", sans-serif',
+  itemFont = '700 28px "Space Grotesk", sans-serif',
+  descFont = '400 20px Inter, sans-serif',
+  priceStyle = 'dots', // 'dots' | 'pill' | 'discreet'
+  showDivider = true,
+  dividerColor = null,
+}) {
+  ctx.save();
+  let currentY = y;
+
+  const resolvedTitle = titleColor || (theme === 'dark' || theme === 'solid-dark' ? '#FFFFFF' : '#141416');
+  const resolvedBody = bodyColor || (theme === 'dark' || theme === 'solid-dark' ? 'rgba(255, 255, 255, 0.65)' : '#5C646C');
+  const resolvedPrice = priceColor || accentColor;
+
+  // 1. Category Header
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.font = headerFont;
+  ctx.fillStyle = resolvedTitle;
+
+  const headerText = category.icon ? `${category.icon}  ${category.name}` : category.name;
+  ctx.fillText(headerText, x, currentY);
+  currentY += 46;
+
+  // Header Divider Rule
+  if (showDivider) {
+    ctx.beginPath();
+    ctx.moveTo(x, currentY);
+    ctx.lineTo(x + width, currentY);
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = dividerColor || accentColor;
+    ctx.stroke();
+    currentY += 28;
+  } else {
+    currentY += 16;
+  }
+
+  // 2. Menu Items
+  const items = category.items || [];
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    const itemStartY = currentY;
+
+    // Item Title
+    ctx.font = itemFont;
+    ctx.fillStyle = resolvedTitle;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(item.name, x, itemStartY);
+
+    const titleMetrics = ctx.measureText(item.name);
+    let nameEndX = x + titleMetrics.width;
+
+    // Optional Tag Pill
+    if (item.tag) {
+      ctx.font = '700 15px "Space Grotesk", sans-serif';
+      const tagMetrics = ctx.measureText(item.tag);
+      const tagPillW = tagMetrics.width + 18;
+      const tagPillH = 26;
+      const tagPillX = nameEndX + 12;
+      const tagPillY = itemStartY + 3;
+
+      ctx.beginPath();
+      ctx.roundRect(tagPillX, tagPillY, tagPillW, tagPillH, 8);
+      ctx.fillStyle = tagBg || (theme === 'dark' || theme === 'solid-dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.06)');
+      ctx.fill();
+
+      ctx.fillStyle = tagText || accentColor;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(item.tag, tagPillX + tagPillW / 2, tagPillY + tagPillH / 2);
+
+      nameEndX = tagPillX + tagPillW;
+    }
+
+    // Price Formatting
+    const priceNum = typeof item.price === 'number' ? item.price : Number(item.price);
+    const priceStr = priceStyle === 'discreet'
+      ? `${currency} ${priceNum}`
+      : `${priceNum % 1 === 0 ? priceNum : priceNum.toFixed(2)} ${currency}`;
+
+    ctx.font = '800 28px "Space Grotesk", monospace';
+    const priceMetrics = ctx.measureText(priceStr);
+    const priceX = x + width - priceMetrics.width;
+
+    if (priceStyle === 'pill') {
+      const pillW = priceMetrics.width + 24;
+      const pillH = 38;
+      const pillX = x + width - pillW;
+      const pillY = itemStartY - 2;
+
+      ctx.beginPath();
+      ctx.roundRect(pillX, pillY, pillW, pillH, 12);
+      ctx.fillStyle = accentColor;
+      ctx.fill();
+
+      ctx.fillStyle = theme === 'solid-dark' ? '#141416' : '#FFFFFF';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(priceStr, pillX + pillW / 2, pillY + pillH / 2);
+    } else {
+      ctx.fillStyle = resolvedPrice;
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'top';
+      ctx.fillText(priceStr, x + width, itemStartY);
+
+      // Dotted Leader
+      if (priceStyle === 'dots') {
+        const dotStartX = nameEndX + 16;
+        const dotEndX = priceX - 16;
+        if (dotEndX > dotStartX + 20) {
+          ctx.save();
+          ctx.setLineDash([4, 6]);
+          ctx.beginPath();
+          ctx.moveTo(dotStartX, itemStartY + 18);
+          ctx.lineTo(dotEndX, itemStartY + 18);
+          ctx.lineWidth = 1.8;
+          ctx.strokeStyle = theme === 'dark' || theme === 'solid-dark' ? 'rgba(255, 255, 255, 0.22)' : 'rgba(0, 0, 0, 0.18)';
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+    }
+
+    currentY += 36;
+
+    // Item Description
+    if (item.desc) {
+      ctx.font = descFont;
+      ctx.fillStyle = resolvedBody;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+
+      const descLines = wrapCanvasText(ctx, item.desc, width - (priceStyle === 'pill' ? 140 : 100));
+      for (let l = 0; l < Math.min(descLines.length, 2); l++) {
+        ctx.fillText(descLines[l], x, currentY);
+        currentY += 24;
+      }
+    }
+
+    currentY += 22; // Spacing to next item
+  }
+
+  ctx.restore();
+  return currentY;
+}
+

@@ -13,16 +13,14 @@ const userSchema = new mongoose.Schema(
     name:  { type: String, required: true, trim: true },
     email: {
       type: String,
-      sparse: true,
-      unique: true,
       lowercase: true,
       trim: true,
+      default: undefined,
     },
     phone: {
       type: String,
-      sparse: true,
-      unique: true,
       trim: true,
+      default: undefined,
     },
 
     // select: false — never returned in queries unless explicitly requested
@@ -52,8 +50,25 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Require at least one contact identifier (email or phone)
+// Robust partial unique indexes: only documents where email/phone is an actual string are indexed.
+// Missing or undefined fields are completely excluded, preventing duplicate key errors on null.
+userSchema.index(
+  { email: 1 },
+  { unique: true, sparse: true, partialFilterExpression: { email: { $type: 'string' } } }
+);
+userSchema.index(
+  { phone: 1 },
+  { unique: true, sparse: true, partialFilterExpression: { phone: { $type: 'string' } } }
+);
+
+// Require at least one contact identifier (email or phone) and clean empty strings
 userSchema.pre('validate', function (next) {
+  if (this.email !== undefined && (!this.email || !String(this.email).trim())) {
+    this.email = undefined;
+  }
+  if (this.phone !== undefined && (!this.phone || !String(this.phone).trim())) {
+    this.phone = undefined;
+  }
   if (!this.email && !this.phone) {
     return next(new Error('User must have either an email or a phone number.'));
   }

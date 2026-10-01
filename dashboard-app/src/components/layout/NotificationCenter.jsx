@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -96,6 +97,23 @@ export default function NotificationCenter() {
     return () => clearInterval(timer);
   }, []);
 
+  // Lock body scroll and handle Escape key when drawer is open
+  useEffect(() => {
+    if (!isDrawerOpen) return;
+    const origOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') setDrawerOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+
+    return () => {
+      document.body.style.overflow = origOverflow;
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isDrawerOpen, setDrawerOpen]);
+
   // Fetch pending assistance requests from server
   const { data: assistanceData } = useQuery({
     queryKey: ['assistance'],
@@ -191,12 +209,13 @@ export default function NotificationCenter() {
         </button>
       </div>
 
-      {/* ── Slide-Over Notification Drawer ──────────────────────────────── */}
-      {isDrawerOpen && (
-        <div
-          className="fixed inset-0 z-50 overflow-hidden bg-ink/30 backdrop-blur-xs transition-opacity animate-fade-in"
-          onClick={() => setDrawerOpen(false)}
-        >
+      {/* ── Slide-Over Notification Drawer (Portaled to document.body with z-[100]) ── */}
+      {isDrawerOpen &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[100] overflow-hidden bg-ink/40 backdrop-blur-xs transition-opacity animate-fade-in"
+            onClick={() => setDrawerOpen(false)}
+          >
           <div className="absolute inset-y-0 right-0 max-w-full flex pl-10" onClick={(e) => e.stopPropagation()}>
             <div
               ref={panelRef}
@@ -474,7 +493,8 @@ export default function NotificationCenter() {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

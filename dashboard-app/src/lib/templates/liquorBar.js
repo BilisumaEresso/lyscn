@@ -7,7 +7,10 @@ import {
   drawImageCover,
   drawLayoScanFooter,
   formatTableCode,
+  drawMenuBridgeBar,
+  drawMenuCategorySection,
 } from '../canvasHelpers';
+import { getMenuForCard } from '../menuDataHelpers';
 
 /**
  * ─────────────────────────────────────────────────────────────────────────────
@@ -990,3 +993,250 @@ export async function renderLiquorBarLandscape(ctx, {
     templateId: 'liquor_bar',
   });
 }
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * FULL MENU BOARD RENDERER (2400 x 3400) — Big Printed Table Card / Placemat
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+export async function renderLiquorBarMenuBoard(ctx, {
+  table,
+  restaurant,
+  qrImage,
+  logoImage,
+  menuData,
+  width = 2400,
+  height = 3400,
+}) {
+  const goldAccent = '#E5C583';
+  const amberAccent = '#F59E0B';
+  const textMuted = '#94A3B8';
+  const tableLabel = table?.label || 'VIP Table 1';
+  const tableCodeFormatted = formatTableCode(table?.qrToken);
+
+  // 1. Dark Velvet Obsidian Background
+  const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
+  bgGrad.addColorStop(0, '#120F0D');
+  bgGrad.addColorStop(0.5, '#0A0806');
+  bgGrad.addColorStop(1, '#050403');
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, width, height);
+
+  // Warm amber bokeh glows
+  ctx.save();
+  const glow1 = ctx.createRadialGradient(400, 300, 50, 400, 300, 450);
+  glow1.addColorStop(0, 'rgba(229, 197, 131, 0.12)');
+  glow1.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = glow1;
+  ctx.fillRect(0, 0, 900, 800);
+
+  const glow2 = ctx.createRadialGradient(2000, 1800, 80, 2000, 1800, 600);
+  glow2.addColorStop(0, 'rgba(245, 158, 11, 0.08)');
+  glow2.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = glow2;
+  ctx.fillRect(1400, 1200, 1000, 1200);
+  ctx.restore();
+
+  // Luxurious gold outer frame
+  ctx.save();
+  ctx.lineWidth = 3.5;
+  ctx.strokeStyle = 'rgba(229, 197, 131, 0.65)';
+  ctx.strokeRect(60, 60, width - 120, height - 120);
+
+  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = 'rgba(229, 197, 131, 0.25)';
+  ctx.strokeRect(74, 74, width - 148, height - 148);
+
+  // Corner Gold Brackets
+  drawGoldBracketFrame(ctx, 80, 80, width - 160, 56, goldAccent, 3.5, 0);
+  ctx.restore();
+
+  // 2. Header Section (Y: 90 - 380)
+  const restName = (restaurant?.name || 'Velvet Lounge & Bar').toUpperCase();
+  const restTagline = restaurant?.tagline || 'CRAFT COCKTAILS • RESERVE SPIRITS • NIGHTLIFE LOUNGE BITES';
+
+  // Glassware Emblem or Logo
+  if (logoImage) {
+    const logoSize = 120;
+    const logoX = 1200 - logoSize / 2;
+    const logoY = 95;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(1200, logoY + logoSize / 2, logoSize / 2, 0, Math.PI * 2);
+    ctx.fillStyle = '#14110E';
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = goldAccent;
+    ctx.stroke();
+    ctx.clip();
+    ctx.drawImage(logoImage, logoX, logoY, logoSize, logoSize);
+    ctx.restore();
+  } else {
+    drawBarEmblemLockup(ctx, 1200, 150, 110, goldAccent);
+  }
+
+  // Restaurant Name with amber gold glow
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(229, 197, 131, 0.45)';
+  ctx.shadowBlur = 24;
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '700 68px "Playfair Display", Georgia, serif';
+  ctx.fillText(restName, 1200, 240);
+  ctx.restore();
+
+  // Tagline
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = goldAccent;
+  ctx.font = '600 22px "Space Grotesk", sans-serif';
+  ctx.letterSpacing = '3px';
+  ctx.fillText(restTagline, 1200, 296);
+
+  // Table Label Pill
+  drawPillBadge(ctx, 1200, 350, 290, 50, tableLabel, goldAccent, '#0E0C09');
+  ctx.restore();
+
+  // 3. Slim Digital Bridge Bar (Y: 410 - 550)
+  drawMenuBridgeBar(ctx, {
+    x: 140,
+    y: 410,
+    width: 2120,
+    height: 140,
+    qrImage,
+    tableCodeFormatted,
+    theme: 'dark',
+    accentColor: goldAccent,
+    bgColor: '#14110E',
+    borderColor: 'rgba(229, 197, 131, 0.45)',
+    titleColor: '#FFFFFF',
+    subtitleColor: '#CBD5E1',
+  });
+
+  // 4. Two-Column Menu Spread (Y: 590 - 3080)
+  const menu = getMenuForCard({
+    restaurant,
+    categories: menuData?.categories,
+    products: menuData?.products,
+    templateId: 'liquor_bar',
+  });
+
+  const colWidth = 980;
+  const col1X = 140;
+  const col2X = 1280;
+  const col1Y = 600;
+  const col2Y = 600;
+
+  // Center Decorative Vertical Line with Cocktail Emblem
+  ctx.save();
+  ctx.setLineDash([4, 7]);
+  ctx.beginPath();
+  ctx.moveTo(1200, 600);
+  ctx.lineTo(1200, 3050);
+  ctx.lineWidth = 1.8;
+  ctx.strokeStyle = 'rgba(229, 197, 131, 0.3)';
+  ctx.stroke();
+
+  // Center gold emblem
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.arc(1200, 1820, 22, 0, Math.PI * 2);
+  ctx.fillStyle = '#14110E';
+  ctx.fill();
+  ctx.lineWidth = 1.8;
+  ctx.strokeStyle = goldAccent;
+  ctx.stroke();
+
+  ctx.fillStyle = goldAccent;
+  ctx.font = '22px serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('🍸', 1200, 1820);
+  ctx.restore();
+
+  const categories = menu.categories || [];
+  const cat0 = categories[0];
+  const cat1 = categories[1];
+  const cat2 = categories[2];
+  const cat3 = categories[3];
+
+  const commonStyles = {
+    currency: menu.currency,
+    theme: 'dark',
+    accentColor: goldAccent,
+    titleColor: '#FFFFFF',
+    bodyColor: textMuted,
+    priceColor: goldAccent,
+    tagBg: 'rgba(245, 158, 11, 0.16)',
+    tagText: amberAccent,
+    headerFont: '700 38px "Playfair Display", Georgia, serif',
+    itemFont: '700 27px "Playfair Display", Georgia, serif',
+    descFont: '400 20px Inter, sans-serif',
+    priceStyle: 'dots',
+    dividerColor: goldAccent,
+  };
+
+  // Left Column
+  if (cat0) {
+    const bottom0 = drawMenuCategorySection(ctx, {
+      x: col1X,
+      y: col1Y,
+      width: colWidth,
+      category: cat0,
+      ...commonStyles,
+    });
+    if (cat1) {
+      drawMenuCategorySection(ctx, {
+        x: col1X,
+        y: Math.max(bottom0 + 50, 1850),
+        width: colWidth,
+        category: cat1,
+        ...commonStyles,
+      });
+    }
+  }
+
+  // Right Column
+  if (cat2) {
+    const bottom2 = drawMenuCategorySection(ctx, {
+      x: col2X,
+      y: col2Y,
+      width: colWidth,
+      category: cat2,
+      ...commonStyles,
+    });
+    if (cat3) {
+      drawMenuCategorySection(ctx, {
+        x: col2X,
+        y: Math.max(bottom2 + 50, 1850),
+        width: colWidth,
+        category: cat3,
+        ...commonStyles,
+      });
+    }
+  }
+
+  // 5. Footer Section (Y: 3120 - 3400)
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = textMuted;
+  ctx.font = '500 21px Inter, sans-serif';
+  ctx.fillText('🍸 21+ Only • Responsible Service of Alcohol: Please drink responsibly • VIP Bottle Service available on request.', 1200, 3140);
+  ctx.fillText('📶 Velvet Lounge Guest Wi-Fi • Ask VIP host or bartender for network credentials.', 1200, 3175);
+  ctx.restore();
+
+  // Signature "Powered by LayoScan" Footer Badge
+  await drawLayoScanFooter(ctx, {
+    cx: 1200,
+    cy: 3260,
+    badgeW: 460,
+    badgeH: 68,
+    templateId: 'liquor_bar',
+    theme: 'dark',
+    accentColor: goldAccent,
+  });
+}
+

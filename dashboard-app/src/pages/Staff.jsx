@@ -65,6 +65,7 @@ export default function Staff() {
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
+    email: '',
     role: 'waiter',
     password: '',
     pin: '',
@@ -107,6 +108,7 @@ export default function Staff() {
       setFormData({
         name: '',
         phone: '',
+        email: '',
         role: 'waiter',
         password: '',
         pin: '',
@@ -175,6 +177,14 @@ export default function Staff() {
       toast.error('Name and phone number are required.');
       return;
     }
+    if (
+      formData.email &&
+      formData.email.trim() &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())
+    ) {
+      toast.error('Please enter a valid email address or leave it blank.');
+      return;
+    }
     if (formData.pin && !/^\d{4}$/.test(formData.pin.trim())) {
       toast.error('PIN must be exactly 4 digits.');
       return;
@@ -184,6 +194,7 @@ export default function Staff() {
       name: formData.name.trim(),
       phone: formData.phone.trim(),
       role: formData.role,
+      ...(formData.email?.trim() && { email: formData.email.trim().toLowerCase() }),
       ...(formData.password.trim() && { password: formData.password.trim() }),
       ...(formData.pin.trim() && { pin: formData.pin.trim() }),
       ...(formData.role === 'kitchen' && { station: formData.station }),
@@ -537,15 +548,26 @@ export default function Staff() {
             required
           />
 
-          <Input
-            label="Phone Number"
-            type="tel"
-            placeholder="0911223344 or 0711223344"
-            value={formData.phone}
-            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-            helperText="Mobile number used to sign in to the app."
-            required
-          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              label="Phone Number"
+              type="tel"
+              placeholder="0911223344 or 0711223344"
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              helperText="Required for mobile login."
+              required
+            />
+
+            <Input
+              label="Email Address (Optional)"
+              type="email"
+              placeholder="e.g. staff@gmail.com"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              helperText="Optional alternative login."
+            />
+          </div>
 
           <div>
             <label className="block text-xs font-medium text-ink mb-1.5">

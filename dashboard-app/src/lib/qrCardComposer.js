@@ -14,26 +14,32 @@ import liquorBgImg from '../assets/templates/liquor_bg.jpg';
 import {
   renderCafeArtisanPortrait,
   renderCafeArtisanLandscape,
+  renderCafeArtisanMenuBoard,
 } from './templates/cafeArtisan';
 import {
   renderFastCasualPortrait,
   renderFastCasualLandscape,
+  renderFastCasualMenuBoard,
 } from './templates/fastCasual';
 import {
   renderFreshMartPortrait,
   renderFreshMartLandscape,
+  renderFreshMartMenuBoard,
 } from './templates/freshMart';
 import {
   renderLuxuryHotelPortrait,
   renderLuxuryHotelLandscape,
+  renderLuxuryHotelMenuBoard,
 } from './templates/luxuryHotel';
 import {
   renderCulturalHeritagePortrait,
   renderCulturalHeritageLandscape,
+  renderCulturalHeritageMenuBoard,
 } from './templates/culturalHeritage';
 import {
   renderLiquorBarPortrait,
   renderLiquorBarLandscape,
+  renderLiquorBarMenuBoard,
 } from './templates/liquorBar';
 
 const CUSTOMER_URL = import.meta.env.VITE_CUSTOMER_APP_URL || 'https://layoscancustomer.vercel.app';
@@ -57,6 +63,7 @@ export const QR_TEMPLATES = [
     defaultHero: cafeLatteHeroImg,
     renderPortrait: renderCafeArtisanPortrait,
     renderLandscape: renderCafeArtisanLandscape,
+    renderMenuBoard: renderCafeArtisanMenuBoard,
   },
   {
     id: 'fast_casual',
@@ -75,6 +82,7 @@ export const QR_TEMPLATES = [
     defaultHero: null,
     renderPortrait: renderFastCasualPortrait,
     renderLandscape: renderFastCasualLandscape,
+    renderMenuBoard: renderFastCasualMenuBoard,
   },
   {
     id: 'fresh_mart',
@@ -93,6 +101,7 @@ export const QR_TEMPLATES = [
     defaultHero: greenMartHeroImg,
     renderPortrait: renderFreshMartPortrait,
     renderLandscape: renderFreshMartLandscape,
+    renderMenuBoard: renderFreshMartMenuBoard,
   },
   {
     id: 'luxury_hotel',
@@ -111,6 +120,7 @@ export const QR_TEMPLATES = [
     defaultHero: skyViewSuiteHeroImg,
     renderPortrait: renderLuxuryHotelPortrait,
     renderLandscape: renderLuxuryHotelLandscape,
+    renderMenuBoard: renderLuxuryHotelMenuBoard,
   },
   {
     id: 'cultural_heritage',
@@ -129,6 +139,7 @@ export const QR_TEMPLATES = [
     defaultHero: enatFeastHeroImg,
     renderPortrait: renderCulturalHeritagePortrait,
     renderLandscape: renderCulturalHeritageLandscape,
+    renderMenuBoard: renderCulturalHeritageMenuBoard,
   },
   {
     id: 'liquor_bar',
@@ -148,6 +159,7 @@ export const QR_TEMPLATES = [
     defaultBg: liquorBgImg,
     renderPortrait: renderLiquorBarPortrait,
     renderLandscape: renderLiquorBarLandscape,
+    renderMenuBoard: renderLiquorBarMenuBoard,
   },
 ];
 
@@ -209,7 +221,8 @@ export async function renderPrintCardCanvas({
   table,
   restaurant,
   templateId = 'cafe_artisan',
-  orientation = 'portrait',
+  orientation = 'portrait', // 'portrait' | 'landscape' | 'menu_board'
+  menuData = null,
 }) {
   const template = getTemplateById(templateId);
   const qrUrl = `${CUSTOMER_URL}/t/${table.qrToken}`;
@@ -247,9 +260,10 @@ export async function renderPrintCardCanvas({
   const bgImage = await loadImage(template.defaultBg);
 
   // 3. Create Canvas
+  const isMenuBoard = orientation === 'menu_board';
   const isLandscape = orientation === 'landscape';
-  const width = isLandscape ? 1800 : 1200;
-  const height = isLandscape ? 1200 : 1800;
+  const width = isMenuBoard ? 2400 : (isLandscape ? 1800 : 1200);
+  const height = isMenuBoard ? 3400 : (isLandscape ? 1200 : 1800);
 
   const canvas = document.createElement('canvas');
   canvas.width = width;
@@ -257,7 +271,13 @@ export async function renderPrintCardCanvas({
   const ctx = canvas.getContext('2d');
 
   // 4. Delegate to template renderer
-  const renderFn = isLandscape ? template.renderLandscape : template.renderPortrait;
+  let renderFn = template.renderPortrait;
+  if (isMenuBoard && template.renderMenuBoard) {
+    renderFn = template.renderMenuBoard;
+  } else if (isLandscape && template.renderLandscape) {
+    renderFn = template.renderLandscape;
+  }
+
   await renderFn(ctx, {
     table,
     restaurant,
@@ -265,6 +285,7 @@ export async function renderPrintCardCanvas({
     logoImage,
     heroImage,
     bgImage,
+    menuData,
     width,
     height,
   });
@@ -280,15 +301,18 @@ export async function downloadTableCard({
   restaurant,
   templateId = 'cafe_artisan',
   orientation = 'portrait',
+  menuData = null,
 }) {
-  const canvas = await renderPrintCardCanvas({ table, restaurant, templateId, orientation });
+  const canvas = await renderPrintCardCanvas({ table, restaurant, templateId, orientation, menuData });
 
   return new Promise((resolve) => {
     canvas.toBlob((blob) => {
       if (blob) {
         const restSlug = sanitizeFilename(restaurant?.name || 'restaurant');
         const tableSlug = sanitizeFilename(table.label || 'table');
-        const orientTag = orientation === 'landscape' ? '-tent' : '-card';
+        const orientTag = orientation === 'landscape'
+          ? '-tent'
+          : (orientation === 'menu_board' ? '-menu-board' : '-card');
         const filename = `${restSlug}-${tableSlug}-${templateId}${orientTag}.png`;
         saveAs(blob, filename);
       }
@@ -305,6 +329,7 @@ export async function downloadAllTablesZip({
   restaurant,
   templateId = 'cafe_artisan',
   orientation = 'portrait',
+  menuData = null,
   onProgress,
 }) {
   const zip = new JSZip();
@@ -327,18 +352,23 @@ export async function downloadAllTablesZip({
       restaurant,
       templateId,
       orientation,
+      menuData,
     });
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
 
     if (blob) {
       const tableSlug = sanitizeFilename(table.label || `table-${i + 1}`);
-      const orientTag = orientation === 'landscape' ? '-tent' : '-card';
+      const orientTag = orientation === 'landscape'
+        ? '-tent'
+        : (orientation === 'menu_board' ? '-menu-board' : '-card');
       zip.file(`${restSlug}-${tableSlug}-${templateId}${orientTag}.png`, blob);
     }
   }
 
   const content = await zip.generateAsync({ type: 'blob' });
-  const orientSuffix = orientation === 'landscape' ? '-tent-cards' : '-qr-cards';
+  const orientSuffix = orientation === 'landscape'
+    ? '-tent-cards'
+    : (orientation === 'menu_board' ? '-menu-boards' : '-qr-cards');
   saveAs(content, `${restSlug}-all-${templateId}${orientSuffix}.zip`);
 }
 

@@ -5,6 +5,7 @@ const {
   listAssistance,
   acknowledgeAssistance,
   resolveAssistance,
+  updateAssistanceStatus,
 } = require('../controllers/assistanceController');
 const { protect } = require('../middleware/auth');
 const { resolveTenantFromAuth } = require('../middleware/tenantResolver');
@@ -14,6 +15,7 @@ router.post('/public', publicWriteLimiter, requestAssistance);
 
 router.use(protect, resolveTenantFromAuth);
 router.get('/', listAssistance);
+router.patch('/:id/status', updateAssistanceStatus);
 router.patch('/:id/acknowledge', acknowledgeAssistance);
 router.patch('/:id/resolve', resolveAssistance);
 
