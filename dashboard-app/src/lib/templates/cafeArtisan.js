@@ -8,6 +8,7 @@ import {
   drawLayoScanFooter,
   formatTableCode,
   drawMenuBridgeBar,
+  drawDynamicMenuGrid,
   drawMenuCategorySection,
 } from '../canvasHelpers';
 import { getMenuForCard } from '../menuDataHelpers';
@@ -554,82 +555,82 @@ export async function renderCafeArtisanMenuBoard(ctx, {
   drawBotanicalSprig(ctx, 100, height - 100, 1.8, -Math.PI / 2 - 0.15, 'rgba(27, 56, 43, 0.45)');
   drawBotanicalSprig(ctx, width - 100, height - 100, 1.8, Math.PI + 0.15, 'rgba(27, 56, 43, 0.45)');
 
-  // 2. Header Section (Y: 90 - 380)
+  // 2. Header Section (Y: 85 - 380) — Generously spaced Logo, Title & Slogan
   const restName = (restaurant?.name || 'Elili Cafe').toUpperCase();
   const restTagline = restaurant?.tagline || 'SPECIALTY ROASTERY • ARTISAN BAKERY • FRESH ALL-DAY BRUNCH';
 
-  // Logo or Artisan Coffee Emblem
+  // Logo or Artisan Coffee Emblem (Diameter: 130px, centered with generous padding)
+  const logoCenterY = 155;
   if (logoImage) {
-    const logoSize = 120;
+    const logoSize = 130;
     const logoX = 1200 - logoSize / 2;
-    const logoY = 100;
+    const logoY = logoCenterY - logoSize / 2;
     ctx.save();
     ctx.beginPath();
-    ctx.arc(1200, logoY + logoSize / 2, logoSize / 2, 0, Math.PI * 2);
+    ctx.arc(1200, logoCenterY, logoSize / 2 + 3, 0, Math.PI * 2);
     ctx.fillStyle = '#FFFFFF';
+    ctx.shadowColor = 'rgba(27, 56, 43, 0.16)';
+    ctx.shadowBlur = 18;
+    ctx.shadowOffsetY = 4;
     ctx.fill();
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = 2.8;
     ctx.strokeStyle = brandDark;
     ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(1200, logoCenterY, logoSize / 2, 0, Math.PI * 2);
     ctx.clip();
     ctx.drawImage(logoImage, logoX, logoY, logoSize, logoSize);
     ctx.restore();
   } else {
-    drawCoffeeCupEmblem(ctx, 1200, 150, 85, brandDark);
+    drawCoffeeCupEmblem(ctx, 1200, logoCenterY, 96, brandDark);
   }
 
-  // Restaurant Name
+  // Restaurant Name (Spaced with breathing room below logo)
   ctx.save();
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = brandDark;
-  ctx.font = '700 68px "Playfair Display", Georgia, serif';
-  ctx.fillText(restName, 1200, 240);
+  ctx.font = '700 72px "Playfair Display", Georgia, serif';
+  ctx.fillText(restName, 1200, 285);
 
-  // Tagline
+  // Tagline (Cleanly spaced below restaurant name)
   ctx.fillStyle = textMuted;
-  ctx.font = '600 22px "Space Grotesk", Inter, sans-serif';
-  ctx.letterSpacing = '2px';
-  ctx.fillText(restTagline, 1200, 296);
-
-  // Table Label Pill
-  drawPillBadge(ctx, 1200, 350, 260, 48, tableLabel, brandDark, '#FFFFFF');
+  ctx.font = '600 23px "Space Grotesk", Inter, sans-serif';
+  ctx.letterSpacing = '2.5px';
+  ctx.fillText(restTagline, 1200, 345);
   ctx.restore();
 
-  // 3. Slim Digital Bridge Bar (Y: 410 - 550)
+  // 3. Prominent Digital QR & Table Credentials Dock (Y: 410 - 680, Height: 270px)
   drawMenuBridgeBar(ctx, {
     x: 140,
     y: 410,
     width: 2120,
-    height: 140,
+    height: 270,
     qrImage,
+    tableLabel,
     tableCodeFormatted,
     theme: 'light',
     accentColor: brandDark,
     bgColor: '#FFFFFF',
-    borderColor: 'rgba(27, 56, 43, 0.25)',
+    borderColor: 'rgba(27, 56, 43, 0.28)',
+    titleColor: brandDark,
+    subtitleColor: textMuted,
   });
 
-  // 4. Two-Column Menu Spread (Y: 590 - 3080)
+  // 4. Unified Restaurant Menu Data
   const menu = getMenuForCard({
     restaurant,
     categories: menuData?.categories,
     products: menuData?.products,
-    templateId: 'cafe_artisan',
   });
-
-  const colWidth = 980;
-  const col1X = 140;
-  const col2X = 1280;
-  const col1Y = 600;
-  const col2Y = 600;
 
   // Center Decorative Vertical Divider Line
   ctx.save();
   ctx.setLineDash([5, 8]);
   ctx.beginPath();
-  ctx.moveTo(1200, 600);
-  ctx.lineTo(1200, 3050);
+  ctx.moveTo(1200, 720);
+  ctx.lineTo(1200, 3160);
   ctx.lineWidth = 1.8;
   ctx.strokeStyle = 'rgba(27, 56, 43, 0.25)';
   ctx.stroke();
@@ -637,27 +638,28 @@ export async function renderCafeArtisanMenuBoard(ctx, {
   // Center coffee bean emblem in middle of divider
   ctx.setLineDash([]);
   ctx.beginPath();
-  ctx.arc(1200, 1820, 22, 0, Math.PI * 2);
+  ctx.arc(1200, 1940, 24, 0, Math.PI * 2);
   ctx.fillStyle = '#FAF6EF';
   ctx.fill();
-  ctx.lineWidth = 1.8;
+  ctx.lineWidth = 2.0;
   ctx.strokeStyle = brandDark;
   ctx.stroke();
 
   ctx.fillStyle = brandDark;
   ctx.beginPath();
-  ctx.ellipse(1200, 1820, 10, 6, Math.PI / 4, 0, Math.PI * 2);
+  ctx.ellipse(1200, 1940, 11, 7, Math.PI / 4, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 
-  const categories = menu.categories || [];
-  const cat0 = categories[0];
-  const cat1 = categories[1];
-  const cat2 = categories[2];
-  const cat3 = categories[3];
-
-  const commonStyles = {
+  // Dynamic Two-Column Menu Spread (Balanced items, dynamic row heights, no dead space)
+  drawDynamicMenuGrid(ctx, {
+    categories: menu.categories || [],
     currency: menu.currency,
+    col1X: 140,
+    col2X: 1260,
+    colWidth: 1000,
+    startY: 720,
+    endY: 3160,
     theme: 'light',
     accentColor: brandDark,
     titleColor: brandDark,
@@ -666,66 +668,16 @@ export async function renderCafeArtisanMenuBoard(ctx, {
     tagBg: 'rgba(27, 56, 43, 0.08)',
     tagText: brandDark,
     headerFont: '700 38px "Playfair Display", Georgia, serif',
-    itemFont: '700 27px "Playfair Display", Georgia, serif',
-    descFont: '400 20px Inter, sans-serif',
+    itemFont: '700 30px "Playfair Display", Georgia, serif',
+    priceFont: '800 30px "Space Grotesk", monospace',
     priceStyle: 'dots',
     dividerColor: brandDark,
-  };
+  });
 
-  // Left Column
-  if (cat0) {
-    const bottom0 = drawMenuCategorySection(ctx, {
-      x: col1X,
-      y: col1Y,
-      width: colWidth,
-      category: cat0,
-      ...commonStyles,
-    });
-    if (cat1) {
-      drawMenuCategorySection(ctx, {
-        x: col1X,
-        y: Math.max(bottom0 + 50, 1850),
-        width: colWidth,
-        category: cat1,
-        ...commonStyles,
-      });
-    }
-  }
-
-  // Right Column
-  if (cat2) {
-    const bottom2 = drawMenuCategorySection(ctx, {
-      x: col2X,
-      y: col2Y,
-      width: colWidth,
-      category: cat2,
-      ...commonStyles,
-    });
-    if (cat3) {
-      drawMenuCategorySection(ctx, {
-        x: col2X,
-        y: Math.max(bottom2 + 50, 1850),
-        width: colWidth,
-        category: cat3,
-        ...commonStyles,
-      });
-    }
-  }
-
-  // 5. Footer Section (Y: 3120 - 3400)
-  ctx.save();
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = textMuted;
-  ctx.font = '500 21px Inter, sans-serif';
-  ctx.fillText('🌱 Milk Alternatives: Oat, Almond & Soy Available • Please notify our barista of any food allergies.', 1200, 3140);
-  ctx.fillText('📶 Complimentary Guest Wi-Fi • Ask server for the day’s network and access password.', 1200, 3175);
-  ctx.restore();
-
-  // Signature "Powered by LayoScan" Footer Badge
+  // 5. Official LayoScan Footer (Y: 3280, clean, no unasked clutter)
   await drawLayoScanFooter(ctx, {
     cx: 1200,
-    cy: 3260,
+    cy: 3280,
     badgeW: 460,
     badgeH: 68,
     templateId: 'cafe_artisan',

@@ -1087,14 +1087,16 @@ export function wrapCanvasText(ctx, text, maxWidth) {
 }
 
 /**
- * Slim Digital QR & Manual Table Code Bridge Bar for Full Menu Board
+ * Prominent Digital QR & Table Credentials Dock for Full Menu Board (2400 x 3400)
+ * Features an enlarged 240x240px QR code, clear scan instructions, and prominent table badges.
  */
 export function drawMenuBridgeBar(ctx, {
   x,
   y,
   width = 2120,
-  height = 140,
+  height = 270,
   qrImage = null,
+  tableLabel = 'Table 1',
   tableCodeFormatted = '',
   theme = 'light',
   accentColor = '#1B382B',
@@ -1104,15 +1106,15 @@ export function drawMenuBridgeBar(ctx, {
   subtitleColor = null,
 }) {
   ctx.save();
-  const radius = 24;
+  const radius = 28;
 
-  // Background Container
+  // 1. Background Dock Container
   ctx.beginPath();
   ctx.roundRect(x, y, width, height, radius);
   if (bgColor) {
     ctx.fillStyle = bgColor;
   } else if (theme === 'dark') {
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.07)';
   } else if (theme === 'solid-dark') {
     ctx.fillStyle = '#18181B';
   } else {
@@ -1120,57 +1122,60 @@ export function drawMenuBridgeBar(ctx, {
   }
   ctx.fill();
 
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = borderColor || (theme === 'dark' || theme === 'solid-dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)');
+  ctx.lineWidth = 2.4;
+  ctx.strokeStyle = borderColor || (theme === 'dark' || theme === 'solid-dark' ? 'rgba(255, 255, 255, 0.18)' : 'rgba(0, 0, 0, 0.12)');
   ctx.stroke();
 
-  // QR Code on Left
-  const qrPad = 16;
-  const qrBoxSize = height - qrPad * 2; // ~108px
-  const qrX = x + qrPad + 8;
-  const qrY = y + qrPad;
+  // 2. High-Visibility Enlarged QR Code Container on Left (236 x 236 px)
+  const qrBoxSize = 236;
+  const qrX = x + 18;
+  const qrY = y + (height - qrBoxSize) / 2;
+  const qrRadius = 22;
 
+  ctx.save();
   ctx.beginPath();
-  ctx.roundRect(qrX, qrY, qrBoxSize, qrBoxSize, 14);
+  ctx.roundRect(qrX, qrY, qrBoxSize, qrBoxSize, qrRadius);
   ctx.fillStyle = '#FFFFFF';
   ctx.fill();
-  ctx.lineWidth = 1.5;
-  ctx.strokeStyle = borderColor || 'rgba(0,0,0,0.12)';
+  ctx.lineWidth = 2.0;
+  ctx.strokeStyle = borderColor || (theme === 'solid-dark' ? accentColor : 'rgba(0, 0, 0, 0.15)');
   ctx.stroke();
 
   if (qrImage) {
-    const qrInner = qrBoxSize - 12;
-    ctx.drawImage(qrImage, qrX + 6, qrY + 6, qrInner, qrInner);
+    const qrInner = 216;
+    const qrInnerX = qrX + (qrBoxSize - qrInner) / 2;
+    const qrInnerY = qrY + (qrBoxSize - qrInner) / 2;
+    ctx.drawImage(qrImage, qrInnerX, qrInnerY, qrInner, qrInner);
   }
+  ctx.restore();
 
-  // Middle Text Block
-  const textX = qrX + qrBoxSize + 28;
-  const resolvedTitle = titleColor || (theme === 'dark' || theme === 'solid-dark' ? '#FFFFFF' : '#141416');
-  const resolvedSub = subtitleColor || (theme === 'dark' || theme === 'solid-dark' ? 'rgba(255, 255, 255, 0.65)' : '#5A626A');
+  // 3. Right Table Credentials Box (Table Pill + Table Code)
+  const rightBoxW = 480;
+  const rightX = x + width - rightBoxW - 20;
 
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
+  // Table Label Pill (Top)
+  const pillH = 76;
+  const pillY = y + 36;
+  drawPillBadge(ctx, {
+    x: rightX,
+    y: pillY,
+    width: rightBoxW,
+    height: pillH,
+    bgColor: accentColor,
+    text: tableLabel,
+    textColor: theme === 'solid-dark' ? '#141416' : '#FFFFFF',
+    font: '800 36px "Space Grotesk", sans-serif',
+  });
 
-  // Title with camera/phone icon
-  ctx.font = '700 28px "Space Grotesk", Inter, sans-serif';
-  ctx.fillStyle = resolvedTitle;
-  ctx.fillText('📱 Prefer ordering & paying directly from your phone?', textX, y + height * 0.36);
-
-  // Subtitle
-  ctx.font = '500 21px Inter, sans-serif';
-  ctx.fillStyle = resolvedSub;
-  ctx.fillText('Point camera at QR code or visit layoscancustomer.vercel.app with the table code', textX, y + height * 0.68);
-
-  // Table Code Pill on Right
+  // Table Code Tabular Box (Bottom)
   if (tableCodeFormatted) {
-    const pillW = 320;
-    const pillH = 72;
-    const pillX = x + width - pillW - 24;
-    const pillY = y + (height - pillH) / 2;
+    const codeH = 92;
+    const codeY = pillY + pillH + 20;
 
+    ctx.save();
     ctx.beginPath();
-    ctx.roundRect(pillX, pillY, pillW, pillH, 18);
-    ctx.fillStyle = theme === 'dark' || theme === 'solid-dark' ? 'rgba(255, 255, 255, 0.1)' : '#F4F5F7';
+    ctx.roundRect(rightX, codeY, rightBoxW, codeH, 16);
+    ctx.fillStyle = theme === 'dark' || theme === 'solid-dark' ? 'rgba(255, 255, 255, 0.08)' : '#F5F5F7';
     ctx.fill();
     ctx.lineWidth = 1.8;
     ctx.strokeStyle = accentColor;
@@ -1178,20 +1183,255 @@ export function drawMenuBridgeBar(ctx, {
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = resolvedSub;
+    ctx.fillStyle = subtitleColor || (theme === 'dark' || theme === 'solid-dark' ? '#94A3B8' : '#5A626A');
     ctx.font = '700 15px "Space Grotesk", sans-serif';
-    ctx.fillText('TABLE CODE:', pillX + pillW / 2, pillY + 22);
+    ctx.fillText('TABLE CODE FOR MANUAL ORDERING:', rightX + rightBoxW / 2, codeY + 28);
 
     ctx.fillStyle = accentColor;
-    ctx.font = '800 27px "Space Grotesk", monospace';
-    ctx.fillText(tableCodeFormatted, pillX + pillW / 2, pillY + 50);
+    ctx.font = '800 28px "Space Grotesk", monospace';
+    ctx.fillText(tableCodeFormatted, rightX + rightBoxW / 2, codeY + 64);
+    ctx.restore();
   }
 
+  // 4. Middle Scan & Order Instructions Callout
+  const textX = qrX + qrBoxSize + 38;
+  const resolvedTitle = titleColor || (theme === 'dark' || theme === 'solid-dark' ? '#FFFFFF' : '#141416');
+  const resolvedSub = subtitleColor || (theme === 'dark' || theme === 'solid-dark' ? 'rgba(255, 255, 255, 0.72)' : '#5A626A');
+
+  ctx.save();
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+
+  // Primary Callout Title
+  ctx.font = '700 32px "Space Grotesk", Inter, sans-serif';
+  ctx.fillStyle = resolvedTitle;
+  ctx.fillText('📱 Scan QR to View Full Menu & Order', textX, y + 68);
+
+  // Digital Web Address
+  ctx.font = '700 24px "Space Grotesk", monospace';
+  ctx.fillStyle = accentColor;
+  ctx.fillText('layoscancustomer.vercel.app', textX, y + 128);
+
+  // Subtitle Explanation
+  ctx.font = '500 21px Inter, sans-serif';
+  ctx.fillStyle = resolvedSub;
+  ctx.fillText('Browse full interactive menu, customize dishes & pay from your phone', textX, y + 184);
+
+  ctx.restore();
   ctx.restore();
 }
 
 /**
- * Renders a full Category Section (Header + Items with Prices) for the Menu Board
+ * Dynamic 2-Column Menu Grid Engine for Full Menu Board (2400 x 3400)
+ * Intelligently balances categories across two columns, dynamically computes row heights,
+ * renders clean single-line items with dotted leaders, and eliminates dead voids.
+ */
+export function drawDynamicMenuGrid(ctx, {
+  categories = [],
+  currency = 'Br',
+  col1X = 140,
+  col2X = 1260,
+  colWidth = 1000,
+  startY = 720,
+  endY = 3160,
+  theme = 'light',
+  accentColor = '#1B382B',
+  titleColor = null,
+  bodyColor = null,
+  priceColor = null,
+  tagBg = null,
+  tagText = null,
+  headerFont = '700 38px "Playfair Display", Georgia, serif',
+  itemFont = '700 30px "Playfair Display", Georgia, serif',
+  priceFont = '800 30px "Space Grotesk", monospace',
+  priceStyle = 'dots', // 'dots' | 'pill' | 'discreet'
+  showDivider = true,
+  dividerColor = null,
+}) {
+  if (!categories || categories.length === 0) return;
+
+  const resolvedTitle = titleColor || (theme === 'dark' || theme === 'solid-dark' ? '#FFFFFF' : '#141416');
+  const resolvedBody = bodyColor || (theme === 'dark' || theme === 'solid-dark' ? 'rgba(255, 255, 255, 0.65)' : '#5C646C');
+  const resolvedPrice = priceColor || accentColor;
+
+  // 1. Partition categories across Column 1 and Column 2
+  let col1Cats = [];
+  let col2Cats = [];
+
+  if (categories.length === 1) {
+    const singleCat = categories[0];
+    const items = singleCat.items || [];
+    if (items.length > 4) {
+      const half = Math.ceil(items.length / 2);
+      col1Cats = [{ ...singleCat, items: items.slice(0, half) }];
+      col2Cats = [{ ...singleCat, name: `${singleCat.name} (Cont.)`, items: items.slice(half) }];
+    } else {
+      col1Cats = [singleCat];
+      col2Cats = [];
+    }
+  } else {
+    // Greedy bin-packing by item count for balanced columns
+    let count1 = 0;
+    let count2 = 0;
+    for (const cat of categories) {
+      const itemCount = Math.max(1, (cat.items || []).length);
+      if (count1 <= count2) {
+        col1Cats.push(cat);
+        count1 += itemCount;
+      } else {
+        col2Cats.push(cat);
+        count2 += itemCount;
+      }
+    }
+  }
+
+  // 2. Render helper for a single column
+  const renderColumn = (colCats, colX) => {
+    if (!colCats || colCats.length === 0) return;
+
+    const availH = endY - startY;
+    const totalCategories = colCats.length;
+    const totalItems = colCats.reduce((sum, c) => sum + (c.items?.length || 0), 0);
+
+    const headerBudget = totalCategories * 76; // Title + divider
+    const remainingForItems = availH - headerBudget - Math.max(0, totalCategories - 1) * 70;
+    const computedRowH = totalItems > 0 ? remainingForItems / totalItems : 70;
+    const rowHeight = Math.min(84, Math.max(54, computedRowH));
+
+    const totalUsedH = headerBudget + totalItems * rowHeight + Math.max(0, totalCategories - 1) * 60;
+    const extraSpace = Math.max(0, availH - totalUsedH);
+    const topPad = Math.min(extraSpace * 0.12, 100);
+    const categoryGap = Math.min(180, Math.max(50, 60 + extraSpace / Math.max(1, totalCategories)));
+
+    let currentY = startY + topPad;
+
+    for (let cIdx = 0; cIdx < colCats.length; cIdx++) {
+      const cat = colCats[cIdx];
+      const items = cat.items || [];
+
+      // Category Header
+      ctx.save();
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.font = headerFont;
+      ctx.fillStyle = resolvedTitle;
+      const headerText = cat.icon ? `${cat.icon}  ${cat.name}` : cat.name;
+      ctx.fillText(headerText, colX, currentY + 22);
+      currentY += 46;
+
+      // Divider Line
+      if (showDivider) {
+        ctx.beginPath();
+        ctx.moveTo(colX, currentY);
+        ctx.lineTo(colX + colWidth, currentY);
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = dividerColor || accentColor;
+        ctx.stroke();
+        currentY += 28;
+      } else {
+        currentY += 16;
+      }
+      ctx.restore();
+
+      // Category Items (Single-line, large typography, no descriptions)
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const itemY = currentY + rowHeight / 2;
+
+        ctx.save();
+        ctx.textBaseline = 'middle';
+
+        // Item Name (Left)
+        ctx.font = itemFont;
+        ctx.fillStyle = resolvedTitle;
+        ctx.textAlign = 'left';
+        ctx.fillText(item.name, colX, itemY);
+
+        const nameMetrics = ctx.measureText(item.name);
+        let nameEndX = colX + nameMetrics.width;
+
+        // Optional Tag Badge Pill
+        if (item.tag) {
+          ctx.font = '700 16px "Space Grotesk", sans-serif';
+          const tagMetrics = ctx.measureText(item.tag);
+          const tagW = tagMetrics.width + 20;
+          const tagH = 28;
+          const tagX = nameEndX + 14;
+          const tagY = itemY - tagH / 2;
+
+          ctx.beginPath();
+          ctx.roundRect(tagX, tagY, tagW, tagH, 9);
+          ctx.fillStyle = tagBg || (theme === 'dark' || theme === 'solid-dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.06)');
+          ctx.fill();
+
+          ctx.fillStyle = tagText || accentColor;
+          ctx.textAlign = 'center';
+          ctx.fillText(item.tag, tagX + tagW / 2, itemY);
+
+          nameEndX = tagX + tagW;
+        }
+
+        // Price String (Right)
+        const priceNum = typeof item.price === 'number' ? item.price : Number(item.price);
+        const formattedPrice = priceNum % 1 === 0 ? priceNum.toLocaleString() : priceNum.toFixed(2);
+        const priceStr = priceStyle === 'discreet' ? `${currency} ${formattedPrice}` : `${formattedPrice} ${currency}`;
+
+        ctx.font = priceFont;
+        const priceMetrics = ctx.measureText(priceStr);
+        const priceW = priceMetrics.width;
+
+        if (priceStyle === 'pill') {
+          const pillW = priceW + 28;
+          const pillH = 42;
+          const pillX = colX + colWidth - pillW;
+          const pillY = itemY - pillH / 2;
+
+          ctx.beginPath();
+          ctx.roundRect(pillX, pillY, pillW, pillH, 12);
+          ctx.fillStyle = accentColor;
+          ctx.fill();
+
+          ctx.fillStyle = theme === 'solid-dark' ? '#141416' : '#FFFFFF';
+          ctx.textAlign = 'center';
+          ctx.fillText(priceStr, pillX + pillW / 2, itemY);
+        } else {
+          ctx.fillStyle = resolvedPrice;
+          ctx.textAlign = 'right';
+          ctx.fillText(priceStr, colX + colWidth, itemY);
+
+          // Dotted Leader Connecting Name to Price
+          if (priceStyle === 'dots') {
+            const dotsStart = nameEndX + 18;
+            const dotsEnd = colX + colWidth - priceW - 18;
+            if (dotsEnd > dotsStart + 24) {
+              ctx.save();
+              ctx.setLineDash([4, 6]);
+              ctx.beginPath();
+              ctx.moveTo(dotsStart, itemY);
+              ctx.lineTo(dotsEnd, itemY);
+              ctx.lineWidth = 2.0;
+              ctx.strokeStyle = theme === 'dark' || theme === 'solid-dark' ? 'rgba(255, 255, 255, 0.22)' : 'rgba(0, 0, 0, 0.18)';
+              ctx.stroke();
+              ctx.restore();
+            }
+          }
+        }
+
+        ctx.restore();
+        currentY += rowHeight;
+      }
+
+      currentY += categoryGap;
+    }
+  };
+
+  // 3. Render Both Columns
+  renderColumn(col1Cats, col1X);
+  renderColumn(col2Cats, col2X);
+}
+
+/**
+ * Backwards-compatible single section drawer for Menu Board
  */
 export function drawMenuCategorySection(ctx, {
   x,
@@ -1209,7 +1449,7 @@ export function drawMenuCategorySection(ctx, {
   headerFont = '700 36px "Space Grotesk", sans-serif',
   itemFont = '700 28px "Space Grotesk", sans-serif',
   descFont = '400 20px Inter, sans-serif',
-  priceStyle = 'dots', // 'dots' | 'pill' | 'discreet'
+  priceStyle = 'dots',
   showDivider = true,
   dividerColor = null,
 }) {
@@ -1220,17 +1460,15 @@ export function drawMenuCategorySection(ctx, {
   const resolvedBody = bodyColor || (theme === 'dark' || theme === 'solid-dark' ? 'rgba(255, 255, 255, 0.65)' : '#5C646C');
   const resolvedPrice = priceColor || accentColor;
 
-  // 1. Category Header
+  // Category Header
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   ctx.font = headerFont;
   ctx.fillStyle = resolvedTitle;
-
   const headerText = category.icon ? `${category.icon}  ${category.name}` : category.name;
   ctx.fillText(headerText, x, currentY);
   currentY += 46;
 
-  // Header Divider Rule
   if (showDivider) {
     ctx.beginPath();
     ctx.moveTo(x, currentY);
@@ -1243,13 +1481,11 @@ export function drawMenuCategorySection(ctx, {
     currentY += 16;
   }
 
-  // 2. Menu Items
   const items = category.items || [];
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
     const itemStartY = currentY;
 
-    // Item Title
     ctx.font = itemFont;
     ctx.fillStyle = resolvedTitle;
     ctx.textAlign = 'left';
@@ -1259,7 +1495,6 @@ export function drawMenuCategorySection(ctx, {
     const titleMetrics = ctx.measureText(item.name);
     let nameEndX = x + titleMetrics.width;
 
-    // Optional Tag Pill
     if (item.tag) {
       ctx.font = '700 15px "Space Grotesk", sans-serif';
       const tagMetrics = ctx.measureText(item.tag);
@@ -1281,7 +1516,6 @@ export function drawMenuCategorySection(ctx, {
       nameEndX = tagPillX + tagPillW;
     }
 
-    // Price Formatting
     const priceNum = typeof item.price === 'number' ? item.price : Number(item.price);
     const priceStr = priceStyle === 'discreet'
       ? `${currency} ${priceNum}`
@@ -1312,7 +1546,6 @@ export function drawMenuCategorySection(ctx, {
       ctx.textBaseline = 'top';
       ctx.fillText(priceStr, x + width, itemStartY);
 
-      // Dotted Leader
       if (priceStyle === 'dots') {
         const dotStartX = nameEndX + 16;
         const dotEndX = priceX - 16;
@@ -1330,23 +1563,7 @@ export function drawMenuCategorySection(ctx, {
       }
     }
 
-    currentY += 36;
-
-    // Item Description
-    if (item.desc) {
-      ctx.font = descFont;
-      ctx.fillStyle = resolvedBody;
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'top';
-
-      const descLines = wrapCanvasText(ctx, item.desc, width - (priceStyle === 'pill' ? 140 : 100));
-      for (let l = 0; l < Math.min(descLines.length, 2); l++) {
-        ctx.fillText(descLines[l], x, currentY);
-        currentY += 24;
-      }
-    }
-
-    currentY += 22; // Spacing to next item
+    currentY += 44;
   }
 
   ctx.restore();

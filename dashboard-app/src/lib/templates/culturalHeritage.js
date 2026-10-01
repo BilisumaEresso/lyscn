@@ -6,6 +6,7 @@ import {
   drawLayoScanFooter,
   formatTableCode,
   drawMenuBridgeBar,
+  drawDynamicMenuGrid,
   drawMenuCategorySection,
 } from '../canvasHelpers';
 import { getMenuForCard } from '../menuDataHelpers';
@@ -1289,55 +1290,60 @@ export async function renderCulturalHeritageMenuBoard(ctx, {
   drawEthiopianCrossRosette(ctx, width - 100, height - 100, 32);
   ctx.restore();
 
-  // 2. Header Section (Y: 90 - 380)
+  // 2. Header Section (Y: 85 - 380) — Authentic Habesha Heritage Spaced Header
   const restName = (restaurant?.name || 'Enat Traditional Ethiopian Cuisine').toUpperCase();
   const restTagline = restaurant?.tagline || 'AUTHENTIC ETHIOPIAN CUISINE • BUNA CEREMONY • TEJ';
 
-  // Traditional Mesob Basket Emblem or Logo
+  // Traditional Mesob Basket Emblem or Logo (Diameter: 130px, centered with generous padding)
+  const logoCenterY = 155;
   if (logoImage) {
-    const logoSize = 120;
+    const logoSize = 130;
     const logoX = 1200 - logoSize / 2;
-    const logoY = 95;
+    const logoY = logoCenterY - logoSize / 2;
     ctx.save();
     ctx.beginPath();
-    ctx.arc(1200, logoY + logoSize / 2, logoSize / 2, 0, Math.PI * 2);
+    ctx.arc(1200, logoCenterY, logoSize / 2 + 3, 0, Math.PI * 2);
     ctx.fillStyle = ETH_CREAM;
+    ctx.shadowColor = 'rgba(120, 24, 18, 0.22)';
+    ctx.shadowBlur = 18;
+    ctx.shadowOffsetY = 4;
     ctx.fill();
     ctx.lineWidth = 3;
     ctx.strokeStyle = ETH_BURGUNDY;
     ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(1200, logoCenterY, logoSize / 2, 0, Math.PI * 2);
     ctx.clip();
     ctx.drawImage(logoImage, logoX, logoY, logoSize, logoSize);
     ctx.restore();
   } else {
-    drawTraditionalMesobBasket(ctx, 1200, 150, 110);
+    drawTraditionalMesobBasket(ctx, 1200, logoCenterY, 115);
   }
 
-  // Restaurant Name
+  // Restaurant Name (Spaced with breathing room below logo)
   ctx.save();
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = ETH_BURGUNDY;
-  ctx.font = '700 66px "Playfair Display", Georgia, serif';
-  ctx.fillText(restName, 1200, 240);
+  ctx.font = '700 70px "Playfair Display", Georgia, serif';
+  ctx.fillText(restName, 1200, 285);
 
-  // Tagline
+  // Tagline (Cleanly spaced below restaurant name)
   ctx.fillStyle = ETH_UMBER;
-  ctx.font = '600 22px "Space Grotesk", sans-serif';
+  ctx.font = '600 23px "Space Grotesk", sans-serif';
   ctx.letterSpacing = '2px';
-  ctx.fillText(restTagline, 1200, 296);
-
-  // Table Label Pill
-  drawPillBadge(ctx, 1200, 350, 270, 50, tableLabel, ETH_BURGUNDY, ETH_CREAM);
+  ctx.fillText(restTagline, 1200, 345);
   ctx.restore();
 
-  // 3. Slim Digital Bridge Bar (Y: 410 - 550)
+  // 3. Prominent Digital QR & Table Credentials Dock (Y: 410 - 680, Height: 270px)
   drawMenuBridgeBar(ctx, {
     x: 140,
     y: 410,
     width: 2120,
-    height: 140,
+    height: 270,
     qrImage,
+    tableLabel,
     tableCodeFormatted,
     theme: 'light',
     accentColor: ETH_BURGUNDY,
@@ -1347,43 +1353,37 @@ export async function renderCulturalHeritageMenuBoard(ctx, {
     subtitleColor: ETH_UMBER,
   });
 
-  // 4. Two-Column Menu Spread (Y: 590 - 3080)
+  // 4. Unified Restaurant Menu Data
   const menu = getMenuForCard({
     restaurant,
     categories: menuData?.categories,
     products: menuData?.products,
-    templateId: 'cultural_heritage',
   });
-
-  const colWidth = 980;
-  const col1X = 140;
-  const col2X = 1280;
-  const col1Y = 600;
-  const col2Y = 600;
 
   // Center Decorative Vertical Line with Traditional Rosette
   ctx.save();
   ctx.setLineDash([5, 8]);
   ctx.beginPath();
-  ctx.moveTo(1200, 600);
-  ctx.lineTo(1200, 3050);
+  ctx.moveTo(1200, 720);
+  ctx.lineTo(1200, 3160);
   ctx.lineWidth = 1.8;
   ctx.strokeStyle = 'rgba(120, 24, 18, 0.28)';
   ctx.stroke();
 
   // Center Rosette
   ctx.setLineDash([]);
-  drawEthiopianCrossRosette(ctx, 1200, 1820, 26);
+  drawEthiopianCrossRosette(ctx, 1200, 1940, 26);
   ctx.restore();
 
-  const categories = menu.categories || [];
-  const cat0 = categories[0];
-  const cat1 = categories[1];
-  const cat2 = categories[2];
-  const cat3 = categories[3];
-
-  const commonStyles = {
+  // Dynamic Two-Column Menu Spread (Balanced items, dynamic row heights, no dead space)
+  drawDynamicMenuGrid(ctx, {
+    categories: menu.categories || [],
     currency: menu.currency,
+    col1X: 140,
+    col2X: 1260,
+    colWidth: 1000,
+    startY: 720,
+    endY: 3160,
     theme: 'light',
     accentColor: ETH_BURGUNDY,
     titleColor: ETH_BURGUNDY,
@@ -1391,67 +1391,17 @@ export async function renderCulturalHeritageMenuBoard(ctx, {
     priceColor: ETH_BURGUNDY,
     tagBg: 'rgba(120, 24, 18, 0.08)',
     tagText: ETH_BURGUNDY,
-    headerFont: '700 36px "Playfair Display", Georgia, serif',
-    itemFont: '700 27px "Playfair Display", Georgia, serif',
-    descFont: '400 20px Inter, sans-serif',
+    headerFont: '700 38px "Playfair Display", Georgia, serif',
+    itemFont: '700 30px "Playfair Display", Georgia, serif',
+    priceFont: '800 30px "Space Grotesk", monospace',
     priceStyle: 'dots',
     dividerColor: ETH_GOLD,
-  };
+  });
 
-  // Left Column
-  if (cat0) {
-    const bottom0 = drawMenuCategorySection(ctx, {
-      x: col1X,
-      y: col1Y,
-      width: colWidth,
-      category: cat0,
-      ...commonStyles,
-    });
-    if (cat1) {
-      drawMenuCategorySection(ctx, {
-        x: col1X,
-        y: Math.max(bottom0 + 50, 1850),
-        width: colWidth,
-        category: cat1,
-        ...commonStyles,
-      });
-    }
-  }
-
-  // Right Column
-  if (cat2) {
-    const bottom2 = drawMenuCategorySection(ctx, {
-      x: col2X,
-      y: col2Y,
-      width: colWidth,
-      category: cat2,
-      ...commonStyles,
-    });
-    if (cat3) {
-      drawMenuCategorySection(ctx, {
-        x: col2X,
-        y: Math.max(bottom2 + 50, 1850),
-        width: colWidth,
-        category: cat3,
-        ...commonStyles,
-      });
-    }
-  }
-
-  // 5. Footer Section (Y: 3120 - 3400)
-  ctx.save();
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = ETH_UMBER;
-  ctx.font = '500 21px Inter, sans-serif';
-  ctx.fillText('🍲 Injera & Gursha Hospitality: Fresh Teff Injera served with all platters • Vegetarian fasting (Yetsom) prepared in separate vessels.', 1200, 3140);
-  ctx.fillText('📶 Habesha Heritage Guest Wi-Fi • Ask your server for access details.', 1200, 3175);
-  ctx.restore();
-
-  // Signature "Powered by LayoScan" Footer Badge
+  // 5. Official LayoScan Footer (Y: 3280, clean, no unasked clutter)
   await drawLayoScanFooter(ctx, {
     cx: 1200,
-    cy: 3260,
+    cy: 3280,
     badgeW: 460,
     badgeH: 68,
     templateId: 'cultural_heritage',

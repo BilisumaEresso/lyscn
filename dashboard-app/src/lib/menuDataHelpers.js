@@ -270,53 +270,167 @@ export const ARCHETYPE_SAMPLE_MENUS = {
 };
 
 /**
+ * Contextual visual icon for category headers based on category name
+ */
+export function getCategoryVisualIcon(catName = '') {
+  const lower = (catName || '').toLowerCase();
+  if (lower.includes('coffee') || lower.includes('tea') || lower.includes('hot drink') || lower.includes('espresso') || lower.includes('latte')) return '☕';
+  if (lower.includes('cocktail') || lower.includes('wine') || lower.includes('bar') || lower.includes('beer') || lower.includes('spirit') || lower.includes('whiskey')) return '🍸';
+  if (lower.includes('breakfast') || lower.includes('brunch') || lower.includes('egg') || lower.includes('morning')) return '🍳';
+  if (lower.includes('sandwich') || lower.includes('burger') || lower.includes('panini') || lower.includes('wrap') || lower.includes('toast')) return '🥪';
+  if (lower.includes('starter') || lower.includes('appetizer') || lower.includes('snack') || lower.includes('salad') || lower.includes('side') || lower.includes('wing') || lower.includes('bite')) return '🥗';
+  if (lower.includes('local') || lower.includes('traditional') || lower.includes('cultural') || lower.includes('tibs') || lower.includes('kitfo') || lower.includes('wot') || lower.includes('habesha')) return '🍲';
+  if (lower.includes('pizza') || lower.includes('pie')) return '🍕';
+  if (lower.includes('bakery') || lower.includes('pastry') || lower.includes('croissant') || lower.includes('cake') || lower.includes('dessert') || lower.includes('sweet')) return '🥐';
+  if (lower.includes('meat') || lower.includes('steak') || lower.includes('grill') || lower.includes('siga') || lower.includes('beef') || lower.includes('chicken')) return '🥩';
+  if (lower.includes('pasta') || lower.includes('noodle')) return '🍝';
+  if (lower.includes('juice') || lower.includes('smoothie') || lower.includes('chiller') || lower.includes('shake') || lower.includes('drink')) return '🧃';
+  if (lower.includes('seafood') || lower.includes('fish')) return '🐟';
+  return '🍽️';
+}
+
+/**
+ * Strict product-to-category matching helper.
+ * Handles both populated { _id, name } objects and raw ObjectId / ID strings.
+ * Prevents undefined === undefined matching bugs.
+ */
+export function productMatchesCategory(product, category) {
+  if (!product || !category) return false;
+
+  const targetCatId = category._id ? String(category._id) : (category.id ? String(category.id) : null);
+  const targetCatName = category.name ? String(category.name).trim().toLowerCase() : null;
+
+  // 1. Check product.categoryId as populated object
+  if (product.categoryId && typeof product.categoryId === 'object') {
+    const popId = product.categoryId._id ? String(product.categoryId._id) : (product.categoryId.id ? String(product.categoryId.id) : null);
+    if (targetCatId && popId && popId === targetCatId) return true;
+    if (targetCatName && product.categoryId.name && String(product.categoryId.name).trim().toLowerCase() === targetCatName) return true;
+  }
+
+  // 2. Check product.categoryId as direct ID string
+  if (product.categoryId && typeof product.categoryId !== 'object') {
+    const strId = String(product.categoryId).trim();
+    if (targetCatId && strId && strId === targetCatId) return true;
+  }
+
+  // 3. Check product.category as populated object
+  if (product.category && typeof product.category === 'object') {
+    const popId = product.category._id ? String(product.category._id) : (product.category.id ? String(product.category.id) : null);
+    if (targetCatId && popId && popId === targetCatId) return true;
+    if (targetCatName && product.category.name && String(product.category.name).trim().toLowerCase() === targetCatName) return true;
+  }
+
+  // 4. Check product.category as direct ID string
+  if (product.category && typeof product.category !== 'object') {
+    const strId = String(product.category).trim();
+    if (targetCatId && strId && strId === targetCatId) return true;
+  }
+
+  // 5. Fallback: Check categoryName string on product
+  if (targetCatName && product.categoryName && String(product.categoryName).trim().toLowerCase() === targetCatName) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Extracts and organizes menu items for the print card.
  * Priority:
  * 1. Live categories & products passed in options
  * 2. Archetype curated sample menu as rich fallback
  */
-export function getMenuForCard({ restaurant, categories = [], products = [], templateId = 'cafe_artisan' }) {
-  const fallback = ARCHETYPE_SAMPLE_MENUS[templateId] || ARCHETYPE_SAMPLE_MENUS.cafe_artisan;
+export function getMenuForCard({ restaurant, categories = [], products = [], templateId = null }) {
+  // Determine restaurant archetype preference (fixed per restaurant, NOT per preview template)
+  const restaurantArchetype = restaurant?.qrCardTemplate || 'cafe_artisan';
+  const fallback = ARCHETYPE_SAMPLE_MENUS[restaurantArchetype] || ARCHETYPE_SAMPLE_MENUS.cafe_artisan;
   const currency = restaurant?.currency || fallback.currency || 'Br';
 
-  // If we have live categories with active products
+  // 1. If we have live categories with active products
   if (Array.isArray(categories) && categories.length > 0 && Array.isArray(products) && products.length > 0) {
     const liveCats = [];
     const sortedCats = [...categories].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
 
     for (const cat of sortedCats) {
       const catProducts = products.filter(
-        (p) => (p.categoryId === cat._id || p.category === cat._id) && p.isAvailable !== false
+        (p) => productMatchesCategory(p, cat) && p.isAvailable !== false
       );
 
       if (catProducts.length > 0) {
         liveCats.push({
           name: cat.name,
-          icon: cat.icon || '🍽️',
-          items: catProducts.slice(0, 5).map((p) => ({
+          icon: cat.icon || getCategoryVisualIcon(cat.name),
+          items: catProducts.slice(0, 15).map((p) => ({
             name: p.name,
             price: p.price,
-            desc: p.description || '',
-            tag: p.modifierGroups?.length ? `${p.modifierGroups.length} opts` : null,
+            tag: p.tag || (p.isVegetarian ? '🌱 Vegan' : (p.isSpicy ? '🔥 Spicy' : (p.modifierGroups?.length ? `${p.modifierGroups.length} opts` : null))),
           })),
         });
       }
+    }
+
+    // Include any active products that did not match an active category
+    const includedProductNames = new Set();
+    liveCats.forEach((c) => c.items.forEach((it) => includedProductNames.add(it.name)));
+    const unassigned = products.filter((p) => p.isAvailable !== false && !includedProductNames.has(p.name));
+    if (unassigned.length > 0 && liveCats.length < 8) {
+      liveCats.push({
+        name: 'Chef Specialties',
+        icon: '✨',
+        items: unassigned.map((p) => ({
+          name: p.name,
+          price: p.price,
+          tag: p.tag || (p.isVegetarian ? '🌱 Vegan' : (p.isSpicy ? '🔥 Spicy' : null)),
+        })),
+      });
     }
 
     if (liveCats.length > 0) {
       return {
         tagline: restaurant?.tagline || fallback.tagline,
         currency,
-        categories: liveCats.slice(0, 4), // 4 categories fit beautifully in 2x2 grid
+        categories: liveCats.slice(0, 8), // Balances dynamically across 2 columns
       };
     }
   }
 
-  // Fallback to archetype sample
+  // 2. If products exist without explicit categories, bundle into a single catalog
+  if (Array.isArray(products) && products.length > 0) {
+    const activeProducts = products.filter((p) => p.isAvailable !== false);
+    if (activeProducts.length > 0) {
+      return {
+        tagline: restaurant?.tagline || fallback.tagline,
+        currency,
+        categories: [
+          {
+            name: 'House Menu',
+            icon: '🍽️',
+            items: activeProducts.slice(0, 16).map((p) => ({
+              name: p.name,
+              price: p.price,
+              tag: p.tag || (p.isVegetarian ? '🌱 Vegan' : (p.isSpicy ? '🔥 Spicy' : null)),
+            })),
+          },
+        ],
+      };
+    }
+  }
+
+  // 3. Fallback: Cleaned restaurant sample menu (no descriptions, consistent across all templates)
+  const cleanedFallbackCategories = fallback.categories.map((c) => ({
+    name: c.name,
+    icon: c.icon || '🍽️',
+    items: (c.items || []).map((it) => ({
+      name: it.name,
+      price: it.price,
+      tag: it.tag || null,
+    })),
+  }));
+
   return {
     tagline: restaurant?.tagline || fallback.tagline,
     currency,
-    categories: fallback.categories,
+    categories: cleanedFallbackCategories,
   };
 }
 

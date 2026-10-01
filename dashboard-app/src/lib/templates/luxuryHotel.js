@@ -6,6 +6,7 @@ import {
   drawLayoScanFooter,
   formatTableCode,
   drawMenuBridgeBar,
+  drawDynamicMenuGrid,
   drawMenuCategorySection,
 } from '../canvasHelpers';
 import { getMenuForCard } from '../menuDataHelpers';
@@ -595,56 +596,60 @@ export async function renderLuxuryHotelMenuBoard(ctx, {
   ctx.stroke();
   ctx.restore();
 
-  // 2. Header Section (Y: 90 - 380)
+  // 2. Header Section (Y: 85 - 380) — Midnight Royal Gold Spaced Header
   const restName = (restaurant?.name || 'SkyView Hotel & Suites').toUpperCase();
   const restTagline = restaurant?.tagline || 'HAUTE CUISINE • SOMMELIER SELECTION • REFINED HOSPITALITY';
 
-  // Architectural Crown Logo or Custom Logo
+  // Architectural Crown Logo or Custom Logo (Diameter: 130px, centered with generous padding)
+  const logoCenterY = 155;
   if (logoImage) {
-    const logoSize = 120;
+    const logoSize = 130;
     const logoX = 1200 - logoSize / 2;
-    const logoY = 95;
+    const logoY = logoCenterY - logoSize / 2;
     ctx.save();
     ctx.beginPath();
-    ctx.arc(1200, logoY + logoSize / 2, logoSize / 2, 0, Math.PI * 2);
+    ctx.arc(1200, logoCenterY, logoSize / 2 + 3, 0, Math.PI * 2);
     ctx.fillStyle = deepNavy;
+    ctx.shadowColor = 'rgba(229, 197, 131, 0.35)';
+    ctx.shadowBlur = 20;
     ctx.fill();
     ctx.lineWidth = 3;
     ctx.strokeStyle = goldAccent;
     ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(1200, logoCenterY, logoSize / 2, 0, Math.PI * 2);
     ctx.clip();
     ctx.drawImage(logoImage, logoX, logoY, logoSize, logoSize);
     ctx.restore();
   } else {
-    drawArchitecturalCrownLogo(ctx, 1200, 140, 110, goldAccent);
+    drawArchitecturalCrownLogo(ctx, 1200, logoCenterY, 115, goldAccent);
   }
 
-  // Restaurant Name
+  // Restaurant Name (Spaced with breathing room below logo)
   ctx.save();
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = '700 66px "Playfair Display", Georgia, serif';
+  ctx.font = '700 70px "Playfair Display", Georgia, serif';
   ctx.letterSpacing = '3px';
-  ctx.fillText(restName, 1200, 240);
+  ctx.fillText(restName, 1200, 285);
 
-  // Tagline
+  // Tagline (Cleanly spaced below restaurant name)
   ctx.fillStyle = goldAccent;
-  ctx.font = '600 22px "Space Grotesk", sans-serif';
+  ctx.font = '600 23px "Space Grotesk", sans-serif';
   ctx.letterSpacing = '3px';
-  ctx.fillText(restTagline, 1200, 296);
-
-  // Table / Suite Label Pill
-  drawPillBadge(ctx, 1200, 350, 280, 50, tableLabel, goldAccent, midnightNavy);
+  ctx.fillText(restTagline, 1200, 345);
   ctx.restore();
 
-  // 3. Slim Digital Bridge Bar (Y: 410 - 550)
+  // 3. Prominent Digital QR & Table Credentials Dock (Y: 410 - 680, Height: 270px)
   drawMenuBridgeBar(ctx, {
     x: 140,
     y: 410,
     width: 2120,
-    height: 140,
+    height: 270,
     qrImage,
+    tableLabel,
     tableCodeFormatted,
     theme: 'dark',
     accentColor: goldAccent,
@@ -654,32 +659,25 @@ export async function renderLuxuryHotelMenuBoard(ctx, {
     subtitleColor: '#CBD5E1',
   });
 
-  // 4. Two-Column Menu Spread (Y: 590 - 3080)
+  // 4. Unified Restaurant Menu Data
   const menu = getMenuForCard({
     restaurant,
     categories: menuData?.categories,
     products: menuData?.products,
-    templateId: 'luxury_hotel',
   });
-
-  const colWidth = 980;
-  const col1X = 140;
-  const col2X = 1280;
-  const col1Y = 600;
-  const col2Y = 600;
 
   // Center Decorative Vertical Line with Gold Fleur-de-lis / Pip
   ctx.save();
   ctx.beginPath();
-  ctx.moveTo(1200, 600);
-  ctx.lineTo(1200, 3050);
+  ctx.moveTo(1200, 720);
+  ctx.lineTo(1200, 3160);
   ctx.lineWidth = 1.8;
   ctx.strokeStyle = 'rgba(229, 197, 131, 0.35)';
   ctx.stroke();
 
   // Center gold rosette
   ctx.beginPath();
-  ctx.arc(1200, 1820, 22, 0, Math.PI * 2);
+  ctx.arc(1200, 1940, 24, 0, Math.PI * 2);
   ctx.fillStyle = deepNavy;
   ctx.fill();
   ctx.lineWidth = 1.8;
@@ -690,17 +688,18 @@ export async function renderLuxuryHotelMenuBoard(ctx, {
   ctx.font = '22px serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('⚜️', 1200, 1820);
+  ctx.fillText('⚜️', 1200, 1940);
   ctx.restore();
 
-  const categories = menu.categories || [];
-  const cat0 = categories[0];
-  const cat1 = categories[1];
-  const cat2 = categories[2];
-  const cat3 = categories[3];
-
-  const commonStyles = {
+  // Dynamic Two-Column Menu Spread (Balanced items, dynamic row heights, no dead space)
+  drawDynamicMenuGrid(ctx, {
+    categories: menu.categories || [],
     currency: menu.currency,
+    col1X: 140,
+    col2X: 1260,
+    colWidth: 1000,
+    startY: 720,
+    endY: 3160,
     theme: 'dark',
     accentColor: goldAccent,
     titleColor: '#FFFFFF',
@@ -709,66 +708,16 @@ export async function renderLuxuryHotelMenuBoard(ctx, {
     tagBg: 'rgba(229, 197, 131, 0.16)',
     tagText: goldAccent,
     headerFont: '700 38px "Playfair Display", Georgia, serif',
-    itemFont: '700 27px "Playfair Display", Georgia, serif',
-    descFont: '400 20px Inter, sans-serif',
+    itemFont: '700 30px "Playfair Display", Georgia, serif',
+    priceFont: '800 30px "Space Grotesk", monospace',
     priceStyle: 'discreet',
     dividerColor: goldAccent,
-  };
+  });
 
-  // Left Column
-  if (cat0) {
-    const bottom0 = drawMenuCategorySection(ctx, {
-      x: col1X,
-      y: col1Y,
-      width: colWidth,
-      category: cat0,
-      ...commonStyles,
-    });
-    if (cat1) {
-      drawMenuCategorySection(ctx, {
-        x: col1X,
-        y: Math.max(bottom0 + 50, 1850),
-        width: colWidth,
-        category: cat1,
-        ...commonStyles,
-      });
-    }
-  }
-
-  // Right Column
-  if (cat2) {
-    const bottom2 = drawMenuCategorySection(ctx, {
-      x: col2X,
-      y: col2Y,
-      width: colWidth,
-      category: cat2,
-      ...commonStyles,
-    });
-    if (cat3) {
-      drawMenuCategorySection(ctx, {
-        x: col2X,
-        y: Math.max(bottom2 + 50, 1850),
-        width: colWidth,
-        category: cat3,
-        ...commonStyles,
-      });
-    }
-  }
-
-  // 5. Footer Section (Y: 3120 - 3400)
-  ctx.save();
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = textMuted;
-  ctx.font = '500 21px Inter, sans-serif';
-  ctx.fillText('⚜️ Suite Service: In-room dining and private sommelier consultations available 24/7.', 1200, 3140);
-  ctx.fillText('📶 High-Speed Hotel Wi-Fi • Network: SkyView-Guest • No password required.', 1200, 3175);
-  ctx.restore();
-
-  // Signature "Powered by LayoScan" Footer Badge
+  // 5. Official LayoScan Footer (Y: 3280, clean, no unasked clutter)
   await drawLayoScanFooter(ctx, {
     cx: 1200,
-    cy: 3260,
+    cy: 3280,
     badgeW: 460,
     badgeH: 68,
     templateId: 'luxury_hotel',

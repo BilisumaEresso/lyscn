@@ -7,6 +7,7 @@ import {
   drawLayoScanFooter,
   formatTableCode,
   drawMenuBridgeBar,
+  drawDynamicMenuGrid,
   drawMenuCategorySection,
 } from '../canvasHelpers';
 import { getMenuForCard } from '../menuDataHelpers';
@@ -822,176 +823,124 @@ export async function renderFastCasualMenuBoard(ctx, {
   ctx.stroke();
   ctx.restore();
 
-  // 2. Header Section (Y: 90 - 380)
+  // 2. Header Section (Y: 85 - 380) — Energetic Bold Street Spaced Header
   const restName = (restaurant?.name || 'GoodBite Street Food').toUpperCase();
   const restTagline = restaurant?.tagline || 'SMASH BURGERS • STONE-BAKED PIZZA • LOADED FRIES';
 
-  // Logo or Split Burger/Pizza Vector Mark
+  // Logo or Split Burger/Pizza Vector Mark (Diameter: 130px, centered with generous breathing room)
+  const logoCenterY = 155;
   if (logoImage) {
-    const logoSize = 120;
+    const logoSize = 130;
     const logoX = 1200 - logoSize / 2;
-    const logoY = 95;
+    const logoY = logoCenterY - logoSize / 2;
     ctx.save();
     ctx.beginPath();
-    ctx.arc(1200, logoY + logoSize / 2, logoSize / 2, 0, Math.PI * 2);
+    ctx.arc(1200, logoCenterY, logoSize / 2 + 3, 0, Math.PI * 2);
     ctx.fillStyle = '#1A1A1E';
+    ctx.shadowColor = 'rgba(255, 168, 0, 0.35)';
+    ctx.shadowBlur = 20;
     ctx.fill();
     ctx.lineWidth = 3;
     ctx.strokeStyle = yellow;
     ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(1200, logoCenterY, logoSize / 2, 0, Math.PI * 2);
     ctx.clip();
     ctx.drawImage(logoImage, logoX, logoY, logoSize, logoSize);
     ctx.restore();
   } else {
-    drawSplitBurgerPizzaLogo(ctx, 1200, 150, 110);
+    drawSplitBurgerPizzaLogo(ctx, 1200, logoCenterY, 115);
   }
 
-  // Restaurant Name with energetic street shadow
+  // Restaurant Name with energetic street shadow (spaced below logo)
   ctx.save();
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.font = '900 68px "Space Grotesk", Impact, sans-serif';
+  ctx.font = '900 74px "Space Grotesk", Impact, sans-serif';
   ctx.shadowColor = 'rgba(255, 168, 0, 0.45)';
   ctx.shadowBlur = 24;
   ctx.fillStyle = '#FFFFFF';
-  ctx.fillText(restName, 1200, 240);
+  ctx.fillText(restName, 1200, 285);
   ctx.restore();
 
-  // Tagline
+  // Tagline (cleanly spaced below restaurant name)
   ctx.save();
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = yellow;
   ctx.font = '700 24px "Space Grotesk", sans-serif';
   ctx.letterSpacing = '3px';
-  ctx.fillText(restTagline, 1200, 296);
-
-  // Table Label Pill
-  drawPillBadge(ctx, 1200, 350, 280, 52, tableLabel, yellow, '#141416');
+  ctx.fillText(restTagline, 1200, 345);
   ctx.restore();
 
-  // 3. Slim Digital Bridge Bar (Y: 410 - 550)
+  // 3. Prominent Digital QR & Table Credentials Dock (Y: 410 - 680, Height: 270px)
   drawMenuBridgeBar(ctx, {
     x: 140,
     y: 410,
     width: 2120,
-    height: 140,
+    height: 270,
     qrImage,
+    tableLabel,
     tableCodeFormatted,
     theme: 'solid-dark',
     accentColor: yellow,
     bgColor: '#1A1A1E',
     borderColor: 'rgba(255, 168, 0, 0.45)',
     titleColor: '#FFFFFF',
-    subtitleColor: 'rgba(255, 255, 255, 0.7)',
+    subtitleColor: 'rgba(255, 255, 255, 0.72)',
   });
 
-  // 4. Two-Column Menu Spread (Y: 590 - 3080)
+  // 4. Unified Restaurant Menu Data
   const menu = getMenuForCard({
     restaurant,
     categories: menuData?.categories,
     products: menuData?.products,
-    templateId: 'fast_casual',
   });
-
-  const colWidth = 980;
-  const col1X = 140;
-  const col2X = 1280;
-  const col1Y = 600;
-  const col2Y = 600;
 
   // Center Decorative Vertical Line
   ctx.save();
   ctx.beginPath();
-  ctx.moveTo(1200, 600);
-  ctx.lineTo(1200, 3050);
+  ctx.moveTo(1200, 720);
+  ctx.lineTo(1200, 3160);
   ctx.lineWidth = 2;
   ctx.strokeStyle = 'rgba(255, 168, 0, 0.3)';
   ctx.stroke();
 
   // Center diamond badge
   ctx.beginPath();
-  ctx.rect(1188, 1810, 24, 24);
+  ctx.rect(1188, 1930, 24, 24);
   ctx.fillStyle = yellow;
   ctx.fill();
   ctx.restore();
 
-  const categories = menu.categories || [];
-  const cat0 = categories[0];
-  const cat1 = categories[1];
-  const cat2 = categories[2];
-  const cat3 = categories[3];
-
-  const commonStyles = {
+  // Dynamic Two-Column Menu Spread (Balanced items, dynamic row heights, no dead space)
+  drawDynamicMenuGrid(ctx, {
+    categories: menu.categories || [],
     currency: menu.currency,
+    col1X: 140,
+    col2X: 1260,
+    colWidth: 1000,
+    startY: 720,
+    endY: 3160,
     theme: 'solid-dark',
     accentColor: yellow,
     titleColor: '#FFFFFF',
     bodyColor: textMuted,
     priceColor: yellow,
-    tagBg: 'rgba(255, 75, 38, 0.2)',
+    tagBg: 'rgba(255, 75, 38, 0.22)',
     tagText: '#FFA800',
     headerFont: '800 38px "Space Grotesk", sans-serif',
-    itemFont: '700 28px "Space Grotesk", sans-serif',
-    descFont: '400 20px Inter, sans-serif',
+    itemFont: '700 30px "Space Grotesk", sans-serif',
+    priceFont: '800 30px "Space Grotesk", monospace',
     priceStyle: 'pill',
     dividerColor: yellow,
-  };
+  });
 
-  // Left Column
-  if (cat0) {
-    const bottom0 = drawMenuCategorySection(ctx, {
-      x: col1X,
-      y: col1Y,
-      width: colWidth,
-      category: cat0,
-      ...commonStyles,
-    });
-    if (cat1) {
-      drawMenuCategorySection(ctx, {
-        x: col1X,
-        y: Math.max(bottom0 + 50, 1850),
-        width: colWidth,
-        category: cat1,
-        ...commonStyles,
-      });
-    }
-  }
-
-  // Right Column
-  if (cat2) {
-    const bottom2 = drawMenuCategorySection(ctx, {
-      x: col2X,
-      y: col2Y,
-      width: colWidth,
-      category: cat2,
-      ...commonStyles,
-    });
-    if (cat3) {
-      drawMenuCategorySection(ctx, {
-        x: col2X,
-        y: Math.max(bottom2 + 50, 1850),
-        width: colWidth,
-        category: cat3,
-        ...commonStyles,
-      });
-    }
-  }
-
-  // 5. Footer Section (Y: 3120 - 3400)
-  ctx.save();
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = textMuted;
-  ctx.font = '600 21px "Space Grotesk", sans-serif';
-  ctx.fillText('⚡ Combo Upgrade: Add Hand-Cut Fries & Soft Drink to any Burger or Pizza for +90 Br', 1200, 3140);
-  ctx.fillText('📶 Free Fast Wi-Fi • Ask counter crew for instant network password.', 1200, 3175);
-  ctx.restore();
-
-  // Signature "Powered by LayoScan" Footer Badge
+  // 5. Official LayoScan Footer (Y: 3280, clean, no unasked clutter)
   await drawLayoScanFooter(ctx, {
     cx: 1200,
-    cy: 3260,
+    cy: 3280,
     badgeW: 460,
     badgeH: 68,
     templateId: 'fast_casual',
