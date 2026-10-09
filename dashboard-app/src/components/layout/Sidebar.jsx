@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   LayoutDashboard, UtensilsCrossed, QrCode,
   ClipboardList, Settings, LogOut, X, Download, MapPin, Users, AlertTriangle,
-  ChefHat, Utensils
+  ChefHat, Utensils, BarChart2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '../../store/authStore';
@@ -117,6 +117,7 @@ export default function Sidebar({ isOpen, onClose }) {
       { to: '/kds', icon: ChefHat, label: 'Kitchen KDS' },
       { to: '/waiter', icon: Utensils, label: 'Floor Service' },
       { to: '/staff', icon: Users, label: 'Staff' },
+      { to: '/analytics', icon: BarChart2, label: 'Analytics' },
       { to: '/settings', icon: Settings, label: 'Settings' },
     ];
   }

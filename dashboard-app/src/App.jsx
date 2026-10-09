@@ -18,6 +18,7 @@ const Orders     = lazy(() => import('./pages/Orders'));
 const KDS        = lazy(() => import('./pages/KDS'));
 const WaiterView = lazy(() => import('./pages/WaiterView'));
 const Staff      = lazy(() => import('./pages/Staff'));
+const Analytics  = lazy(() => import('./pages/Analytics'));
 const Settings   = lazy(() => import('./pages/Settings'));
 const NotFound   = lazy(() => import('./pages/NotFound'));
 
@@ -98,6 +99,7 @@ export default function App() {
                   <Route path="/kds"      element={<Suspense fallback={<PageSkeleton />}><KDS /></Suspense>} />
                   <Route path="/waiter"   element={<Suspense fallback={<PageSkeleton />}><WaiterView /></Suspense>} />
                   <Route path="/staff"    element={<Suspense fallback={<PageSkeleton />}><Staff /></Suspense>} />
+                  <Route path="/analytics" element={<Suspense fallback={<PageSkeleton />}><Analytics /></Suspense>} />
                   <Route path="/settings" element={<Suspense fallback={<PageSkeleton />}><Settings /></Suspense>} />
                 </Route>
               </Route>

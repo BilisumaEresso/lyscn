@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ShoppingBag, Clock, DollarSign, AlertCircle, MapPin, ClipboardList } from 'lucide-react';
+import {
+  ShoppingBag, Clock, AlertCircle, MapPin, ClipboardList,
+  TrendingUp, TrendingDown, Minus, Star, BarChart2,
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../lib/api';
@@ -9,18 +12,37 @@ import Badge from '../components/ui/Badge';
 import Spinner from '../components/ui/Spinner';
 import Currency from '../components/ui/Currency';
 
-function StatCard({ icon: Icon, label, value, sub, accent = false }) {
+// ── Delta badge ───────────────────────────────────────────────────────────────
+function Delta({ current, previous, isCurrency = false }) {
+  if (previous == null || previous === 0) return null;
+  const diff = current - previous;
+  const pct  = Math.abs(Math.round((diff / previous) * 100));
+  if (pct === 0) return <span className="text-[11px] text-ink-muted flex items-center gap-0.5"><Minus size={10} /> same as yesterday</span>;
+  const up = diff > 0;
+  return (
+    <span className={`text-[11px] flex items-center gap-0.5 font-semibold ${up ? 'text-emerald-600' : 'text-red-500'}`}>
+      {up ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+      {pct}% vs yesterday
+    </span>
+  );
+}
+
+// ── Stat card ─────────────────────────────────────────────────────────────────
+function StatCard({ icon: Icon, label, value, sub, delta, accent = false }) {
   return (
     <div className={`rounded-xl border p-5 ${accent ? 'border-teal/30 bg-teal/4' : 'border-ink/8 bg-white'}`}>
       <div className="flex items-start justify-between">
-        <div>
+        <div className="min-w-0 flex-1">
           <p className="text-xs font-medium text-ink-muted mb-1">{label}</p>
-          <p className={`font-display font-bold text-3xl ${accent ? 'text-teal' : 'text-ink'}`}>
+          <p className={`font-display font-bold text-3xl leading-none ${accent ? 'text-teal' : 'text-ink'}`}>
             {value}
           </p>
-          {sub && <p className="text-xs text-ink-muted mt-1">{sub}</p>}
+          <div className="mt-1.5 space-y-0.5">
+            {sub && <p className="text-xs text-ink-muted">{sub}</p>}
+            {delta}
+          </div>
         </div>
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${accent ? 'bg-teal/15' : 'bg-ink/6'}`}>
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ml-3 ${accent ? 'bg-teal/15' : 'bg-ink/6'}`}>
           <Icon size={20} className={accent ? 'text-teal' : 'text-ink-muted'} strokeWidth={1.75} />
         </div>
       </div>
@@ -92,8 +114,16 @@ export default function Dashboard() {
     refetchInterval: 30_000,
   });
 
+  // Analytics (yesterday comparison + avg rating)
+  const { data: analyticsData } = useQuery({
+    queryKey: ['analytics-dashboard'],
+    queryFn: () => api.get('/analytics', { params: { from: today, to: today } }).then((r) => r.data),
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  });
+
   const todayOrders = todayData?.orders ?? [];
-  const allOrders   = allData?.orders ?? [];
+  const allOrders   = allData?.orders   ?? [];
 
   const todayCount   = todayOrders.length;
   const todayRevenue = todayOrders
@@ -104,7 +134,13 @@ export default function Dashboard() {
   ).length;
   const placedCount  = todayOrders.filter((o) => o.status === 'placed').length;
 
-  const recentOrders = [...allOrders].slice(0, 5);
+  // Yesterday deltas from analytics
+  const yest          = analyticsData?.yesterday;
+  const avgRating     = analyticsData?.summary?.avgRating;
+  const ratingCount   = analyticsData?.summary?.ratingCount ?? 0;
+
+  // FIX: recent orders from TODAY, not all-time
+  const recentOrders = [...todayOrders].slice(0, 5);
 
   return (
     <div className="max-w-[1200px] mx-auto px-4 py-5 md:px-6 md:py-6 lg:px-8 lg:pt-14 lg:pb-8">
@@ -135,19 +171,29 @@ export default function Dashboard() {
       )}
 
       {/* Header */}
-      <div className="mb-6 md:mb-8">
-        <h1 className="font-display font-bold text-2xl text-ink">
-          Good {getGreeting()},{' '}
-          <span className="text-teal">{restaurant?.name ?? 'Dashboard'}</span>
-        </h1>
-        <p className="text-sm text-ink-muted mt-1">
-          {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-        </p>
-        {restaurant?.contactInfo?.address && (
-          <p className="text-xs text-ink-muted mt-2 flex items-center gap-1">
-            <MapPin size={13} /> {restaurant.contactInfo.address}
+      <div className="mb-6 md:mb-8 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div>
+          <h1 className="font-display font-bold text-2xl text-ink">
+            Good {getGreeting()},{' '}
+            <span className="text-teal">{restaurant?.name ?? 'Dashboard'}</span>
+          </h1>
+          <p className="text-sm text-ink-muted mt-1">
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
           </p>
-        )}
+          {restaurant?.contactInfo?.address && (
+            <p className="text-xs text-ink-muted mt-2 flex items-center gap-1">
+              <MapPin size={13} /> {restaurant.contactInfo.address}
+            </p>
+          )}
+        </div>
+        {/* Quick link to full analytics */}
+        <Link
+          to="/analytics"
+          className="flex items-center gap-1.5 text-sm text-teal hover:text-teal/70 font-medium transition-colors shrink-0 self-start sm:mt-1"
+        >
+          <BarChart2 size={15} />
+          Full Analytics →
+        </Link>
       </div>
 
       {isLoading ? (
@@ -165,12 +211,18 @@ export default function Dashboard() {
               value={todayCount}
               sub="across all tables"
               accent
+              delta={
+                <Delta current={todayCount} previous={yest?.totalOrders} />
+              }
             />
             <StatCard
-              icon={DollarSign}
+              icon={TrendingUp}
               label="Revenue today"
               value={<Currency value={todayRevenue} />}
               sub="paid orders only"
+              delta={
+                <Delta current={todayRevenue} previous={yest?.totalRevenue} isCurrency />
+              }
             />
             <StatCard
               icon={AlertCircle}
@@ -186,10 +238,27 @@ export default function Dashboard() {
             />
           </div>
 
-          {/* Recent orders */}
+          {/* Avg Rating strip — shown when there are ratings today */}
+          {ratingCount > 0 && (
+            <div className="mb-6 flex items-center gap-3 px-5 py-3 rounded-xl border border-amber-200/60 bg-amber-50/60">
+              <Star size={18} className="text-amber-500 fill-amber-400 shrink-0" />
+              <div>
+                <span className="font-display font-bold text-ink text-lg">{avgRating}</span>
+                <span className="text-xs text-ink-muted ml-1.5">avg rating today</span>
+                <span className="text-xs text-ink/40 ml-2">from {ratingCount} review{ratingCount !== 1 ? 's' : ''}</span>
+              </div>
+              <Link to="/analytics" className="ml-auto text-xs text-teal font-medium hover:underline shrink-0">
+                View all →
+              </Link>
+            </div>
+          )}
+
+          {/* Recent orders — fixed to show TODAY's orders */}
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-display font-semibold text-lg text-ink">Recent orders</h2>
+              <h2 className="font-display font-semibold text-lg text-ink">
+                Today's recent orders
+              </h2>
               <Link
                 to="/orders"
                 className="text-sm text-teal hover:text-teal/70 font-medium transition-colors"
@@ -244,6 +313,7 @@ export default function Dashboard() {
                         <th className="text-left px-4 py-3 text-xs font-medium text-ink-muted">Total</th>
                         <th className="text-left px-4 py-3 text-xs font-medium text-ink-muted">Status</th>
                         <th className="text-left px-4 py-3 text-xs font-medium text-ink-muted">Payment</th>
+                        <th className="text-left px-4 py-3 text-xs font-medium text-ink-muted">Rating</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -266,6 +336,16 @@ export default function Dashboard() {
                               status={order.paymentStatus}
                               label={capitalize(order.paymentStatus)}
                             />
+                          </td>
+                          <td className="px-4 py-3 text-ink-muted">
+                            {order.rating ? (
+                              <span className="flex items-center gap-1 text-amber-600 font-semibold text-xs">
+                                <Star size={11} className="fill-amber-400" />
+                                {order.rating}/5
+                              </span>
+                            ) : (
+                              <span className="text-xs text-ink/30">—</span>
+                            )}
                           </td>
                         </tr>
                       ))}
