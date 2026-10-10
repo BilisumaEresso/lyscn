@@ -26,7 +26,7 @@ const resolveQRCode = async (req, res, next) => {
   try {
     const [restaurant, branch, table] = await Promise.all([
       Restaurant.findById(req.tenantId).select(
-        'name slug logoUrl coverUrl brandColor description contactInfo socialLinks'
+        'name slug logoUrl coverUrl brandColor description contactInfo socialLinks paymentAccounts'
       ),
       Branch.findById(req.branchId).select('name address currency timezone location locationStrictMode'),
       Table.findById(req.tableId).select('label qrToken status occupiedSince activeSessionToken sessionExpiresAt sessionLocationVerified restaurantId'),
@@ -219,19 +219,19 @@ const getPublicRestaurant = async (req, res, next) => {
 
     if (/^[a-f\d]{24}$/i.test(identifier)) {
       restaurant = await Restaurant.findById(identifier).select(
-        'name slug logoUrl coverUrl brandColor description contactInfo socialLinks'
+        'name slug logoUrl coverUrl brandColor description contactInfo socialLinks paymentAccounts'
       );
     }
     if (!restaurant) {
       restaurant = await Restaurant.findOne({ slug: identifier }).select(
-        'name slug logoUrl coverUrl brandColor description contactInfo socialLinks'
+        'name slug logoUrl coverUrl brandColor description contactInfo socialLinks paymentAccounts'
       );
     }
     if (!restaurant && /^[a-f\d]{24}$/i.test(identifier)) {
       const branchMatch = await Branch.findById(identifier);
       if (branchMatch) {
         restaurant = await Restaurant.findById(branchMatch.restaurantId).select(
-          'name slug logoUrl coverUrl brandColor description contactInfo socialLinks'
+          'name slug logoUrl coverUrl brandColor description contactInfo socialLinks paymentAccounts'
         );
       }
     }

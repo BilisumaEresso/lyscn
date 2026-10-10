@@ -6,6 +6,7 @@ import {
   drawImageCover,
   drawStepFlowNodes,
   drawLayoScanFooter,
+  drawCardPaymentAccounts,
   formatTableCode,
   drawMenuBridgeBar,
   drawDynamicMenuGrid,
@@ -230,7 +231,16 @@ export async function renderCafeArtisanPortrait(ctx, {
     ctx.restore();
   }
 
-  // 11. "Powered by LayoScan" Footer Badge (Cleanly anchored, zero collision!)
+  // 11. Optional Payment Accounts Strip (Telebirr / CBE Birr)
+  drawCardPaymentAccounts(ctx, {
+    cx: width / 2,
+    cy: height - 120,
+    restaurant,
+    width: 540,
+    theme: 'light',
+  });
+
+  // 12. "Powered by LayoScan" Footer Badge (Cleanly anchored, zero collision!)
   await drawLayoScanFooter(ctx, {
     cx: width / 2,
     cy: height - 60,
@@ -461,6 +471,15 @@ export async function renderCafeArtisanLandscape(ctx, {
   ctx.font = '600 20px Inter, sans-serif';
   ctx.fillText('🌐 layoscancustomer.vercel.app', rightCenterX, codeBoxY + codeBoxH + 34);
   ctx.restore();
+
+  // Payment Accounts Strip (Telebirr / CBE)
+  drawCardPaymentAccounts(ctx, {
+    cx: rightCenterX,
+    cy: codeBoxY + codeBoxH + 82,
+    restaurant,
+    width: 520,
+    theme: 'light',
+  });
 
   // Right Footer (matching left side)
   await drawLayoScanFooter(ctx, {

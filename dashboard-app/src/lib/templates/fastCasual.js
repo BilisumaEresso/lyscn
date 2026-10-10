@@ -5,6 +5,7 @@ import {
   drawThemedCodeBadge,
   drawImageCover,
   drawLayoScanFooter,
+  drawCardPaymentAccounts,
   formatTableCode,
   drawMenuBridgeBar,
   drawDynamicMenuGrid,
@@ -487,6 +488,15 @@ export async function renderFastCasualPortrait(ctx, {
     ctx.restore();
   }
 
+  // Payment Accounts Strip (Telebirr / CBE Birr)
+  drawCardPaymentAccounts(ctx, {
+    cx: width / 2,
+    cy: height - 120,
+    restaurant,
+    width: 540,
+    theme: 'solid-dark',
+  });
+
   // 12. "Powered by LayoScan" Footer Badge (High-contrast solid dark pill on yellow ribbon wave)
   await drawLayoScanFooter(ctx, {
     cx: width / 2,
@@ -715,6 +725,15 @@ export async function renderFastCasualLandscape(ctx, {
   ctx.font = '600 20px Inter, sans-serif';
   ctx.fillText('🌐 layoscancustomer.vercel.app', rightCenterX, codeBoxY + codeBoxH + 34);
   ctx.restore();
+
+  // Payment Accounts Strip (Telebirr / CBE Birr)
+  drawCardPaymentAccounts(ctx, {
+    cx: rightCenterX,
+    cy: codeBoxY + codeBoxH + 82,
+    restaurant,
+    width: 520,
+    theme: 'solid-dark',
+  });
 
   // Right Footer (matching left side)
   await drawLayoScanFooter(ctx, {

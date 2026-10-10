@@ -38,6 +38,29 @@ const restaurantSchema = new mongoose.Schema(
       address: { type: String },
     },
 
+    paymentAccounts: {
+      telebirr: {
+        accountNumber: { type: String, trim: true, default: '' },
+        accountName:   { type: String, trim: true, default: '' },
+        qrCodeUrl:     { type: String, default: null },
+        isActive:      { type: Boolean, default: true },
+      },
+      cbeBirr: {
+        accountNumber: { type: String, trim: true, default: '' },
+        accountName:   { type: String, trim: true, default: '' },
+        qrCodeUrl:     { type: String, default: null },
+        isActive:      { type: Boolean, default: true },
+      },
+      otherBank: {
+        bankName:      { type: String, trim: true, default: '' },
+        accountNumber: { type: String, trim: true, default: '' },
+        accountName:   { type: String, trim: true, default: '' },
+        qrCodeUrl:     { type: String, default: null },
+        isActive:      { type: Boolean, default: false },
+      },
+      instructions: { type: String, trim: true, default: '' },
+    },
+
     subscriptionPlan: {
       type: String,
       enum: ['starter', 'business', 'premium'],

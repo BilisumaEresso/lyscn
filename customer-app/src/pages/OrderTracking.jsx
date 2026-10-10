@@ -17,6 +17,13 @@ import {
   RotateCcw,
   Volume2,
   VolumeX,
+  Copy,
+  Check,
+  QrCode,
+  Phone,
+  Building,
+  ExternalLink,
+  Wallet,
 } from 'lucide-react';
 import clsx from 'clsx';
 import api from '../lib/api';
@@ -118,6 +125,8 @@ export default function OrderTracking() {
   const [selectedRoundId, setSelectedRoundId] = useState(null);
   const [slideDirection, setSlideDirection] = useState('none'); // 'left' | 'right' | 'none'
   const [logoImgError, setLogoImgError] = useState(false);
+  const [copiedKey, setCopiedKey] = useState(null);
+  const [viewingQrModal, setViewingQrModal] = useState(null); // { type, name, qrCodeUrl }
 
   const { soundEnabled, setSoundEnabled } = useCustomerNotificationStore();
 
@@ -770,17 +779,287 @@ export default function OrderTracking() {
               >
                 {paymentStatus === 'paid' || allRoundsFinished
                   ? 'Paid in full ✓'
-                  : 'Unpaid — pay your server'}
+                  : 'Unpaid — pay your server or via mobile transfer'}
               </p>
               <p className="text-[11px] text-ink-muted mt-0.5">
                 {paymentStatus === 'paid' || allRoundsFinished
                   ? 'Receipt confirmed by staff for all table rounds'
-                  : 'When paying, your server settles all table rounds at once.'}
+                  : 'Pay directly via Telebirr or CBE below and show payment SMS/screenshot to your server.'}
               </p>
             </div>
           </div>
         </div>
+
+        {/* ── Copiable Mobile Money / Bank Transfer Card (Unpaid Only) ── */}
+        {paymentStatus !== 'paid' && !allRoundsFinished && (
+          (() => {
+            const pa = session.restaurant?.paymentAccounts;
+            const hasTelebirr = pa?.telebirr?.isActive && pa?.telebirr?.accountNumber;
+            const hasCbe = pa?.cbeBirr?.isActive && pa?.cbeBirr?.accountNumber;
+            const hasOther = pa?.otherBank?.isActive && pa?.otherBank?.accountNumber;
+            const hasAnyAccount = hasTelebirr || hasCbe || hasOther;
+
+            const totalBill = summary.totalAmount || currentRound?.totalAmount || 0;
+            const referenceRemark = `Table ${session.table?.label || ''} Bill #${orderId ? orderId.slice(-4).toUpperCase() : ''}`.trim();
+
+            const copyToClipboard = (text, key, label) => {
+              if (!text) return;
+              if (navigator.clipboard?.writeText) {
+                navigator.clipboard.writeText(text).then(() => {
+                  setCopiedKey(key);
+                  toast.success(`Copied ${label} to clipboard!`);
+                  setTimeout(() => setCopiedKey(null), 2500);
+                }).catch(() => {
+                  toast.success(`Copied ${label}`);
+                });
+              } else {
+                toast.success(`Copied ${label}`);
+              }
+            };
+
+            return (
+              <div className="mt-4 pt-3.5 border-t border-ink/8">
+                <div className="flex items-center justify-between mb-2.5">
+                  <span className="font-display font-bold text-xs text-ink flex items-center gap-1.5">
+                    <Wallet size={14} className="text-primary" />
+                    <span>Pay with Mobile Money / Bank</span>
+                  </span>
+                  <span className="text-[11px] font-medium text-ink-muted">Ethiopia</span>
+                </div>
+
+                {hasAnyAccount ? (
+                  <div className="space-y-2.5">
+                    {/* Quick Bill Reference & Amount Helper Bar */}
+                    <div className="p-2.5 rounded-xl bg-ink/2 border border-ink/6 flex items-center justify-between gap-2 text-xs">
+                      <div className="min-w-0">
+                        <span className="text-[10px] text-ink-muted uppercase font-bold tracking-wider block">Remark / Reason</span>
+                        <span className="font-semibold text-ink truncate block text-[11px]">{referenceRemark}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(referenceRemark, 'remark', 'Remark reference')}
+                          className="px-2 py-1 rounded-lg bg-white border border-ink/10 text-[11px] font-medium text-ink flex items-center gap-1 hover:bg-ink/5"
+                        >
+                          {copiedKey === 'remark' ? <Check size={11} className="text-emerald-600" /> : <Copy size={11} />}
+                          <span>Copy Ref</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(String(totalBill), 'amount', 'Total amount')}
+                          className="px-2 py-1 rounded-lg bg-white border border-ink/10 text-[11px] font-medium text-ink flex items-center gap-1 hover:bg-ink/5"
+                        >
+                          {copiedKey === 'amount' ? <Check size={11} className="text-emerald-600" /> : <Copy size={11} />}
+                          <span>Copy Amount</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Telebirr Account Card */}
+                    {hasTelebirr && (
+                      <div className="p-3 rounded-2xl bg-sky-50/60 border border-sky-200/80 flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="w-6 h-6 rounded-lg bg-sky-600 text-white font-bold text-[10px] flex items-center justify-center shrink-0 shadow-xs">
+                              tb
+                            </span>
+                            <div className="min-w-0">
+                              <p className="font-display font-bold text-xs text-sky-950 leading-tight">Telebirr</p>
+                              {pa.telebirr.accountName && (
+                                <p className="text-[11px] text-sky-800/80 truncate">{pa.telebirr.accountName}</p>
+                              )}
+                            </div>
+                          </div>
+                          {pa.telebirr.qrCodeUrl && (
+                            <button
+                              type="button"
+                              onClick={() => setViewingQrModal({ type: 'Telebirr', name: pa.telebirr.accountName, qrCodeUrl: pa.telebirr.qrCodeUrl })}
+                              className="px-2 py-1 rounded-lg bg-white border border-sky-200 text-sky-700 font-semibold text-[11px] flex items-center gap-1 hover:bg-sky-50 shadow-2xs"
+                            >
+                              <QrCode size={12} />
+                              <span>View QR</span>
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-between bg-white/90 p-2 rounded-xl border border-sky-200/60">
+                          <span className="font-mono font-bold text-sm tracking-wide text-ink">
+                            {pa.telebirr.accountNumber}
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <a
+                              href="tel:*127#"
+                              className="px-2 py-1 rounded-lg bg-sky-100 text-sky-800 text-[11px] font-semibold flex items-center gap-1 hover:bg-sky-200 transition-colors"
+                              title="Open Telebirr USSD *127#"
+                            >
+                              <Phone size={11} />
+                              <span>*127#</span>
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(pa.telebirr.accountNumber, 'telebirr', 'Telebirr number')}
+                              className="px-2.5 py-1 rounded-lg bg-sky-600 text-white text-[11px] font-semibold flex items-center gap-1 shadow-xs hover:bg-sky-700 active:scale-95 transition-all"
+                            >
+                              {copiedKey === 'telebirr' ? <Check size={12} /> : <Copy size={12} />}
+                              <span>{copiedKey === 'telebirr' ? 'Copied' : 'Copy'}</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* CBE / CBE Birr Account Card */}
+                    {hasCbe && (
+                      <div className="p-3 rounded-2xl bg-purple-50/60 border border-purple-200/80 flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="w-6 h-6 rounded-lg bg-purple-700 text-white font-bold text-[10px] flex items-center justify-center shrink-0 shadow-xs">
+                              CBE
+                            </span>
+                            <div className="min-w-0">
+                              <p className="font-display font-bold text-xs text-purple-950 leading-tight">CBE / CBE Birr</p>
+                              {pa.cbeBirr.accountName && (
+                                <p className="text-[11px] text-purple-800/80 truncate">{pa.cbeBirr.accountName}</p>
+                              )}
+                            </div>
+                          </div>
+                          {pa.cbeBirr.qrCodeUrl && (
+                            <button
+                              type="button"
+                              onClick={() => setViewingQrModal({ type: 'CBE Birr', name: pa.cbeBirr.accountName, qrCodeUrl: pa.cbeBirr.qrCodeUrl })}
+                              className="px-2 py-1 rounded-lg bg-white border border-purple-200 text-purple-700 font-semibold text-[11px] flex items-center gap-1 hover:bg-purple-50 shadow-2xs"
+                            >
+                              <QrCode size={12} />
+                              <span>View QR</span>
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-between bg-white/90 p-2 rounded-xl border border-purple-200/60">
+                          <span className="font-mono font-bold text-xs sm:text-sm tracking-wide text-ink truncate mr-2">
+                            {pa.cbeBirr.accountNumber}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(pa.cbeBirr.accountNumber, 'cbe', 'CBE account number')}
+                            className="px-2.5 py-1 rounded-lg bg-purple-700 text-white text-[11px] font-semibold flex items-center gap-1 shadow-xs hover:bg-purple-800 active:scale-95 transition-all shrink-0"
+                          >
+                            {copiedKey === 'cbe' ? <Check size={12} /> : <Copy size={12} />}
+                            <span>{copiedKey === 'cbe' ? 'Copied' : 'Copy'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Other Bank Account Card */}
+                    {hasOther && (
+                      <div className="p-3 rounded-2xl bg-amber-50/60 border border-amber-200/80 flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="w-6 h-6 rounded-lg bg-amber-600 text-white font-bold text-[10px] flex items-center justify-center shrink-0 shadow-xs">
+                              <Building size={12} />
+                            </span>
+                            <div className="min-w-0">
+                              <p className="font-display font-bold text-xs text-amber-950 leading-tight">
+                                {pa.otherBank.bankName || 'Bank Transfer'}
+                              </p>
+                              {pa.otherBank.accountName && (
+                                <p className="text-[11px] text-amber-800/80 truncate">{pa.otherBank.accountName}</p>
+                              )}
+                            </div>
+                          </div>
+                          {pa.otherBank.qrCodeUrl && (
+                            <button
+                              type="button"
+                              onClick={() => setViewingQrModal({ type: pa.otherBank.bankName || 'Bank', name: pa.otherBank.accountName, qrCodeUrl: pa.otherBank.qrCodeUrl })}
+                              className="px-2 py-1 rounded-lg bg-white border border-amber-200 text-amber-700 font-semibold text-[11px] flex items-center gap-1 hover:bg-amber-50 shadow-2xs"
+                            >
+                              <QrCode size={12} />
+                              <span>View QR</span>
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-between bg-white/90 p-2 rounded-xl border border-amber-200/60">
+                          <span className="font-mono font-bold text-xs sm:text-sm tracking-wide text-ink truncate mr-2">
+                            {pa.otherBank.accountNumber}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(pa.otherBank.accountNumber, 'otherBank', 'Bank account')}
+                            className="px-2.5 py-1 rounded-lg bg-amber-600 text-white text-[11px] font-semibold flex items-center gap-1 shadow-xs hover:bg-amber-700 active:scale-95 transition-all shrink-0"
+                          >
+                            {copiedKey === 'otherBank' ? <Check size={12} /> : <Copy size={12} />}
+                            <span>{copiedKey === 'otherBank' ? 'Copied' : 'Copy'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {pa.instructions && (
+                      <p className="text-[11px] text-ink-muted italic bg-paper p-2 rounded-xl border border-ink/6">
+                        💡 {pa.instructions}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-2xl bg-paper border border-ink/6 text-center">
+                    <p className="text-xs text-ink-muted">
+                      Please request your bill from your server to pay via cash or portable POS machine.
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })()
+        )}
       </div>
+
+      {/* ── Payment QR Lightbox Modal ─────────────────────────────────── */}
+      {viewingQrModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setViewingQrModal(null)}
+        >
+          <div
+            className="bg-white rounded-3xl p-5 max-w-sm w-full shadow-2xl flex flex-col items-center text-center relative animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-3">
+              <QrCode size={26} />
+            </div>
+            <h4 className="font-display font-bold text-base text-ink">
+              {viewingQrModal.type} Payment QR
+            </h4>
+            {viewingQrModal.name && (
+              <p className="text-xs text-ink-muted mt-0.5">{viewingQrModal.name}</p>
+            )}
+
+            <div className="my-4 p-3 bg-white rounded-2xl border-2 border-dashed border-ink/12 shadow-inner">
+              <img
+                src={viewingQrModal.qrCodeUrl}
+                alt={`${viewingQrModal.type} QR`}
+                className="w-56 h-56 object-contain rounded-xl"
+              />
+            </div>
+
+            <p className="text-[11px] text-ink-muted mb-4 max-w-xs leading-relaxed">
+              Scan this QR with your {viewingQrModal.type} app to complete your payment, then show receipt confirmation to your server.
+            </p>
+
+            <button
+              type="button"
+              onClick={() => setViewingQrModal(null)}
+              className="w-full py-3 rounded-2xl font-bold text-xs text-white"
+              style={{ background: 'var(--color-primary)' }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Finished Rounds Accordion / History ──────────────────────── */}
       {finishedRounds.length > 0 && (

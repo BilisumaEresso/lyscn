@@ -11,6 +11,9 @@ import {
   Bell,
   Play,
   Monitor,
+  CreditCard,
+  Building,
+  QrCode,
 } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { useForm } from "react-hook-form";
@@ -122,8 +125,19 @@ export default function Settings() {
       contactAddress: "",
       instagram: "",
       facebook: "",
+      tiktok: "",
       website: "",
       qrCardTemplate: "cafe_artisan",
+      telebirrNumber: "",
+      telebirrName: "",
+      telebirrQrUrl: "",
+      cbeNumber: "",
+      cbeName: "",
+      cbeQrUrl: "",
+      otherBankName: "",
+      otherBankAccount: "",
+      otherBankHolder: "",
+      paymentInstructions: "",
     },
   });
 
@@ -132,6 +146,8 @@ export default function Settings() {
     register("logoUrl");
     register("coverUrl");
     register("qrCardTemplate");
+    register("telebirrQrUrl");
+    register("cbeQrUrl");
   }, [register]);
 
   // Watch fields for live preview
@@ -139,11 +155,14 @@ export default function Settings() {
   const logoUrl = watch("logoUrl");
   const coverUrl = watch("coverUrl");
   const qrCardTemplate = watch("qrCardTemplate") || "cafe_artisan";
+  const telebirrQrUrl = watch("telebirrQrUrl");
+  const cbeQrUrl = watch("cbeQrUrl");
 
   // Populate form only on initial data load to prevent window focus from wiping dirty state
   useEffect(() => {
     if (!restaurant || hasInitializedRef.current) return;
     hasInitializedRef.current = true;
+    const pa = restaurant.paymentAccounts || {};
     reset({
       name: restaurant.name ?? "",
       description: restaurant.description ?? "",
@@ -158,6 +177,16 @@ export default function Settings() {
       tiktok: restaurant.socialLinks?.tiktok ?? "",
       website: restaurant.socialLinks?.website ?? "",
       qrCardTemplate: restaurant.qrCardTemplate ?? "cafe_artisan",
+      telebirrNumber: pa.telebirr?.accountNumber ?? "",
+      telebirrName: pa.telebirr?.accountName ?? "",
+      telebirrQrUrl: pa.telebirr?.qrCodeUrl ?? "",
+      cbeNumber: pa.cbeBirr?.accountNumber ?? "",
+      cbeName: pa.cbeBirr?.accountName ?? "",
+      cbeQrUrl: pa.cbeBirr?.qrCodeUrl ?? "",
+      otherBankName: pa.otherBank?.bankName ?? "",
+      otherBankAccount: pa.otherBank?.accountNumber ?? "",
+      otherBankHolder: pa.otherBank?.accountName ?? "",
+      paymentInstructions: pa.instructions ?? "",
     });
   }, [restaurant, reset]);
 
@@ -166,6 +195,7 @@ export default function Settings() {
       api.patch("/restaurants/me", body).then((r) => r.data),
     onSuccess: (d) => {
       setRestaurant(d.restaurant);
+      const pa = d.restaurant.paymentAccounts || {};
       reset({
         name: d.restaurant.name ?? "",
         description: d.restaurant.description ?? "",
@@ -180,6 +210,16 @@ export default function Settings() {
         tiktok: d.restaurant.socialLinks?.tiktok ?? "",
         website: d.restaurant.socialLinks?.website ?? "",
         qrCardTemplate: d.restaurant.qrCardTemplate ?? "cafe_artisan",
+        telebirrNumber: pa.telebirr?.accountNumber ?? "",
+        telebirrName: pa.telebirr?.accountName ?? "",
+        telebirrQrUrl: pa.telebirr?.qrCodeUrl ?? "",
+        cbeNumber: pa.cbeBirr?.accountNumber ?? "",
+        cbeName: pa.cbeBirr?.accountName ?? "",
+        cbeQrUrl: pa.cbeBirr?.qrCodeUrl ?? "",
+        otherBankName: pa.otherBank?.bankName ?? "",
+        otherBankAccount: pa.otherBank?.accountNumber ?? "",
+        otherBankHolder: pa.otherBank?.accountName ?? "",
+        paymentInstructions: pa.instructions ?? "",
       });
       qc.invalidateQueries({ queryKey: ["restaurant-me"] });
       toast.success("Settings saved successfully");
@@ -205,6 +245,28 @@ export default function Settings() {
         facebook: form.facebook,
         tiktok: form.tiktok,
         website: form.website,
+      },
+      paymentAccounts: {
+        telebirr: {
+          accountNumber: form.telebirrNumber?.trim() || "",
+          accountName: form.telebirrName?.trim() || "",
+          qrCodeUrl: form.telebirrQrUrl?.trim() || null,
+          isActive: Boolean(form.telebirrNumber?.trim()),
+        },
+        cbeBirr: {
+          accountNumber: form.cbeNumber?.trim() || "",
+          accountName: form.cbeName?.trim() || "",
+          qrCodeUrl: form.cbeQrUrl?.trim() || null,
+          isActive: Boolean(form.cbeNumber?.trim()),
+        },
+        otherBank: {
+          bankName: form.otherBankName?.trim() || "",
+          accountNumber: form.otherBankAccount?.trim() || "",
+          accountName: form.otherBankHolder?.trim() || "",
+          qrCodeUrl: null,
+          isActive: Boolean(form.otherBankAccount?.trim()),
+        },
+        instructions: form.paymentInstructions?.trim() || "",
       },
     });
   };
@@ -459,6 +521,133 @@ export default function Settings() {
                 }
                 placeholder="Bole, Addis Ababa"
                 {...register("contactAddress")}
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* ── Payment Accounts & Mobile Money (Ethiopia) ────────────────── */}
+        <section className="bg-white rounded-2xl border border-ink/8 p-6 shadow-2xs">
+          <SectionHeader
+            title="Payment Accounts & Mobile Money (Ethiopia)"
+            description="Configure your official Telebirr, CBE Birr, or Bank account. These details are presented to diners on order receipts and copiable payment sheets."
+          />
+
+          <div className="space-y-6">
+            {/* Telebirr Section */}
+            <div className="p-4 rounded-2xl border border-blue-200/60 bg-blue-50/30 space-y-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+                  TB
+                </div>
+                <div>
+                  <h3 className="font-display font-semibold text-sm text-ink">Telebirr Merchant / Phone</h3>
+                  <p className="text-[11px] text-ink-muted">Accept payments via Telebirr mobile number or Till / SuperApp</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <Input
+                  label="Telebirr Number or Till ID"
+                  placeholder="0911223344 or 123456"
+                  {...register("telebirrNumber")}
+                />
+                <Input
+                  label="Registered Account Name"
+                  placeholder="e.g. Abebe Cafe Enterprise"
+                  {...register("telebirrName")}
+                />
+              </div>
+
+              <div className="pt-2">
+                <label className="block text-xs font-semibold text-ink-muted mb-1.5">
+                  Telebirr Payment QR Image (Optional)
+                </label>
+                <ImageUploader
+                  value={telebirrQrUrl}
+                  onChange={(url) => setValue("telebirrQrUrl", url || "", { shouldDirty: true })}
+                  aspectRatio="1:1"
+                  helperText="Upload your official Telebirr merchant QR code for customer phone-to-phone scanning."
+                />
+              </div>
+            </div>
+
+            {/* CBE Birr Section */}
+            <div className="p-4 rounded-2xl border border-purple-200/60 bg-purple-50/30 space-y-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-purple-700 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+                  CBE
+                </div>
+                <div>
+                  <h3 className="font-display font-bold text-sm text-ink">Commercial Bank of Ethiopia (CBE Birr / Bank)</h3>
+                  <p className="text-[11px] text-ink-muted">Commercial Bank of Ethiopia 13-digit account or CBE Birr phone</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <Input
+                  label="CBE Account Number / Phone"
+                  placeholder="1000123456789"
+                  {...register("cbeNumber")}
+                />
+                <Input
+                  label="CBE Account Holder Name"
+                  placeholder="e.g. Abebe Kebede Cafe"
+                  {...register("cbeName")}
+                />
+              </div>
+
+              <div className="pt-2">
+                <label className="block text-xs font-semibold text-ink-muted mb-1.5">
+                  CBE QR Code Image (Optional)
+                </label>
+                <ImageUploader
+                  value={cbeQrUrl}
+                  onChange={(url) => setValue("cbeQrUrl", url || "", { shouldDirty: true })}
+                  aspectRatio="1:1"
+                  helperText="Upload your CBE Birr QR code for direct customer scanning."
+                />
+              </div>
+            </div>
+
+            {/* Other Bank Transfer (Awash, Abyssinia, Dashen) */}
+            <div className="p-4 rounded-2xl border border-ink/10 bg-paper/60 space-y-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+                  <Building size={16} />
+                </div>
+                <div>
+                  <h3 className="font-display font-semibold text-sm text-ink">Other Bank Transfer (Awash, Abyssinia, etc.)</h3>
+                  <p className="text-[11px] text-ink-muted">Secondary bank account for electronic bank transfers</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                <Input
+                  label="Bank Name"
+                  placeholder="e.g. Bank of Abyssinia / Awash"
+                  {...register("otherBankName")}
+                />
+                <Input
+                  label="Account Number"
+                  placeholder="e.g. 12345678"
+                  {...register("otherBankAccount")}
+                />
+                <Input
+                  label="Account Holder Name"
+                  placeholder="e.g. Abebe Cafe"
+                  {...register("otherBankHolder")}
+                />
+              </div>
+            </div>
+
+            {/* Transfer Instructions Note */}
+            <div>
+              <Input
+                label="Payment Transfer Remark Instructions"
+                placeholder="e.g. Please put your Table Number in the transaction remark/reason"
+                helperText="Displayed to customers when copying account numbers to guide their payment reference."
+                {...register("paymentInstructions")}
               />
             </div>
           </div>

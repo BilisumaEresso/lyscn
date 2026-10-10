@@ -913,6 +913,123 @@ export async function drawLayoScanFooter(ctx, {
 }
 
 /**
+ * Renders an elegant mobile payment accounts strip on print cards (Telebirr & CBE Birr)
+ * Placed cleanly above the footer or below the QR code so diners can see account numbers directly on tables.
+ */
+export function drawCardPaymentAccounts(ctx, {
+  cx,
+  cy,
+  restaurant,
+  width = 600,
+  theme = 'light', // 'light' | 'dark' | 'solid-dark'
+}) {
+  const pa = restaurant?.paymentAccounts;
+  if (!pa) return;
+
+  const parts = [];
+  if (pa.telebirr?.isActive && pa.telebirr?.accountNumber) {
+    parts.push({
+      label: 'Telebirr',
+      number: pa.telebirr.accountNumber,
+      color: theme === 'dark' || theme === 'solid-dark' ? '#38BDF8' : '#0284C7',
+    });
+  }
+  if (pa.cbeBirr?.isActive && pa.cbeBirr?.accountNumber) {
+    parts.push({
+      label: 'CBE',
+      number: pa.cbeBirr.accountNumber,
+      color: theme === 'dark' || theme === 'solid-dark' ? '#C084FC' : '#7E22CE',
+    });
+  }
+  if (pa.otherBank?.isActive && pa.otherBank?.accountNumber && parts.length < 2) {
+    parts.push({
+      label: pa.otherBank.bankName || 'Bank',
+      number: pa.otherBank.accountNumber,
+      color: theme === 'dark' || theme === 'solid-dark' ? '#FCD34D' : '#D97706',
+    });
+  }
+
+  if (parts.length === 0) return;
+
+  ctx.save();
+  const height = 44;
+  const radius = 14;
+  const x = cx - width / 2;
+  const y = cy - height / 2;
+
+  // Background pill / bar
+  ctx.beginPath();
+  ctx.roundRect(x, y, width, height, radius);
+  if (theme === 'solid-dark' || theme === 'dark') {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+  } else {
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+  }
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.08)';
+  ctx.shadowBlur = 8;
+  ctx.shadowOffsetY = 2;
+  ctx.fill();
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  // Content
+  const textY = cy;
+  ctx.textBaseline = 'middle';
+  ctx.font = '600 17px "Space Grotesk", Inter, sans-serif';
+
+  if (parts.length === 1) {
+    ctx.textAlign = 'center';
+    const item = parts[0];
+    ctx.fillStyle = item.color;
+    const labelText = `${item.label}: `;
+    const numText = item.number;
+    const labelW = ctx.measureText(labelText).width;
+    const numW = ctx.measureText(numText).width;
+    const totalW = labelW + numW;
+    const startItemX = cx - totalW / 2;
+
+    ctx.textAlign = 'left';
+    ctx.fillText(labelText, startItemX, textY);
+    ctx.fillStyle = theme === 'dark' || theme === 'solid-dark' ? '#F3F4F6' : '#111827';
+    ctx.font = '700 17px "Space Grotesk", monospace';
+    ctx.fillText(numText, startItemX + labelW, textY);
+  } else {
+    // Two items side-by-side separated by subtle divider
+    const colW = width / 2;
+    
+    // Divider
+    ctx.beginPath();
+    ctx.moveTo(cx, y + 8);
+    ctx.lineTo(cx, y + height - 8);
+    ctx.strokeStyle = theme === 'dark' || theme === 'solid-dark' ? 'rgba(255, 255, 255, 0.18)' : 'rgba(0, 0, 0, 0.12)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    parts.forEach((item, idx) => {
+      const centerItemX = x + (idx === 0 ? colW * 0.5 : colW * 1.5);
+      ctx.font = '700 15px "Space Grotesk", Inter, sans-serif';
+      const labelText = `${item.label}: `;
+      const numText = item.number;
+      ctx.font = '700 15px "Space Grotesk", monospace';
+      const labelW = ctx.measureText(labelText).width;
+      const numW = ctx.measureText(numText).width;
+      const totalW = labelW + numW;
+      const startItemX = centerItemX - totalW / 2;
+
+      ctx.textAlign = 'left';
+      ctx.fillStyle = item.color;
+      ctx.fillText(labelText, startItemX, textY);
+      ctx.fillStyle = theme === 'dark' || theme === 'solid-dark' ? '#F3F4F6' : '#111827';
+      ctx.fillText(numText, startItemX + labelW, textY);
+    });
+  }
+
+  ctx.restore();
+}
+
+/**
  * Generate a crisp themed vector icon data URL for the center of QR code
  */
 export function getThemedQRIconDataUrl(templateId = 'cafe_artisan') {

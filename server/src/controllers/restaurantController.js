@@ -20,6 +20,7 @@ const updateMyRestaurant = async (req, res, next) => {
     const ALLOWED = [
       'name', 'logoUrl', 'coverUrl', 'brandColor',
       'description', 'socialLinks', 'contactInfo', 'qrCardTemplate',
+      'paymentAccounts',
     ];
 
     const updates = {};

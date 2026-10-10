@@ -18,6 +18,12 @@ import {
   ShieldCheck,
   CheckCircle2,
   Star,
+  Phone,
+  Mail,
+  Globe,
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import api from '../lib/api';
 import { applyBrandColor } from '../lib/theme';
@@ -27,6 +33,38 @@ import PoweredBy from '../components/PoweredBy';
 import cafeLogoPlaceholder from '../assets/cafe_logo_placeholder.png';
 import cafeCoverPlaceholder from '../assets/cafe_cover_placeholder.png';
 import toast from 'react-hot-toast';
+
+function InstagramIcon({ className = 'w-4 h-4' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+      <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+    </svg>
+  );
+}
+
+function FacebookIcon({ className = 'w-4 h-4' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
+    </svg>
+  );
+}
+
+function TikTokIcon({ className = 'w-4 h-4' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5" />
+    </svg>
+  );
+}
+
+function formatUrl(url) {
+  if (!url) return '';
+  if (/^https?:\/\//i.test(url)) return url;
+  return `https://${url}`;
+}
 
 function haversineMeters(lat1, lon1, lat2, lon2) {
   const R = 6371000;
@@ -68,6 +106,25 @@ export default function CafePreview() {
   const recentReviews = reviewsSummary?.recentReviews || [];
   const isStrictMode = Boolean(branch?.locationStrictMode);
   const hasGps = Number.isFinite(branch?.location?.lat) && Number.isFinite(branch?.location?.lng);
+
+  // Contact info
+  const contact = restaurant?.contactInfo || {};
+  const phone = (contact.phone || branch?.phone)?.trim();
+  const email = contact.email?.trim();
+  const address = (contact.address || branch?.address)?.trim();
+  const hasContact = Boolean(phone || email || address);
+
+  // Socials & Website
+  const socials = restaurant?.socialLinks || {};
+  const socialList = useMemo(() => {
+    return [
+      { key: 'website',   label: 'Website',   url: socials.website?.trim(),   Icon: Globe },
+      { key: 'instagram', label: 'Instagram', url: socials.instagram?.trim(), Icon: InstagramIcon },
+      { key: 'facebook',  label: 'Facebook',  url: socials.facebook?.trim(),  Icon: FacebookIcon },
+      { key: 'tiktok',    label: 'TikTok',    url: socials.tiktok?.trim(),    Icon: TikTokIcon },
+    ].filter((s) => Boolean(s.url));
+  }, [socials]);
+  const hasSocials = socialList.length > 0;
 
   useEffect(() => {
     if (restaurant?.brandColor) {
@@ -393,6 +450,92 @@ export default function CafePreview() {
                 <span className="not-italic text-[10px] text-ink-muted block mt-1 font-medium">
                   — {recentReviews[0].guestName} ({new Date(recentReviews[0].createdAt).toLocaleDateString()})
                 </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── About Cafe & Social Media Hub ──────────────────────────────── */}
+      {(restaurant?.description || hasSocials || hasContact) && (
+        <div className="px-4 mt-3">
+          <div className="bg-white rounded-2xl p-4 border border-ink/8 shadow-xs space-y-3.5">
+            <h3 className="font-display font-bold text-xs uppercase tracking-wider text-ink-muted flex items-center justify-between">
+              <span>About & Connect</span>
+              {branch?.name && (
+                <span className="text-[10px] normal-case font-medium text-ink-muted">
+                  {branch.name}
+                </span>
+              )}
+            </h3>
+
+            {/* Cafe Story / Bio */}
+            {restaurant?.description && (
+              <p className="text-xs text-ink/85 leading-relaxed whitespace-pre-line border-b border-ink/6 pb-3">
+                {restaurant.description}
+              </p>
+            )}
+
+            {/* Social Media & Official Website Links */}
+            {hasSocials && (
+              <div className="space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-ink/50">
+                  Online & Social Channels
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {socialList.map(({ key, label, url, Icon }) => (
+                    <a
+                      key={key}
+                      href={formatUrl(url)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 p-2.5 rounded-xl bg-paper hover:bg-ink/5 text-ink text-xs font-semibold transition-colors border border-ink/8 group"
+                    >
+                      <div className="w-6 h-6 rounded-lg bg-teal/10 text-teal flex items-center justify-center shrink-0">
+                        <Icon className="w-3.5 h-3.5" />
+                      </div>
+                      <span className="truncate flex-1 group-hover:text-teal transition-colors">
+                        {label}
+                      </span>
+                      <ExternalLink size={11} className="text-ink/30 shrink-0 group-hover:text-teal" />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Contact Details (Phone, Email, Address) */}
+            {hasContact && (
+              <div className="pt-2 border-t border-ink/6 space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-ink/50">
+                  Contact Information
+                </p>
+                <div className="space-y-1.5 text-xs">
+                  {phone && (
+                    <a
+                      href={`tel:${phone}`}
+                      className="flex items-center gap-2 text-ink hover:text-teal transition-colors py-0.5"
+                    >
+                      <Phone size={13} className="text-teal shrink-0" />
+                      <span className="font-medium truncate">{phone}</span>
+                    </a>
+                  )}
+                  {email && (
+                    <a
+                      href={`mailto:${email}`}
+                      className="flex items-center gap-2 text-ink hover:text-teal transition-colors py-0.5"
+                    >
+                      <Mail size={13} className="text-teal shrink-0" />
+                      <span className="font-medium truncate">{email}</span>
+                    </a>
+                  )}
+                  {address && (
+                    <div className="flex items-start gap-2 text-ink-muted py-0.5">
+                      <MapPin size={13} className="text-teal shrink-0 mt-0.5" />
+                      <span className="leading-snug">{address}</span>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
