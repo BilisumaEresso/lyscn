@@ -375,7 +375,7 @@ function OrderCard({ order, highlighted, isShaking, now, index, tableOrderCount 
                     Settles all {tableOrderCount} rounds for this table at once
                   </p>
                 )}
-                <div className="grid grid-cols-2 gap-1.5">
+                <div className="grid grid-cols-3 gap-1.5">
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); payMutation.mutate('telebirr'); }}
@@ -392,6 +392,16 @@ function OrderCard({ order, highlighted, isShaking, now, index, tableOrderCount 
                   >
                     CBE Birr
                   </button>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); payMutation.mutate('awash'); }}
+                    disabled={payMutation.isPending}
+                    className="py-1.5 rounded-lg text-xs font-semibold text-white bg-blue-800 hover:bg-blue-900 shadow-xs flex items-center justify-center gap-1"
+                  >
+                    Awash
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); payMutation.mutate('cash'); }}

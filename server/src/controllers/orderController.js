@@ -714,7 +714,7 @@ const updateOrderPayment = async (req, res, next) => {
     }
 
     const { paymentMethod } = req.body;
-    const VALID_METHODS = ['cash', 'pos', 'telebirr', 'cbebirr', 'other'];
+    const VALID_METHODS = ['cash', 'pos', 'telebirr', 'cbebirr', 'awash', 'other'];
 
     if (!paymentMethod || !VALID_METHODS.includes(paymentMethod)) {
       return res.status(400).json({
@@ -807,7 +807,7 @@ const updateTablePayment = async (req, res, next) => {
     }
 
     const { paymentMethod } = req.body;
-    const VALID_METHODS = ['cash', 'pos', 'telebirr', 'cbebirr', 'other'];
+    const VALID_METHODS = ['cash', 'pos', 'telebirr', 'cbebirr', 'awash', 'other'];
 
     if (!paymentMethod || !VALID_METHODS.includes(paymentMethod)) {
       return res.status(400).json({

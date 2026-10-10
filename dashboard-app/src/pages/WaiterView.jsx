@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Utensils, CheckCircle2, Clock, DollarSign, CreditCard,
-  PhoneCall, AlertCircle, RefreshCw, Power, UserCheck, ShieldCheck, MapPin, Sparkles
+  PhoneCall, AlertCircle, RefreshCw, Power, UserCheck, ShieldCheck, MapPin, Sparkles,
+  QrCode, Copy, Check, Eye, ExternalLink, Building, Info, ChevronRight
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../lib/api';
@@ -28,6 +29,10 @@ export default function WaiterView() {
   const [settleModalOpen, setSettleModalOpen] = useState(false);
   const [selectedTableForSettle, setSelectedTableForSettle] = useState(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('telebirr');
+  const [copiedKey, setCopiedKey] = useState(null);
+  const [presentQrFullScreen, setPresentQrFullScreen] = useState(false);
+  const [verifiedWithEyes, setVerifiedWithEyes] = useState(false);
+  const [txnRefInput, setTxnRefInput] = useState('');
   const [now, setNow] = useState(Date.now());
 
   // Clock ticker for elapsed time
@@ -35,6 +40,16 @@ export default function WaiterView() {
     const timer = setInterval(() => setNow(Date.now()), 10000);
     return () => clearInterval(timer);
   }, []);
+
+  // Fetch restaurant details for active paymentAccounts
+  const { data: restaurantData } = useQuery({
+    queryKey: ['restaurant-me'],
+    queryFn: () => api.get('/restaurants/me').then((r) => r.data),
+    staleTime: 60_000,
+  });
+
+  const restaurant = restaurantData?.restaurant;
+  const paymentAccounts = restaurant?.paymentAccounts || {};
 
   // Fetch orders
   const { data: ordersData, refetch: refetchOrders } = useQuery({
@@ -177,8 +192,35 @@ export default function WaiterView() {
 
   const handleOpenSettle = (tableItem) => {
     setSelectedTableForSettle(tableItem);
-    setSelectedPaymentMethod('telebirr');
+    // Auto-select first active bank or default to telebirr
+    if (paymentAccounts.telebirr?.isActive && paymentAccounts.telebirr?.accountNumber) {
+      setSelectedPaymentMethod('telebirr');
+    } else if (paymentAccounts.cbeBirr?.isActive && paymentAccounts.cbeBirr?.accountNumber) {
+      setSelectedPaymentMethod('cbebirr');
+    } else if (paymentAccounts.awashBank?.isActive && paymentAccounts.awashBank?.accountNumber) {
+      setSelectedPaymentMethod('awash');
+    } else {
+      setSelectedPaymentMethod('cash');
+    }
+    setVerifiedWithEyes(false);
+    setTxnRefInput('');
+    setPresentQrFullScreen(false);
     setSettleModalOpen(true);
+  };
+
+  const copyToClipboard = (text, key, label) => {
+    if (!text) return;
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        setCopiedKey(key);
+        toast.success(`Copied ${label}`);
+        setTimeout(() => setCopiedKey(null), 2500);
+      }).catch(() => {
+        toast.success(`Copied ${label}`);
+      });
+    } else {
+      toast.success(`Copied ${label}`);
+    }
   };
 
   const handleConfirmSettle = () => {
@@ -547,55 +589,294 @@ export default function WaiterView() {
         )}
       </main>
 
-      {/* Settle Table Bill Modal */}
+      {/* Settle Table Bill Modal — Waiter Assisted Scan & Verify */}
       {selectedTableForSettle && (
         <Modal
           open={settleModalOpen}
           onClose={() => setSettleModalOpen(false)}
           title={`Settle Bill — ${selectedTableForSettle.label}`}
-          size="sm"
+          size="md"
         >
           <div className="space-y-4">
-            <div className="p-3.5 rounded-xl bg-teal/10 border border-teal/20 text-center space-y-1">
-              <span className="text-xs text-ink-muted font-medium">Total Balance to Collect</span>
+            {/* Bill Summary Strip */}
+            <div className="p-3.5 rounded-2xl bg-teal/10 border border-teal/20 flex items-center justify-between">
+              <div>
+                <span className="text-[11px] text-ink-muted uppercase font-bold tracking-wider block">Total Due</span>
+                <span className="text-xs text-ink-muted">
+                  {selectedTableForSettle.unpaidCount} unpaid round{selectedTableForSettle.unpaidCount !== 1 ? 's' : ''}
+                </span>
+              </div>
               <Currency
                 value={selectedTableForSettle.unpaidTotal}
-                className="font-display font-bold text-2xl text-ink block"
+                className="font-display font-bold text-2xl text-ink"
               />
-              <span className="text-[11px] text-ink-muted block">
-                Settles all {selectedTableForSettle.unpaidCount} unpaid rounds for this table
-              </span>
             </div>
 
+            {/* Payment Method Selector Tabs */}
             <div>
               <label className="block text-xs font-semibold text-ink mb-1.5">
-                Select Customer Payment Method
+                Payment Channel
               </label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-5 gap-1.5">
                 {[
-                  { id: 'telebirr', label: 'Telebirr', icon: Sparkles, color: 'text-blue-500' },
-                  { id: 'cbebirr', label: 'CBE Birr', icon: Sparkles, color: 'text-purple-500' },
-                  { id: 'cash', label: 'Cash Birr', icon: DollarSign, color: 'text-emerald-500' },
-                  { id: 'pos', label: 'POS Card', icon: CreditCard, color: 'text-indigo-500' },
-                ].map(({ id, label, icon: Icon, color }) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setSelectedPaymentMethod(id)}
-                    className={`p-3 rounded-xl border text-center flex flex-col items-center gap-1 transition-all ${
-                      selectedPaymentMethod === id
-                        ? 'border-teal bg-teal/10 text-teal font-semibold shadow-xs'
-                        : 'border-ink/8 text-ink-muted hover:border-ink/20 hover:text-ink'
-                    }`}
-                  >
-                    <Icon size={18} className={color} />
-                    <span className="text-xs">{label}</span>
-                  </button>
-                ))}
+                  {
+                    id: 'telebirr',
+                    label: 'Telebirr',
+                    logo: '/banks_logo/telebirr.png',
+                    fallback: 'TB',
+                    bgColor: 'bg-blue-600',
+                    isDigital: true,
+                    isConfigured: Boolean(paymentAccounts.telebirr?.isActive && paymentAccounts.telebirr?.accountNumber),
+                  },
+                  {
+                    id: 'cbebirr',
+                    label: 'CBE Birr',
+                    logo: '/banks_logo/CBE.png',
+                    fallback: 'CBE',
+                    bgColor: 'bg-purple-700',
+                    isDigital: true,
+                    isConfigured: Boolean(paymentAccounts.cbeBirr?.isActive && paymentAccounts.cbeBirr?.accountNumber),
+                  },
+                  {
+                    id: 'awash',
+                    label: 'Awash',
+                    logo: '/banks_logo/awash.png',
+                    fallback: 'AW',
+                    bgColor: 'bg-blue-800',
+                    isDigital: true,
+                    isConfigured: Boolean(paymentAccounts.awashBank?.isActive && paymentAccounts.awashBank?.accountNumber),
+                  },
+                  {
+                    id: 'cash',
+                    label: 'Cash',
+                    icon: DollarSign,
+                    color: 'text-emerald-600',
+                    isDigital: false,
+                    isConfigured: true,
+                  },
+                  {
+                    id: 'pos',
+                    label: 'POS Card',
+                    icon: CreditCard,
+                    color: 'text-indigo-600',
+                    isDigital: false,
+                    isConfigured: true,
+                  },
+                ].map((m) => {
+                  const isSelected = selectedPaymentMethod === m.id;
+                  const Icon = m.icon;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedPaymentMethod(m.id);
+                        setVerifiedWithEyes(false);
+                      }}
+                      className={`p-2 rounded-xl border text-center flex flex-col items-center justify-center gap-1 transition-all relative ${
+                        isSelected
+                          ? 'border-teal bg-teal/10 text-teal font-bold shadow-xs'
+                          : 'border-ink/8 text-ink-muted hover:border-ink/20 hover:text-ink'
+                      }`}
+                    >
+                      {m.logo ? (
+                        <div className="w-6 h-6 rounded-lg bg-white p-0.5 border border-ink/10 flex items-center justify-center shrink-0 overflow-hidden">
+                          <img
+                            src={m.logo}
+                            alt={m.label}
+                            className="w-full h-full object-contain"
+                            onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = 'flex'; }}
+                          />
+                          <span className={`w-full h-full rounded text-white font-bold text-[8px] items-center justify-center hidden ${m.bgColor}`}>
+                            {m.fallback}
+                          </span>
+                        </div>
+                      ) : (
+                        <Icon size={18} className={m.color} />
+                      )}
+                      <span className="text-[10px] truncate max-w-full leading-tight">{m.label}</span>
+                      {m.isDigital && !m.isConfigured && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 absolute top-1 right-1" title="Account number not set in settings" />
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            <div className="flex gap-2 pt-2">
+            {/* ── DIGITAL PAYMENT PRESENTATION PANEL (Telebirr, CBE, Awash) ── */}
+            {['telebirr', 'cbebirr', 'awash'].includes(selectedPaymentMethod) && (() => {
+              const accountKey = selectedPaymentMethod === 'telebirr'
+                ? 'telebirr'
+                : selectedPaymentMethod === 'cbebirr'
+                ? 'cbeBirr'
+                : 'awashBank';
+              const bankDetails = paymentAccounts[accountKey] || {};
+              const bankName = selectedPaymentMethod === 'telebirr'
+                ? 'Telebirr'
+                : selectedPaymentMethod === 'cbebirr'
+                ? 'Commercial Bank of Ethiopia'
+                : 'Awash Bank';
+              const bankLogo = selectedPaymentMethod === 'telebirr'
+                ? '/banks_logo/telebirr.png'
+                : selectedPaymentMethod === 'cbebirr'
+                ? '/banks_logo/CBE.png'
+                : '/banks_logo/awash.png';
+
+              const isConfigured = Boolean(bankDetails.isActive && bankDetails.accountNumber);
+              const tableRefRemark = `Table ${selectedTableForSettle.label} Bill #${selectedTableForSettle._id ? String(selectedTableForSettle._id).slice(-4).toUpperCase() : ''}`;
+
+              return (
+                <div className="p-3.5 rounded-2xl bg-paper border border-ink/8 space-y-3 animate-fade-in">
+                  {isConfigured ? (
+                    <>
+                      {/* Bank Identification Strip */}
+                      <div className="flex items-center justify-between border-b border-ink/6 pb-2.5">
+                        <div className="flex items-center gap-2">
+                          <img src={bankLogo} alt={bankName} className="w-7 h-7 object-contain rounded-lg bg-white p-0.5 border border-ink/10 shadow-2xs" />
+                          <div>
+                            <p className="font-display font-bold text-xs text-ink leading-tight">{bankName}</p>
+                            {bankDetails.accountName && (
+                              <p className="text-[11px] text-ink-muted leading-tight">{bankDetails.accountName}</p>
+                            )}
+                          </div>
+                        </div>
+
+                        {bankDetails.qrCodeUrl && (
+                          <button
+                            type="button"
+                            onClick={() => setPresentQrFullScreen(!presentQrFullScreen)}
+                            className="px-2 py-1 rounded-lg bg-white border border-ink/10 text-xs font-semibold text-ink flex items-center gap-1 hover:bg-ink/5 shadow-2xs"
+                          >
+                            <QrCode size={13} />
+                            <span>{presentQrFullScreen ? 'Compact' : 'Expand QR'}</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Waiter Presentation Zone: QR Code for Diner to Scan from Waiter Screen */}
+                      <div className="flex flex-col items-center justify-center p-3 bg-white rounded-xl border border-ink/6 shadow-inner text-center">
+                        {bankDetails.qrCodeUrl ? (
+                          <div className={`transition-all duration-200 ${presentQrFullScreen ? 'p-3 bg-white rounded-2xl shadow-lg border-2 border-primary' : ''}`}>
+                            <img
+                              src={bankDetails.qrCodeUrl}
+                              alt={`${bankName} QR`}
+                              className={`object-contain rounded-lg mx-auto ${presentQrFullScreen ? 'w-56 h-56' : 'w-32 h-32'}`}
+                            />
+                            <p className="text-[11px] font-semibold text-primary mt-1.5 flex items-center justify-center gap-1">
+                              <span>Hold phone towards guest to scan</span>
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="py-2 space-y-1">
+                            <span className="text-xs text-ink-muted">No QR image uploaded for {bankName}</span>
+                            <p className="text-[11px] text-ink-muted">Guest can transfer directly to the account number below</p>
+                          </div>
+                        )}
+
+                        {/* Account Number & 1-Tap Copy */}
+                        <div className="mt-2.5 w-full flex items-center justify-between bg-paper p-2 rounded-xl border border-ink/6">
+                          <div className="text-left min-w-0 pr-2">
+                            <span className="text-[9px] uppercase tracking-wider text-ink-muted font-bold block">Account / Phone</span>
+                            <span className="font-mono font-bold text-xs sm:text-sm text-ink truncate block">
+                              {bankDetails.accountNumber}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(bankDetails.accountNumber, 'account', 'account number')}
+                            className="px-2.5 py-1 rounded-lg bg-white border border-ink/12 text-xs font-semibold text-ink flex items-center gap-1 hover:bg-ink/5 shadow-2xs shrink-0"
+                          >
+                            {copiedKey === 'account' ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                            <span>{copiedKey === 'account' ? 'Copied' : 'Copy'}</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Reference Helper */}
+                      <div className="flex items-center justify-between text-[11px] bg-white p-2 rounded-xl border border-ink/6">
+                        <span className="text-ink-muted font-medium">Payment Remark: <b className="text-ink">{tableRefRemark}</b></span>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(tableRefRemark, 'remark', 'remark')}
+                          className="text-primary hover:underline font-semibold flex items-center gap-0.5"
+                        >
+                          {copiedKey === 'remark' ? <Check size={11} /> : <Copy size={11} />}
+                          <span>Copy</span>
+                        </button>
+                      </div>
+
+                      {/* ── Eye Verification Step Checklist ── */}
+                      <div className="p-3 rounded-xl bg-amber-50/80 border border-amber-200/80 space-y-2">
+                        <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={verifiedWithEyes}
+                            onChange={(e) => setVerifiedWithEyes(e.target.checked)}
+                            className="w-4 h-4 rounded text-teal focus:ring-teal mt-0.5 shrink-0"
+                          />
+                          <div className="text-xs">
+                            <span className="font-bold text-amber-950 flex items-center gap-1">
+                              <Eye size={13} className="text-amber-700" />
+                              <span>Verified with my own eyes</span>
+                            </span>
+                            <p className="text-[11px] text-amber-800 leading-snug mt-0.5">
+                              I inspected the customer's phone transfer screen/SMS confirming <b><Currency value={selectedTableForSettle.unpaidTotal} /></b> was transferred to <b>{bankDetails.accountName || restaurant?.name}</b>.
+                            </p>
+                          </div>
+                        </label>
+
+                        {/* Optional Transaction reference code input */}
+                        <div className="pt-1 border-t border-amber-200/60 flex items-center gap-2">
+                          <input
+                            type="text"
+                            placeholder="Optional: Enter TXN / SMS Ref code"
+                            value={txnRefInput}
+                            onChange={(e) => setTxnRefInput(e.target.value)}
+                            className="flex-1 px-2.5 py-1 text-xs rounded-lg border border-amber-300/80 bg-white placeholder-ink/30 focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono"
+                          />
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="p-3 text-center space-y-1.5">
+                      <p className="text-xs font-semibold text-ink">No {bankName} Account Configured</p>
+                      <p className="text-[11px] text-ink-muted">
+                        The manager or owner has not set up the {bankName} account details in Settings.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* ── PHYSICAL CASH & POS CONFIRMATION PANEL ── */}
+            {selectedPaymentMethod === 'cash' && (
+              <div className="p-3.5 rounded-2xl bg-emerald-50/60 border border-emerald-200/80 text-xs text-emerald-900 space-y-1">
+                <p className="font-bold flex items-center gap-1.5">
+                  <DollarSign size={14} className="text-emerald-700" />
+                  <span>Cash Payment Collection</span>
+                </p>
+                <p className="text-[11px] text-emerald-800 leading-snug">
+                  Please collect <b><Currency value={selectedTableForSettle.unpaidTotal} /></b> in cash and provide change if needed before marking settled.
+                </p>
+              </div>
+            )}
+
+            {selectedPaymentMethod === 'pos' && (
+              <div className="p-3.5 rounded-2xl bg-indigo-50/60 border border-indigo-200/80 text-xs text-indigo-900 space-y-1">
+                <p className="font-bold flex items-center gap-1.5">
+                  <CreditCard size={14} className="text-indigo-700" />
+                  <span>POS Terminal Payment</span>
+                </p>
+                <p className="text-[11px] text-indigo-800 leading-snug">
+                  Charge the customer's card on the physical terminal and verify the printed slip matches <b><Currency value={selectedTableForSettle.unpaidTotal} /></b>.
+                </p>
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div className="flex gap-2 pt-2 border-t border-ink/6">
               <Button
                 variant="outline"
                 size="sm"
@@ -608,9 +889,14 @@ export default function WaiterView() {
                 size="sm"
                 onClick={handleConfirmSettle}
                 loading={settleMutation.isPending}
-                className="flex-1 bg-teal hover:bg-teal/90 text-white font-semibold"
+                disabled={
+                  ['telebirr', 'cbebirr', 'awash'].includes(selectedPaymentMethod) && !verifiedWithEyes
+                }
+                className="flex-1 bg-teal hover:bg-teal/90 text-white font-semibold disabled:opacity-40"
               >
-                Confirm Settle
+                {['telebirr', 'cbebirr', 'awash'].includes(selectedPaymentMethod)
+                  ? (verifiedWithEyes ? 'Confirm Verified & Settle' : 'Verify Screen First')
+                  : 'Confirm Settle'}
               </Button>
             </div>
           </div>

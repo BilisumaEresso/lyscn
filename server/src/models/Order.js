@@ -83,7 +83,7 @@ const orderSchema = new mongoose.Schema(
     // null until staff marks order as paid
     paymentMethod: {
       type: String,
-      enum: ['cash', 'pos', 'telebirr', 'cbebirr', 'other'],
+      enum: ['cash', 'pos', 'telebirr', 'cbebirr', 'awash', 'other'],
       default: null,
     },
 
