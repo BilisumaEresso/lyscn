@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Phone, Mail, MapPin, Star, MessageSquare, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Phone, Mail, MapPin, Star, MessageSquare, CheckCircle2, ChevronDown, Quote } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
 import { applyBrandColor } from '../lib/theme';
@@ -72,6 +72,7 @@ export default function About() {
 
   const [coverImgError, setCoverImgError] = useState(false);
   const [logoImgError, setLogoImgError] = useState(false);
+  const [showAllReviews, setShowAllReviews] = useState(false);
 
   useEffect(() => { setCoverImgError(false); }, [restaurant?.coverUrl]);
   useEffect(() => { setLogoImgError(false); }, [restaurant?.logoUrl]);
@@ -175,94 +176,83 @@ export default function About() {
           )}
         </div>
 
-        {/* ── Customer Ratings & Verified Reviews Card ───────────────────── */}
+        {/* ── Customer Ratings & Verified Reviews: Minimal & Refined ── */}
         {totalReviews > 0 && (
-          <div className="bg-white rounded-2xl p-5 border border-ink/6 shadow-sm space-y-4">
+          <div className="bg-white rounded-2xl p-4 border border-ink/6 shadow-2xs space-y-3">
+            {/* Minimal Header with score & verified badge */}
             <div className="flex items-center justify-between">
-              <h2 className="text-xs font-bold uppercase tracking-wider text-ink-muted flex items-center gap-1.5">
-                <Star size={13} className="text-amber-500 fill-amber-400" />
-                Guest Ratings & Reviews
-              </h2>
-              <span className="text-[11px] font-semibold text-teal bg-teal/10 px-2 py-0.5 rounded-full flex items-center gap-1">
-                <CheckCircle2 size={11} /> Verified Diners
+              <div className="flex items-center gap-2">
+                <span className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
+                  <Star size={16} className="fill-amber-400 text-amber-500" />
+                </span>
+                <div>
+                  <div className="flex items-baseline gap-1.5 leading-tight">
+                    <span className="font-display font-bold text-base text-ink">
+                      {averageRating}
+                    </span>
+                    <span className="text-xs text-ink-muted">
+                      ({totalReviews} verified {totalReviews === 1 ? 'review' : 'reviews'})
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-0.5 mt-0.5">
+                    {[...Array(5)].map((_, i) => (
+                      <Star
+                        key={i}
+                        size={10}
+                        className={i < Math.round(averageRating) ? 'fill-amber-400 text-amber-500' : 'text-ink/15'}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <span className="text-[10px] font-semibold text-teal bg-teal/10 px-2 py-0.5 rounded-full flex items-center gap-1">
+                <CheckCircle2 size={10} /> Verified
               </span>
             </div>
 
-            {/* Score Summary & Star Bars */}
-            <div className="flex items-center gap-5 p-3.5 rounded-xl bg-paper border border-ink/6">
-              <div className="text-center shrink-0 pr-3 border-r border-ink/8">
-                <span className="font-display font-bold text-3xl text-ink leading-none">
-                  {averageRating}
-                </span>
-                <div className="flex items-center justify-center gap-0.5 my-1 text-amber-400">
-                  {[...Array(5)].map((_, i) => (
-                    <Star
-                      key={i}
-                      size={11}
-                      className={i < Math.round(averageRating) ? 'fill-amber-400 text-amber-500' : 'text-ink/20'}
-                    />
-                  ))}
-                </div>
-                <span className="text-[10px] text-ink-muted block font-medium">
-                  {totalReviews} review{totalReviews !== 1 ? 's' : ''}
-                </span>
-              </div>
-
-              {/* Star distribution */}
-              <div className="flex-1 space-y-1">
-                {[5, 4, 3, 2, 1].map((star) => {
-                  const count = distribution[star] || 0;
-                  const pct = totalReviews > 0 ? Math.round((count / totalReviews) * 100) : 0;
-                  return (
-                    <div key={star} className="flex items-center gap-1.5 text-[10px]">
-                      <span className="w-3 text-right font-semibold text-ink-muted">{star}</span>
-                      <div className="flex-1 h-1.5 bg-ink/6 rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-amber-400"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                      <span className="w-6 text-right text-ink/40 font-mono">{pct}%</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Recent Diner Feedback List */}
+            {/* Curated Recent Review Cards (Compact & Elegant) */}
             {recentReviews.length > 0 && (
-              <div className="space-y-3 pt-1">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-ink/50">
-                  Recent Feedback
-                </p>
-                <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
-                  {recentReviews.map((rev) => (
-                    <div
-                      key={rev._id}
-                      className="p-3 rounded-xl bg-paper/70 border border-ink/6 space-y-1.5"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-semibold text-xs text-ink">
-                          {rev.guestName}
-                        </span>
-                        <div className="flex items-center gap-0.5 text-amber-400">
-                          {[...Array(rev.rating || 5)].map((_, i) => (
-                            <Star key={i} size={10} className="fill-amber-400 text-amber-500" />
-                          ))}
-                        </div>
+              <div className="space-y-2 pt-1 border-t border-ink/5">
+                {(showAllReviews ? recentReviews : recentReviews.slice(0, 2)).map((rev) => (
+                  <div
+                    key={rev._id}
+                    className="p-2.5 rounded-xl bg-paper/80 border border-ink/5 text-xs space-y-1"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-[11px] text-ink truncate">
+                        {rev.guestName || 'Diner'}
+                      </span>
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        {[...Array(rev.rating || 5)].map((_, i) => (
+                          <Star key={i} size={9} className="fill-amber-400 text-amber-500" />
+                        ))}
                       </div>
-                      <p className="text-xs text-ink/80 italic leading-relaxed">
+                    </div>
+                    {rev.feedback && (
+                      <p className="text-[11px] text-ink/75 italic leading-snug line-clamp-2">
                         &ldquo;{rev.feedback}&rdquo;
                       </p>
-                      <span className="text-[10px] text-ink/40 block">
-                        {new Date(rev.createdAt).toLocaleDateString(undefined, {
-                          month: 'short',
-                          day: 'numeric',
-                        })}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                    )}
+                    <span className="text-[9px] text-ink/35 block">
+                      {new Date(rev.createdAt).toLocaleDateString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                    </span>
+                  </div>
+                ))}
+
+                {recentReviews.length > 2 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllReviews(!showAllReviews)}
+                    className="w-full py-1.5 text-center text-[11px] font-semibold text-ink-muted hover:text-ink transition-colors flex items-center justify-center gap-1 pt-0.5"
+                  >
+                    <span>{showAllReviews ? 'Show less' : `Show all (${recentReviews.length}) reviews`}</span>
+                    <ChevronDown size={12} className={`transition-transform duration-200 ${showAllReviews ? 'rotate-180' : ''}`} />
+                  </button>
+                )}
               </div>
             )}
           </div>
