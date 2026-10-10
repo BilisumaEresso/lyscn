@@ -3,8 +3,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Utensils, CheckCircle2, Clock, DollarSign, CreditCard,
   PhoneCall, AlertCircle, RefreshCw, Power, UserCheck, ShieldCheck, MapPin, Sparkles,
-  QrCode, Copy, Check, Eye, ExternalLink, Building, Info, ChevronRight
+  QrCode, Copy, Check, Eye, ExternalLink, Building, Info, ChevronRight, Zap
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import toast from 'react-hot-toast';
 import api from '../lib/api';
 import socket from '../lib/socket';
@@ -13,6 +14,7 @@ import Currency, { formatBirr } from '../components/ui/Currency';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import { playSound } from '../lib/soundEffects';
+import { buildCbeDynamicQrPayload } from '../lib/cbeQrGenerator';
 
 function timeAgo(date, now = Date.now()) {
   const secs = Math.max(0, Math.floor((now - new Date(date).getTime()) / 1000));
@@ -31,6 +33,7 @@ export default function WaiterView() {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('telebirr');
   const [copiedKey, setCopiedKey] = useState(null);
   const [presentQrFullScreen, setPresentQrFullScreen] = useState(false);
+  const [cbeQrMode, setCbeQrMode] = useState('dynamic'); // 'dynamic' | 'static'
   const [verifiedWithEyes, setVerifiedWithEyes] = useState(false);
   const [txnRefInput, setTxnRefInput] = useState('');
   const [now, setNow] = useState(Date.now());
@@ -205,6 +208,7 @@ export default function WaiterView() {
     setVerifiedWithEyes(false);
     setTxnRefInput('');
     setPresentQrFullScreen(false);
+    setCbeQrMode('dynamic');
     setSettleModalOpen(true);
   };
 
@@ -726,6 +730,20 @@ export default function WaiterView() {
               const isConfigured = Boolean(bankDetails.isActive && bankDetails.accountNumber);
               const tableRefRemark = `Table ${selectedTableForSettle.label} Bill #${selectedTableForSettle._id ? String(selectedTableForSettle._id).slice(-4).toUpperCase() : ''}`;
 
+              // Generate dynamic EMVCo CBE QR if CBE is selected
+              const cbeDynamicPayload = isConfigured && selectedPaymentMethod === 'cbebirr'
+                ? buildCbeDynamicQrPayload({
+                    accountNumber: bankDetails.accountNumber,
+                    accountName: bankDetails.accountName || restaurant?.name || 'LayoScan Merchant',
+                    amount: selectedTableForSettle?.unpaidTotal,
+                    reason: `Table ${selectedTableForSettle?.label}`,
+                    city: 'Addis Ababa',
+                  })
+                : '';
+
+              const isDynamicCbe = selectedPaymentMethod === 'cbebirr' && Boolean(cbeDynamicPayload);
+              const showDynamicCbe = isDynamicCbe && (cbeQrMode === 'dynamic' || !bankDetails.qrCodeUrl);
+
               return (
                 <div className="p-3.5 rounded-2xl bg-paper border border-ink/8 space-y-3 animate-fade-in">
                   {isConfigured ? (
@@ -735,28 +753,88 @@ export default function WaiterView() {
                         <div className="flex items-center gap-2">
                           <img src={bankLogo} alt={bankName} className="w-7 h-7 object-contain rounded-lg bg-white p-0.5 border border-ink/10 shadow-2xs" />
                           <div>
-                            <p className="font-display font-bold text-xs text-ink leading-tight">{bankName}</p>
+                            <div className="flex items-center gap-1.5">
+                              <p className="font-display font-bold text-xs text-ink leading-tight">{bankName}</p>
+                              {selectedPaymentMethod === 'cbebirr' && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-100 text-purple-700 border border-purple-200">
+                                  <Zap size={9} className="text-purple-600 fill-purple-600" />
+                                  <span>Dynamic</span>
+                                </span>
+                              )}
+                            </div>
                             {bankDetails.accountName && (
                               <p className="text-[11px] text-ink-muted leading-tight">{bankDetails.accountName}</p>
                             )}
                           </div>
                         </div>
 
-                        {bankDetails.qrCodeUrl && (
-                          <button
-                            type="button"
-                            onClick={() => setPresentQrFullScreen(!presentQrFullScreen)}
-                            className="px-2 py-1 rounded-lg bg-white border border-ink/10 text-xs font-semibold text-ink flex items-center gap-1 hover:bg-ink/5 shadow-2xs"
-                          >
-                            <QrCode size={13} />
-                            <span>{presentQrFullScreen ? 'Compact' : 'Expand QR'}</span>
-                          </button>
-                        )}
+                        <div className="flex items-center gap-1.5">
+                          {/* Toggle between Dynamic and Static QR if merchant has uploaded an image */}
+                          {isDynamicCbe && bankDetails.qrCodeUrl && (
+                            <div className="flex items-center bg-ink/5 p-0.5 rounded-lg text-[10px] font-semibold">
+                              <button
+                                type="button"
+                                onClick={() => setCbeQrMode('dynamic')}
+                                className={`px-2 py-0.5 rounded transition-all ${
+                                  showDynamicCbe ? 'bg-white shadow-2xs text-purple-700 font-bold' : 'text-ink-muted hover:text-ink'
+                                }`}
+                              >
+                                Dynamic
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setCbeQrMode('static')}
+                                className={`px-2 py-0.5 rounded transition-all ${
+                                  !showDynamicCbe ? 'bg-white shadow-2xs text-ink font-bold' : 'text-ink-muted hover:text-ink'
+                                }`}
+                              >
+                                Static
+                              </button>
+                            </div>
+                          )}
+
+                          {(showDynamicCbe || bankDetails.qrCodeUrl) && (
+                            <button
+                              type="button"
+                              onClick={() => setPresentQrFullScreen(!presentQrFullScreen)}
+                              className="px-2 py-1 rounded-lg bg-white border border-ink/10 text-xs font-semibold text-ink flex items-center gap-1 hover:bg-ink/5 shadow-2xs"
+                            >
+                              <QrCode size={13} />
+                              <span>{presentQrFullScreen ? 'Compact' : 'Expand QR'}</span>
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       {/* Waiter Presentation Zone: QR Code for Diner to Scan from Waiter Screen */}
                       <div className="flex flex-col items-center justify-center p-3 bg-white rounded-xl border border-ink/6 shadow-inner text-center">
-                        {bankDetails.qrCodeUrl ? (
+                        {showDynamicCbe ? (
+                          <div className={`transition-all duration-200 flex flex-col items-center ${presentQrFullScreen ? 'p-3 bg-white rounded-2xl shadow-lg border-2 border-primary' : ''}`}>
+                            <div className="p-2.5 bg-white rounded-xl border border-purple-200/80 shadow-xs inline-block">
+                              <QRCodeSVG
+                                value={cbeDynamicPayload}
+                                size={presentQrFullScreen ? 230 : 150}
+                                level="H"
+                                includeMargin={true}
+                                imageSettings={{
+                                  src: '/banks_logo/CBE.png',
+                                  height: presentQrFullScreen ? 32 : 24,
+                                  width: presentQrFullScreen ? 32 : 24,
+                                  excavate: true,
+                                }}
+                              />
+                            </div>
+                            <div className="mt-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-50 border border-purple-200 text-purple-900 text-[11px] font-semibold">
+                              <Sparkles size={12} className="text-purple-600 shrink-0" />
+                              <span>
+                                Prefilled: <b>Br {Number(selectedTableForSettle.unpaidTotal || 0).toLocaleString()}</b> & <b>{tableRefRemark}</b>
+                              </span>
+                            </div>
+                            <p className="text-[11px] font-medium text-ink-muted mt-1">
+                              Hold phone towards guest to scan with CBE Mobile Banking / CBE Birr
+                            </p>
+                          </div>
+                        ) : bankDetails.qrCodeUrl ? (
                           <div className={`transition-all duration-200 ${presentQrFullScreen ? 'p-3 bg-white rounded-2xl shadow-lg border-2 border-primary' : ''}`}>
                             <img
                               src={bankDetails.qrCodeUrl}
