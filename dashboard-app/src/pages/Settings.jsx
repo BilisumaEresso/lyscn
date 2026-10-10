@@ -134,6 +134,9 @@ export default function Settings() {
       cbeNumber: "",
       cbeName: "",
       cbeQrUrl: "",
+      awashNumber: "",
+      awashName: "",
+      awashQrUrl: "",
       otherBankName: "",
       otherBankAccount: "",
       otherBankHolder: "",
@@ -148,6 +151,7 @@ export default function Settings() {
     register("qrCardTemplate");
     register("telebirrQrUrl");
     register("cbeQrUrl");
+    register("awashQrUrl");
   }, [register]);
 
   // Watch fields for live preview
@@ -157,6 +161,7 @@ export default function Settings() {
   const qrCardTemplate = watch("qrCardTemplate") || "cafe_artisan";
   const telebirrQrUrl = watch("telebirrQrUrl");
   const cbeQrUrl = watch("cbeQrUrl");
+  const awashQrUrl = watch("awashQrUrl");
 
   // Populate form only on initial data load to prevent window focus from wiping dirty state
   useEffect(() => {
@@ -183,6 +188,9 @@ export default function Settings() {
       cbeNumber: pa.cbeBirr?.accountNumber ?? "",
       cbeName: pa.cbeBirr?.accountName ?? "",
       cbeQrUrl: pa.cbeBirr?.qrCodeUrl ?? "",
+      awashNumber: pa.awashBank?.accountNumber ?? "",
+      awashName: pa.awashBank?.accountName ?? "",
+      awashQrUrl: pa.awashBank?.qrCodeUrl ?? "",
       otherBankName: pa.otherBank?.bankName ?? "",
       otherBankAccount: pa.otherBank?.accountNumber ?? "",
       otherBankHolder: pa.otherBank?.accountName ?? "",
@@ -216,6 +224,9 @@ export default function Settings() {
         cbeNumber: pa.cbeBirr?.accountNumber ?? "",
         cbeName: pa.cbeBirr?.accountName ?? "",
         cbeQrUrl: pa.cbeBirr?.qrCodeUrl ?? "",
+        awashNumber: pa.awashBank?.accountNumber ?? "",
+        awashName: pa.awashBank?.accountName ?? "",
+        awashQrUrl: pa.awashBank?.qrCodeUrl ?? "",
         otherBankName: pa.otherBank?.bankName ?? "",
         otherBankAccount: pa.otherBank?.accountNumber ?? "",
         otherBankHolder: pa.otherBank?.accountName ?? "",
@@ -258,6 +269,12 @@ export default function Settings() {
           accountName: form.cbeName?.trim() || "",
           qrCodeUrl: form.cbeQrUrl?.trim() || null,
           isActive: Boolean(form.cbeNumber?.trim()),
+        },
+        awashBank: {
+          accountNumber: form.awashNumber?.trim() || "",
+          accountName: form.awashName?.trim() || "",
+          qrCodeUrl: form.awashQrUrl?.trim() || null,
+          isActive: Boolean(form.awashNumber?.trim()),
         },
         otherBank: {
           bankName: form.otherBankName?.trim() || "",
@@ -537,8 +554,16 @@ export default function Settings() {
             {/* Telebirr Section */}
             <div className="p-4 rounded-2xl border border-blue-200/60 bg-blue-50/30 space-y-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
-                  TB
+                <div className="w-9 h-9 rounded-xl bg-white p-1 border border-blue-200/80 shadow-xs flex items-center justify-center shrink-0 overflow-hidden">
+                  <img
+                    src="/banks_logo/telebirr.png"
+                    alt="Telebirr"
+                    className="w-full h-full object-contain"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = 'flex'; }}
+                  />
+                  <div className="w-full h-full bg-blue-600 text-white rounded-lg items-center justify-center font-bold text-xs hidden">
+                    TB
+                  </div>
                 </div>
                 <div>
                   <h3 className="font-display font-semibold text-sm text-ink">Telebirr Merchant / Phone</h3>
@@ -575,8 +600,16 @@ export default function Settings() {
             {/* CBE Birr Section */}
             <div className="p-4 rounded-2xl border border-purple-200/60 bg-purple-50/30 space-y-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-purple-700 text-white flex items-center justify-center font-bold text-xs shadow-xs">
-                  CBE
+                <div className="w-9 h-9 rounded-xl bg-white p-1 border border-purple-200/80 shadow-xs flex items-center justify-center shrink-0 overflow-hidden">
+                  <img
+                    src="/banks_logo/CBE.png"
+                    alt="CBE Birr"
+                    className="w-full h-full object-contain"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = 'flex'; }}
+                  />
+                  <div className="w-full h-full bg-purple-700 text-white rounded-lg items-center justify-center font-bold text-xs hidden">
+                    CBE
+                  </div>
                 </div>
                 <div>
                   <h3 className="font-display font-bold text-sm text-ink">Commercial Bank of Ethiopia (CBE Birr / Bank)</h3>
@@ -610,22 +643,68 @@ export default function Settings() {
               </div>
             </div>
 
-            {/* Other Bank Transfer (Awash, Abyssinia, Dashen) */}
+            {/* Awash Bank Section (New Default) */}
+            <div className="p-4 rounded-2xl border border-blue-300/60 bg-blue-50/20 space-y-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-white p-1 border border-blue-200/80 shadow-xs flex items-center justify-center shrink-0 overflow-hidden">
+                  <img
+                    src="/banks_logo/awash.png"
+                    alt="Awash Bank"
+                    className="w-full h-full object-contain"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = 'flex'; }}
+                  />
+                  <div className="w-full h-full bg-blue-800 text-white rounded-lg items-center justify-center font-bold text-xs hidden">
+                    AW
+                  </div>
+                </div>
+                <div>
+                  <h3 className="font-display font-bold text-sm text-ink">Awash Bank</h3>
+                  <p className="text-[11px] text-ink-muted">Awash Bank account number or Awash Birr mobile wallet</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <Input
+                  label="Awash Bank Account Number / Phone"
+                  placeholder="01320..."
+                  {...register("awashNumber")}
+                />
+                <Input
+                  label="Awash Account Holder Name"
+                  placeholder="e.g. Abebe Kebede Cafe"
+                  {...register("awashName")}
+                />
+              </div>
+
+              <div className="pt-2">
+                <label className="block text-xs font-semibold text-ink-muted mb-1.5">
+                  Awash Bank QR Code Image (Optional)
+                </label>
+                <ImageUploader
+                  value={awashQrUrl}
+                  onChange={(url) => setValue("awashQrUrl", url || "", { shouldDirty: true })}
+                  aspectRatio="1:1"
+                  helperText="Upload your Awash Bank payment QR code for direct diner scanning."
+                />
+              </div>
+            </div>
+
+            {/* Other Bank Transfer (Abyssinia, Dashen, Zemen, etc.) */}
             <div className="p-4 rounded-2xl border border-ink/10 bg-paper/60 space-y-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+                <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
                   <Building size={16} />
                 </div>
                 <div>
-                  <h3 className="font-display font-semibold text-sm text-ink">Other Bank Transfer (Awash, Abyssinia, etc.)</h3>
-                  <p className="text-[11px] text-ink-muted">Secondary bank account for electronic bank transfers</p>
+                  <h3 className="font-display font-semibold text-sm text-ink">Other Bank Transfer (Abyssinia, Dashen, etc.)</h3>
+                  <p className="text-[11px] text-ink-muted">Additional bank account for electronic bank transfers</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                 <Input
                   label="Bank Name"
-                  placeholder="e.g. Bank of Abyssinia / Awash"
+                  placeholder="e.g. Bank of Abyssinia / Dashen"
                   {...register("otherBankName")}
                 />
                 <Input

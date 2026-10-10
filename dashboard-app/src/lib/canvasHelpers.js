@@ -941,6 +941,13 @@ export function drawCardPaymentAccounts(ctx, {
       color: theme === 'dark' || theme === 'solid-dark' ? '#C084FC' : '#7E22CE',
     });
   }
+  if (pa.awashBank?.isActive && pa.awashBank?.accountNumber && parts.length < 2) {
+    parts.push({
+      label: 'Awash',
+      number: pa.awashBank.accountNumber,
+      color: theme === 'dark' || theme === 'solid-dark' ? '#60A5FA' : '#1D4ED8',
+    });
+  }
   if (pa.otherBank?.isActive && pa.otherBank?.accountNumber && parts.length < 2) {
     parts.push({
       label: pa.otherBank.bankName || 'Bank',

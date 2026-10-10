@@ -51,6 +51,12 @@ const restaurantSchema = new mongoose.Schema(
         qrCodeUrl:     { type: String, default: null },
         isActive:      { type: Boolean, default: true },
       },
+      awashBank: {
+        accountNumber: { type: String, trim: true, default: '' },
+        accountName:   { type: String, trim: true, default: '' },
+        qrCodeUrl:     { type: String, default: null },
+        isActive:      { type: Boolean, default: true },
+      },
       otherBank: {
         bankName:      { type: String, trim: true, default: '' },
         accountNumber: { type: String, trim: true, default: '' },

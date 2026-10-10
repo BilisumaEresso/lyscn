@@ -796,8 +796,9 @@ export default function OrderTracking() {
             const pa = session.restaurant?.paymentAccounts;
             const hasTelebirr = pa?.telebirr?.isActive && pa?.telebirr?.accountNumber;
             const hasCbe = pa?.cbeBirr?.isActive && pa?.cbeBirr?.accountNumber;
+            const hasAwash = pa?.awashBank?.isActive && pa?.awashBank?.accountNumber;
             const hasOther = pa?.otherBank?.isActive && pa?.otherBank?.accountNumber;
-            const hasAnyAccount = hasTelebirr || hasCbe || hasOther;
+            const hasAnyAccount = hasTelebirr || hasCbe || hasAwash || hasOther;
 
             const totalBill = summary.totalAmount || currentRound?.totalAmount || 0;
             const referenceRemark = `Table ${session.table?.label || ''} Bill #${orderId ? orderId.slice(-4).toUpperCase() : ''}`.trim();
@@ -859,10 +860,18 @@ export default function OrderTracking() {
                     {hasTelebirr && (
                       <div className="p-3 rounded-2xl bg-sky-50/60 border border-sky-200/80 flex flex-col gap-2">
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="w-6 h-6 rounded-lg bg-sky-600 text-white font-bold text-[10px] flex items-center justify-center shrink-0 shadow-xs">
-                              tb
-                            </span>
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-8 h-8 rounded-xl bg-white p-1 border border-sky-200/80 shadow-2xs flex items-center justify-center shrink-0 overflow-hidden">
+                              <img
+                                src="/banks_logo/telebirr.png"
+                                alt="Telebirr"
+                                className="w-full h-full object-contain"
+                                onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = 'flex'; }}
+                              />
+                              <span className="w-full h-full rounded-lg bg-sky-600 text-white font-bold text-[10px] items-center justify-center hidden">
+                                TB
+                              </span>
+                            </div>
                             <div className="min-w-0">
                               <p className="font-display font-bold text-xs text-sky-950 leading-tight">Telebirr</p>
                               {pa.telebirr.accountName && (
@@ -912,10 +921,18 @@ export default function OrderTracking() {
                     {hasCbe && (
                       <div className="p-3 rounded-2xl bg-purple-50/60 border border-purple-200/80 flex flex-col gap-2">
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="w-6 h-6 rounded-lg bg-purple-700 text-white font-bold text-[10px] flex items-center justify-center shrink-0 shadow-xs">
-                              CBE
-                            </span>
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-8 h-8 rounded-xl bg-white p-1 border border-purple-200/80 shadow-2xs flex items-center justify-center shrink-0 overflow-hidden">
+                              <img
+                                src="/banks_logo/CBE.png"
+                                alt="CBE Birr"
+                                className="w-full h-full object-contain"
+                                onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = 'flex'; }}
+                              />
+                              <span className="w-full h-full rounded-lg bg-purple-700 text-white font-bold text-[10px] items-center justify-center hidden">
+                                CBE
+                              </span>
+                            </div>
                             <div className="min-w-0">
                               <p className="font-display font-bold text-xs text-purple-950 leading-tight">CBE / CBE Birr</p>
                               {pa.cbeBirr.accountName && (
@@ -951,13 +968,64 @@ export default function OrderTracking() {
                       </div>
                     )}
 
+                    {/* Awash Bank Account Card */}
+                    {hasAwash && (
+                      <div className="p-3 rounded-2xl bg-blue-50/50 border border-blue-200/80 flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-8 h-8 rounded-xl bg-white p-1 border border-blue-200/80 shadow-2xs flex items-center justify-center shrink-0 overflow-hidden">
+                              <img
+                                src="/banks_logo/awash.png"
+                                alt="Awash Bank"
+                                className="w-full h-full object-contain"
+                                onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = 'flex'; }}
+                              />
+                              <span className="w-full h-full rounded-lg bg-blue-800 text-white font-bold text-[10px] items-center justify-center hidden">
+                                AW
+                              </span>
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-display font-bold text-xs text-blue-950 leading-tight">Awash Bank</p>
+                              {pa.awashBank.accountName && (
+                                <p className="text-[11px] text-blue-800/80 truncate">{pa.awashBank.accountName}</p>
+                              )}
+                            </div>
+                          </div>
+                          {pa.awashBank.qrCodeUrl && (
+                            <button
+                              type="button"
+                              onClick={() => setViewingQrModal({ type: 'Awash Bank', name: pa.awashBank.accountName, qrCodeUrl: pa.awashBank.qrCodeUrl })}
+                              className="px-2 py-1 rounded-lg bg-white border border-blue-200 text-blue-700 font-semibold text-[11px] flex items-center gap-1 hover:bg-blue-50 shadow-2xs"
+                            >
+                              <QrCode size={12} />
+                              <span>View QR</span>
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-between bg-white/90 p-2 rounded-xl border border-blue-200/60">
+                          <span className="font-mono font-bold text-xs sm:text-sm tracking-wide text-ink truncate mr-2">
+                            {pa.awashBank.accountNumber}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(pa.awashBank.accountNumber, 'awash', 'Awash Bank account number')}
+                            className="px-2.5 py-1 rounded-lg bg-blue-800 text-white text-[11px] font-semibold flex items-center gap-1 shadow-xs hover:bg-blue-900 active:scale-95 transition-all shrink-0"
+                          >
+                            {copiedKey === 'awash' ? <Check size={12} /> : <Copy size={12} />}
+                            <span>{copiedKey === 'awash' ? 'Copied' : 'Copy'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Other Bank Account Card */}
                     {hasOther && (
                       <div className="p-3 rounded-2xl bg-amber-50/60 border border-amber-200/80 flex flex-col gap-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2 min-w-0">
-                            <span className="w-6 h-6 rounded-lg bg-amber-600 text-white font-bold text-[10px] flex items-center justify-center shrink-0 shadow-xs">
-                              <Building size={12} />
+                            <span className="w-8 h-8 rounded-xl bg-amber-600 text-white font-bold text-[10px] flex items-center justify-center shrink-0 shadow-xs">
+                              <Building size={14} />
                             </span>
                             <div className="min-w-0">
                               <p className="font-display font-bold text-xs text-amber-950 leading-tight">
