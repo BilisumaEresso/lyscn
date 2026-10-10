@@ -365,6 +365,8 @@ export default function CafePreview() {
             Scan QR
           </button>
         </div>
+      </div>
+
       {/* ── Guest Ratings & Reviews Card (if reviews exist) ────────────── */}
       {totalReviews > 0 && (
         <div className="px-4 mt-3">
