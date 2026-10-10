@@ -6,11 +6,12 @@ import Currency, { formatBirr } from '../components/ui/Currency';
 import {
   DollarSign, Clock, RefreshCw, Wifi, WifiOff,
   CheckCircle2, CreditCard, ChevronDown, ChevronUp,
-  LayoutGrid, ListFilter, AlertTriangle, User, MessageSquare, Star, MapPin
+  LayoutGrid, ListFilter, AlertTriangle, User, MessageSquare, Star, MapPin, Download
 } from 'lucide-react';
 import clsx from 'clsx';
 import api from '../lib/api';
 import socket from '../lib/socket';
+import { exportToCSV } from '../lib/csvExport';
 
 // ── Time & Formatting Helpers ────────────────────────────────────────────────
 function timeAgo(date, now = Date.now()) {
@@ -1058,6 +1059,61 @@ export default function Orders() {
     setExpandedSections((s) => ({ ...s, [status]: !s[status] }));
   };
 
+  const handleExportOrdersCSV = () => {
+    if (!orders || orders.length === 0) {
+      toast.error('No orders available to export');
+      return;
+    }
+
+    const headers = [
+      'Order ID',
+      'Table',
+      'Status',
+      'Payment Status',
+      'Payment Method',
+      'Total Amount (Br)',
+      'Items Count',
+      'Items Detail',
+      'Server Name',
+      'Guest Name',
+      'Created Date',
+      'Created Time',
+      'Rating',
+      'Feedback'
+    ];
+
+    const rows = orders.map((o) => {
+      const itemsDetail = (o.items || [])
+        .map((i) => `${i.qty}x ${i.name}`)
+        .join('; ');
+
+      const createdAt = new Date(o.createdAt);
+      const dateStr = createdAt.toLocaleDateString();
+      const timeStr = createdAt.toLocaleTimeString();
+
+      return [
+        o._id,
+        o.tableId?.label || 'Takeaway',
+        o.status || 'placed',
+        o.paymentStatus || 'unpaid',
+        o.paymentMethod || 'unpaid',
+        o.totalAmount || 0,
+        o.items?.length || 0,
+        itemsDetail,
+        o.assignedWaiterName || 'Unassigned',
+        o.guestName || '',
+        dateStr,
+        timeStr,
+        o.rating || '',
+        o.feedback || ''
+      ];
+    });
+
+    const dateToday = new Date().toISOString().split('T')[0];
+    exportToCSV(`layoscan-orders-${dateToday}`, headers, rows);
+    toast.success(`Exported ${orders.length} orders as CSV!`);
+  };
+
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-paper">
       {/* ── Header Bar ────────────────────────────────────────────────── */}
@@ -1078,7 +1134,7 @@ export default function Orders() {
           </p>
         </div>
 
-        {/* Header Controls: View Toggle (List/Board) + Cancelled + Refresh */}
+        {/* Header Controls: View Toggle (List/Board) + Cancelled + Export CSV + Refresh */}
         <div className="flex items-center gap-1.5 sm:gap-2">
           {/* Board vs List toggle — always accessible, no floating FAB needed */}
           <div className="flex bg-ink/5 p-0.5 rounded-xl border border-ink/8">
@@ -1121,6 +1177,15 @@ export default function Orders() {
             title="Toggle Cancelled Orders"
           >
             <span>Cancelled ({cancelledCount})</span>
+          </button>
+
+          <button
+            onClick={handleExportOrdersCSV}
+            className="px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-xl border border-ink/12 bg-white hover:bg-ink/3 transition-colors text-ink flex items-center gap-1.5 shadow-2xs"
+            title="Export Orders List to CSV"
+          >
+            <Download size={13} className="text-teal" />
+            <span className="hidden sm:inline">Export CSV</span>
           </button>
 
           <button

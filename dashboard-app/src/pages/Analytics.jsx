@@ -2,11 +2,13 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   BarChart2, TrendingUp, Star, Users, CreditCard,
-  ShoppingBag, Calendar, ChevronDown, AlertCircle,
+  ShoppingBag, Calendar, ChevronDown, AlertCircle, Download,
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import api from '../lib/api';
 import Currency from '../components/ui/Currency';
 import Spinner from '../components/ui/Spinner';
+import { exportToCSV } from '../lib/csvExport';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmt(n) { return Number(n || 0).toFixed(2); }
@@ -180,6 +182,77 @@ export default function Analytics() {
     return { hour: i, orders: found?.orders || 0, label: `${i}:00` };
   });
 
+  const handleExportFullReport = () => {
+    if (!data) {
+      toast.error('No data available to export');
+      return;
+    }
+
+    const headers = [
+      'Report Type',
+      'Period From',
+      'Period To',
+      'Total Orders',
+      'Total Revenue (Br)',
+      'Unpaid Revenue (Br)',
+      'Cancelled Orders',
+      'Avg Order Value (Br)',
+      'Avg Rating',
+      'Total Reviews',
+    ];
+
+    const rows = [
+      [
+        'Summary',
+        from,
+        to,
+        s.totalOrders ?? 0,
+        s.totalRevenue ?? 0,
+        s.unpaidRevenue ?? 0,
+        s.cancelledOrders ?? 0,
+        s.avgOrderValue ?? 0,
+        s.avgRating ?? 'N/A',
+        s.ratingCount ?? 0,
+      ],
+    ];
+
+    exportToCSV(`analytics-summary-${from}-to-${to}`, headers, rows);
+    toast.success('Analytics summary exported as CSV!');
+  };
+
+  const handleExportDailyData = () => {
+    if (!daily || !daily.length) {
+      toast.error('No daily revenue data to export');
+      return;
+    }
+    const headers = ['Date', 'Paid Revenue (Br)', 'Total Orders'];
+    const rows = daily.map((d) => [d.date, d.revenue, d.orders]);
+    exportToCSV(`daily-revenue-${from}-to-${to}`, headers, rows);
+    toast.success('Daily revenue report exported as CSV!');
+  };
+
+  const handleExportTopProducts = () => {
+    if (!top || !top.length) {
+      toast.error('No product sales data to export');
+      return;
+    }
+    const headers = ['Product Name', 'Quantity Sold', 'Total Revenue (Br)', 'Order Count'];
+    const rows = top.map((p) => [p.name, p.qty, p.revenue, p.orders]);
+    exportToCSV(`top-products-${from}-to-${to}`, headers, rows);
+    toast.success('Top products report exported as CSV!');
+  };
+
+  const handleExportStaffPerf = () => {
+    if (!staff || !staff.length) {
+      toast.error('No staff performance data to export');
+      return;
+    }
+    const headers = ['Staff Name', 'Orders Served', 'Revenue Handled (Br)', 'Average Rating'];
+    const rows = staff.map((st) => [st.name, st.ordersServed, st.revenue, st.avgRating ?? 'N/A']);
+    exportToCSV(`staff-performance-${from}-to-${to}`, headers, rows);
+    toast.success('Staff performance report exported as CSV!');
+  };
+
   return (
     <div className="max-w-[1200px] mx-auto px-4 py-5 md:px-6 md:py-6 lg:px-8 lg:pt-14 lg:pb-8 space-y-6">
       {/* Header */}
@@ -194,7 +267,7 @@ export default function Analytics() {
           </p>
         </div>
 
-        {/* Period selector */}
+        {/* Action Controls: Period selector + Export CSV */}
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex bg-ink/4 rounded-xl p-1 gap-1">
             {PRESETS.map((p) => (
@@ -223,20 +296,31 @@ export default function Analytics() {
             </button>
           </div>
 
+          <button
+            type="button"
+            onClick={handleExportFullReport}
+            disabled={!data || isLoading}
+            className="px-3.5 py-1.5 rounded-xl border border-ink/10 bg-white hover:bg-ink/3 text-xs font-semibold text-ink flex items-center gap-1.5 transition-colors shadow-2xs disabled:opacity-50"
+            title="Download Summary Report as CSV"
+          >
+            <Download size={13} className="text-teal" />
+            <span>Export CSV</span>
+          </button>
+
           {showCustom && (
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto mt-2 sm:mt-0">
               <input
                 type="date"
                 value={customFrom}
                 onChange={(e) => setCustomFrom(e.target.value)}
-                className="text-xs border border-ink/12 rounded-lg px-2 py-1.5 text-ink focus:outline-none focus:border-teal"
+                className="text-xs border border-ink/12 rounded-lg px-2 py-1.5 text-ink focus:outline-none focus:border-teal bg-white"
               />
               <span className="text-xs text-ink-muted">to</span>
               <input
                 type="date"
                 value={customTo}
                 onChange={(e) => setCustomTo(e.target.value)}
-                className="text-xs border border-ink/12 rounded-lg px-2 py-1.5 text-ink focus:outline-none focus:border-teal"
+                className="text-xs border border-ink/12 rounded-lg px-2 py-1.5 text-ink focus:outline-none focus:border-teal bg-white"
               />
             </div>
           )}
@@ -318,7 +402,18 @@ export default function Analytics() {
           {/* ── Daily Revenue Chart ────────────────────────────────────── */}
           {daily.length > 0 && (
             <Card>
-              <SectionTitle icon={TrendingUp}>Daily Revenue (Birr — paid orders)</SectionTitle>
+              <div className="flex items-center justify-between mb-4">
+                <SectionTitle icon={TrendingUp}>Daily Revenue (Birr — paid orders)</SectionTitle>
+                <button
+                  type="button"
+                  onClick={handleExportDailyData}
+                  className="text-xs text-teal hover:text-teal/80 font-medium flex items-center gap-1 transition-colors px-2.5 py-1 rounded-lg hover:bg-teal/5"
+                  title="Export daily revenue data as CSV"
+                >
+                  <Download size={12} />
+                  <span>Export CSV</span>
+                </button>
+              </div>
               <BarChart data={daily} valueKey="revenue" labelKey="date" color="#14B8A6" />
               <div className="mt-3 flex items-center gap-4 text-xs text-ink-muted">
                 <span>Peak: <strong className="text-ink">Br {fmt(Math.max(...daily.map((d) => d.revenue)))}</strong></span>
@@ -340,7 +435,20 @@ export default function Analytics() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Top Items */}
             <Card>
-              <SectionTitle icon={ShoppingBag}>Top 10 Menu Items (by quantity)</SectionTitle>
+              <div className="flex items-center justify-between mb-4">
+                <SectionTitle icon={ShoppingBag}>Top 10 Menu Items</SectionTitle>
+                {top.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleExportTopProducts}
+                    className="text-xs text-teal hover:text-teal/80 font-medium flex items-center gap-1 transition-colors px-2.5 py-1 rounded-lg hover:bg-teal/5"
+                    title="Export top products data as CSV"
+                  >
+                    <Download size={12} />
+                    <span>Export CSV</span>
+                  </button>
+                )}
+              </div>
               {top.length === 0 ? (
                 <p className="text-sm text-ink-muted">No orders in this period.</p>
               ) : (
@@ -477,7 +585,18 @@ export default function Analytics() {
           {/* ── Staff Performance ──────────────────────────────────────── */}
           {staff.length > 0 && (
             <Card>
-              <SectionTitle icon={Users}>Staff Performance</SectionTitle>
+              <div className="flex items-center justify-between mb-4">
+                <SectionTitle icon={Users}>Staff Performance</SectionTitle>
+                <button
+                  type="button"
+                  onClick={handleExportStaffPerf}
+                  className="text-xs text-teal hover:text-teal/80 font-medium flex items-center gap-1 transition-colors px-2.5 py-1 rounded-lg hover:bg-teal/5"
+                  title="Export staff performance data as CSV"
+                >
+                  <Download size={12} />
+                  <span>Export CSV</span>
+                </button>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left">
                   <thead>

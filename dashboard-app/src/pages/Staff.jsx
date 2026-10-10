@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Users, UserPlus, Shield, ShieldCheck, ChefHat, Utensils,
   Check, Copy, AlertCircle, UserX, UserCheck, KeyRound,
-  ClipboardCheck, Settings2, Hash, Power
+  ClipboardCheck, Settings2, Hash, Power, Download
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../lib/api';
@@ -13,6 +13,7 @@ import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
 import LoadingIndicator from '../components/ui/LoadingIndicator';
 import EmptyState from '../components/ui/EmptyState';
+import { exportToCSV } from '../lib/csvExport';
 
 const ROLE_CONFIG = {
   owner: {
@@ -241,6 +242,41 @@ export default function Staff() {
     });
   };
 
+  const handleExportStaffCSV = () => {
+    if (!users || users.length === 0) {
+      toast.error('No staff members to export');
+      return;
+    }
+
+    const headers = [
+      'Name',
+      'Phone',
+      'Email',
+      'Role',
+      'Duty Status',
+      'Station',
+      'Assigned Tables Count',
+      'Active Status',
+      'Has Quick PIN'
+    ];
+
+    const rows = users.map((u) => [
+      u.name,
+      u.phone || '',
+      u.email || '',
+      u.role,
+      u.isOnDuty !== false ? 'On Duty' : 'Off Duty',
+      u.station || 'All',
+      u.assignedTables?.length || 0,
+      u.isActive ? 'Active' : 'Inactive',
+      u.hasPin ? 'Yes' : 'No'
+    ]);
+
+    const dateToday = new Date().toISOString().split('T')[0];
+    exportToCSV(`layoscan-staff-roster-${dateToday}`, headers, rows);
+    toast.success(`Exported ${users.length} staff members as CSV!`);
+  };
+
   return (
     <div className="px-6 py-6 lg:pt-14 max-w-6xl mx-auto space-y-6">
       {/* Header */}
@@ -251,10 +287,21 @@ export default function Staff() {
             Manage your coordinators, kitchen brigade, floor servers, and access permissions.
           </p>
         </div>
-        <Button onClick={() => setAddModalOpen(true)} className="flex items-center gap-2">
-          <UserPlus size={16} />
-          Add Staff Member
-        </Button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleExportStaffCSV}
+            className="px-3.5 py-2 rounded-xl border border-ink/10 bg-white hover:bg-ink/3 text-xs font-semibold text-ink flex items-center gap-1.5 transition-colors shadow-2xs"
+            title="Export Staff Roster as CSV"
+          >
+            <Download size={14} className="text-teal" />
+            <span>Export Roster</span>
+          </button>
+          <Button onClick={() => setAddModalOpen(true)} className="flex items-center gap-2">
+            <UserPlus size={16} />
+            Add Staff Member
+          </Button>
+        </div>
       </div>
 
       {/* Summary Cards */}
