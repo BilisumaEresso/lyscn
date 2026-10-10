@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Phone, Mail, MapPin } from 'lucide-react';
+import { ArrowLeft, Phone, Mail, MapPin, Star, MessageSquare, CheckCircle2 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import api from '../lib/api';
 import { applyBrandColor } from '../lib/theme';
 import { useSessionStore } from '../store/sessionStore';
 import PoweredBy from '../components/PoweredBy';
@@ -95,6 +97,19 @@ export default function About() {
 
   const hasSocials = socialList.length > 0;
 
+  const { data: publicData } = useQuery({
+    queryKey: ['public-restaurant-about', restaurant?._id],
+    queryFn: () => api.get(`/public/restaurant/${restaurant._id}`).then((r) => r.data),
+    enabled: !!restaurant?._id,
+    staleTime: 60_000,
+  });
+
+  const reviewsSummary = publicData?.reviewsSummary;
+  const averageRating  = reviewsSummary?.averageRating;
+  const totalReviews   = reviewsSummary?.totalReviews || 0;
+  const recentReviews  = reviewsSummary?.recentReviews || [];
+  const distribution   = reviewsSummary?.distribution || {};
+
   return (
     <div className="min-h-screen bg-paper max-w-[560px] mx-auto flex flex-col relative pb-8">
       {/* ── Expressive Hero Section ────────────────────────────────────────── */}
@@ -142,7 +157,116 @@ export default function About() {
               {branch.name}
             </p>
           )}
+
+          {/* Overall Rating Badge if available */}
+          {averageRating ? (
+            <div className="flex items-center justify-center gap-2 pt-1.5">
+              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-50 border border-amber-200/80 text-amber-900 font-display font-bold text-xs shadow-2xs">
+                <Star size={13} className="text-amber-500 fill-amber-400" />
+                <span>{averageRating}</span>
+                <span className="text-amber-700/80 font-normal">/ 5</span>
+              </span>
+              <span className="text-xs text-ink-muted font-medium">
+                ({totalReviews} verified {totalReviews === 1 ? 'review' : 'reviews'})
+              </span>
+            </div>
+          ) : (
+            <p className="text-[11px] text-ink/40 pt-1">Welcome to our cafe</p>
+          )}
         </div>
+
+        {/* ── Customer Ratings & Verified Reviews Card ───────────────────── */}
+        {totalReviews > 0 && (
+          <div className="bg-white rounded-2xl p-5 border border-ink/6 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-ink-muted flex items-center gap-1.5">
+                <Star size={13} className="text-amber-500 fill-amber-400" />
+                Guest Ratings & Reviews
+              </h2>
+              <span className="text-[11px] font-semibold text-teal bg-teal/10 px-2 py-0.5 rounded-full flex items-center gap-1">
+                <CheckCircle2 size={11} /> Verified Diners
+              </span>
+            </div>
+
+            {/* Score Summary & Star Bars */}
+            <div className="flex items-center gap-5 p-3.5 rounded-xl bg-paper border border-ink/6">
+              <div className="text-center shrink-0 pr-3 border-r border-ink/8">
+                <span className="font-display font-bold text-3xl text-ink leading-none">
+                  {averageRating}
+                </span>
+                <div className="flex items-center justify-center gap-0.5 my-1 text-amber-400">
+                  {[...Array(5)].map((_, i) => (
+                    <Star
+                      key={i}
+                      size={11}
+                      className={i < Math.round(averageRating) ? 'fill-amber-400 text-amber-500' : 'text-ink/20'}
+                    />
+                  ))}
+                </div>
+                <span className="text-[10px] text-ink-muted block font-medium">
+                  {totalReviews} review{totalReviews !== 1 ? 's' : ''}
+                </span>
+              </div>
+
+              {/* Star distribution */}
+              <div className="flex-1 space-y-1">
+                {[5, 4, 3, 2, 1].map((star) => {
+                  const count = distribution[star] || 0;
+                  const pct = totalReviews > 0 ? Math.round((count / totalReviews) * 100) : 0;
+                  return (
+                    <div key={star} className="flex items-center gap-1.5 text-[10px]">
+                      <span className="w-3 text-right font-semibold text-ink-muted">{star}</span>
+                      <div className="flex-1 h-1.5 bg-ink/6 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-amber-400"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <span className="w-6 text-right text-ink/40 font-mono">{pct}%</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Recent Diner Feedback List */}
+            {recentReviews.length > 0 && (
+              <div className="space-y-3 pt-1">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-ink/50">
+                  Recent Feedback
+                </p>
+                <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                  {recentReviews.map((rev) => (
+                    <div
+                      key={rev._id}
+                      className="p-3 rounded-xl bg-paper/70 border border-ink/6 space-y-1.5"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold text-xs text-ink">
+                          {rev.guestName}
+                        </span>
+                        <div className="flex items-center gap-0.5 text-amber-400">
+                          {[...Array(rev.rating || 5)].map((_, i) => (
+                            <Star key={i} size={10} className="fill-amber-400 text-amber-500" />
+                          ))}
+                        </div>
+                      </div>
+                      <p className="text-xs text-ink/80 italic leading-relaxed">
+                        &ldquo;{rev.feedback}&rdquo;
+                      </p>
+                      <span className="text-[10px] text-ink/40 block">
+                        {new Date(rev.createdAt).toLocaleDateString(undefined, {
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Full Description */}
         {restaurant?.description && (

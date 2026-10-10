@@ -277,11 +277,182 @@ const getPublicRestaurant = async (req, res, next) => {
       };
     }
 
+    // Aggregate ratings & verified customer reviews for this restaurant
+    const [ratingStats, recentReviews] = await Promise.all([
+      Order.aggregate([
+        {
+          $match: {
+            restaurantId: restaurant._id,
+            rating: { $gte: 1, $lte: 5 },
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            averageRating: { $avg: '$rating' },
+            totalReviews: { $sum: 1 },
+            rating5: { $sum: { $cond: [{ $eq: ['$rating', 5] }, 1, 0] } },
+            rating4: { $sum: { $cond: [{ $eq: ['$rating', 4] }, 1, 0] } },
+            rating3: { $sum: { $cond: [{ $eq: ['$rating', 3] }, 1, 0] } },
+            rating2: { $sum: { $cond: [{ $eq: ['$rating', 2] }, 1, 0] } },
+            rating1: { $sum: { $cond: [{ $eq: ['$rating', 1] }, 1, 0] } },
+          },
+        },
+      ]),
+      Order.find({
+        restaurantId: restaurant._id,
+        rating: { $gte: 1, $lte: 5 },
+        feedback: { $exists: true, $ne: null, $ne: '' },
+      })
+        .select('rating feedback guestName createdAt items')
+        .sort({ createdAt: -1 })
+        .limit(10),
+    ]);
+
+    const stats = ratingStats[0] || {
+      averageRating: null,
+      totalReviews: 0,
+      rating5: 0,
+      rating4: 0,
+      rating3: 0,
+      rating2: 0,
+      rating1: 0,
+    };
+
     return res.json({
       success: true,
       restaurant,
       branch,
       tableAvailability,
+      reviewsSummary: {
+        averageRating: stats.averageRating ? Math.round(stats.averageRating * 10) / 10 : null,
+        totalReviews: stats.totalReviews,
+        distribution: {
+          5: stats.rating5,
+          4: stats.rating4,
+          3: stats.rating3,
+          2: stats.rating2,
+          1: stats.rating1,
+        },
+        recentReviews: recentReviews.map((r) => ({
+          _id: r._id,
+          rating: r.rating,
+          feedback: r.feedback,
+          guestName: r.guestName || 'Diner',
+          createdAt: r.createdAt,
+          itemCount: r.items?.length || 0,
+        })),
+      },
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ── GET /api/public/restaurants/explore ────────────────────────────────────────
+// Lists active restaurants ranked by reviews, rating, and supports keyword search
+const exploreRestaurants = async (req, res, next) => {
+  try {
+    const { q, sort = 'rating' } = req.query;
+
+    const filter = { isActive: true };
+    if (q && q.trim()) {
+      const term = q.trim();
+      filter.$or = [
+        { name: { $regex: term, $options: 'i' } },
+        { description: { $regex: term, $options: 'i' } },
+        { 'contactInfo.address': { $regex: term, $options: 'i' } },
+      ];
+    }
+
+    const restaurants = await Restaurant.find(filter)
+      .select('name slug logoUrl coverUrl brandColor description contactInfo qrCardTemplate')
+      .lean();
+
+    if (!restaurants || restaurants.length === 0) {
+      return res.json({ success: true, count: 0, restaurants: [] });
+    }
+
+    const restaurantIds = restaurants.map((r) => r._id);
+
+    // Compute ratings and branches for these restaurants in parallel
+    const [ratingAgg, branches] = await Promise.all([
+      Order.aggregate([
+        {
+          $match: {
+            restaurantId: { $in: restaurantIds },
+            rating: { $gte: 1, $lte: 5 },
+          },
+        },
+        {
+          $group: {
+            _id: '$restaurantId',
+            averageRating: { $avg: '$rating' },
+            reviewCount: { $sum: 1 },
+          },
+        },
+      ]),
+      Branch.find({ restaurantId: { $in: restaurantIds } })
+        .select('restaurantId name address location locationStrictMode')
+        .lean(),
+    ]);
+
+    const ratingMap = new Map();
+    for (const item of ratingAgg) {
+      ratingMap.set(String(item._id), {
+        averageRating: Math.round(item.averageRating * 10) / 10,
+        reviewCount: item.reviewCount,
+      });
+    }
+
+    const branchMap = new Map();
+    for (const b of branches) {
+      const rId = String(b.restaurantId);
+      if (!branchMap.has(rId)) branchMap.set(rId, b);
+    }
+
+    const enriched = restaurants.map((r) => {
+      const rIdStr = String(r._id);
+      const ratingInfo = ratingMap.get(rIdStr) || { averageRating: null, reviewCount: 0 };
+      const primaryBranch = branchMap.get(rIdStr) || null;
+
+      return {
+        _id: r._id,
+        name: r.name,
+        slug: r.slug,
+        logoUrl: r.logoUrl,
+        coverUrl: r.coverUrl,
+        brandColor: r.brandColor,
+        description: r.description,
+        address: r.contactInfo?.address || primaryBranch?.address || '',
+        averageRating: ratingInfo.averageRating,
+        reviewCount: ratingInfo.reviewCount,
+        hasLocation: Boolean(
+          Number.isFinite(primaryBranch?.location?.lat) &&
+          Number.isFinite(primaryBranch?.location?.lng)
+        ),
+      };
+    });
+
+    // Sorting options: 'rating' (highest rated & reviewed first), 'reviews' (most reviews), 'alphabetical'
+    if (sort === 'reviews') {
+      enriched.sort((a, b) => (b.reviewCount || 0) - (a.reviewCount || 0));
+    } else if (sort === 'name') {
+      enriched.sort((a, b) => a.name.localeCompare(b.name));
+    } else {
+      // Default: rating first (with review count weight fallback)
+      enriched.sort((a, b) => {
+        const ratingA = a.averageRating || 0;
+        const ratingB = b.averageRating || 0;
+        if (ratingB !== ratingA) return ratingB - ratingA;
+        return (b.reviewCount || 0) - (a.reviewCount || 0);
+      });
+    }
+
+    return res.json({
+      success: true,
+      count: enriched.length,
+      restaurants: enriched,
     });
   } catch (err) {
     return next(err);
@@ -356,6 +527,7 @@ module.exports = {
   resolveQRCode,
   verifyLocation,
   getPublicRestaurant,
+  exploreRestaurants,
   heartbeatTable,
   releaseTableSession,
 };

@@ -17,6 +17,7 @@ import {
   RefreshCw,
   ShieldCheck,
   CheckCircle2,
+  Star,
 } from 'lucide-react';
 import api from '../lib/api';
 import { applyBrandColor } from '../lib/theme';
@@ -61,6 +62,10 @@ export default function CafePreview() {
   const restaurant = cafeData?.restaurant;
   const branch = cafeData?.branch;
   const availability = cafeData?.tableAvailability;
+  const reviewsSummary = cafeData?.reviewsSummary;
+  const averageRating = reviewsSummary?.averageRating;
+  const totalReviews = reviewsSummary?.totalReviews || 0;
+  const recentReviews = reviewsSummary?.recentReviews || [];
   const isStrictMode = Boolean(branch?.locationStrictMode);
   const hasGps = Number.isFinite(branch?.location?.lat) && Number.isFinite(branch?.location?.lng);
 
@@ -273,10 +278,19 @@ export default function CafePreview() {
             <h1 className="font-display font-bold text-xl leading-tight truncate">
               {restaurant.name}
             </h1>
-            <p className="text-xs text-white/80 truncate mt-0.5 flex items-center gap-1">
-              <MapPin size={12} className="shrink-0 text-white/70" />
-              <span>{branch?.address || 'Cafe location'}</span>
-            </p>
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              {averageRating && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-300 bg-black/40 px-2 py-0.5 rounded-full border border-white/20">
+                  <Star size={11} className="fill-amber-400 text-amber-400" />
+                  <span>{averageRating}</span>
+                  <span className="text-white/70 font-normal">({totalReviews})</span>
+                </span>
+              )}
+              <p className="text-xs text-white/80 truncate flex items-center gap-1">
+                <MapPin size={12} className="shrink-0 text-white/70" />
+                <span>{branch?.address || 'Cafe location'}</span>
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -351,7 +365,37 @@ export default function CafePreview() {
             Scan QR
           </button>
         </div>
-      </div>
+      {/* ── Guest Ratings & Reviews Card (if reviews exist) ────────────── */}
+      {totalReviews > 0 && (
+        <div className="px-4 mt-3">
+          <div className="bg-white rounded-2xl p-4 border border-ink/8 shadow-xs space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Star size={15} className="fill-amber-400 text-amber-500" />
+                <h3 className="font-display font-bold text-sm text-ink">
+                  {averageRating} out of 5
+                </h3>
+                <span className="text-xs text-ink-muted">
+                  ({totalReviews} review{totalReviews !== 1 ? 's' : ''})
+                </span>
+              </div>
+              <span className="text-[10px] font-semibold text-teal bg-teal/10 px-2 py-0.5 rounded-full flex items-center gap-1">
+                <CheckCircle2 size={10} /> Verified
+              </span>
+            </div>
+
+            {/* Quick snippet of recent diner review */}
+            {recentReviews.length > 0 && recentReviews[0]?.feedback && (
+              <div className="p-2.5 rounded-xl bg-paper border border-ink/5 text-xs text-ink/80 italic">
+                &ldquo;{recentReviews[0].feedback}&rdquo;
+                <span className="not-italic text-[10px] text-ink-muted block mt-1 font-medium">
+                  — {recentReviews[0].guestName} ({new Date(recentReviews[0].createdAt).toLocaleDateString()})
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Strict Mode Gate (If enabled and not verified) ────────────── */}
       {isStrictMode && !locationVerified ? (

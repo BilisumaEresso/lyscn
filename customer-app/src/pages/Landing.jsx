@@ -1,7 +1,12 @@
 import { Html5Qrcode } from "html5-qrcode";
-import { AlertCircle, ArrowRight, Camera, QrCode, X, UtensilsCrossed, MapPin } from "lucide-react";
+import {
+  AlertCircle, ArrowRight, Camera, QrCode, X, UtensilsCrossed, MapPin,
+  Search, Star, Sparkles, Compass
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import api from "../lib/api";
 import logo from "../assets/logo.png";
 import cafeLogoPlaceholder from "../assets/cafe_logo_placeholder.png";
 import { useInstallPrompt } from "../hooks/useInstallPrompt";
@@ -24,12 +29,25 @@ export default function Landing() {
   const session = useSessionStore();
 
   const [visitedRestaurants, setVisitedRestaurants] = useState([]);
+  const [restaurantSearch, setRestaurantSearch] = useState("");
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [showManual, setShowManual] = useState(false);
   const [manualCode, setManualCode] = useState("");
   const [cameraError, setCameraError] = useState(null);
   const [invalidCodeError, setInvalidCodeError] = useState(null);
   const [installBannerDismissed, setInstallBannerDismissed] = useState(false);
+
+  // Fetch top rated restaurants / explore list
+  const { data: exploreData, isLoading: exploreLoading } = useQuery({
+    queryKey: ['public-explore-restaurants', restaurantSearch],
+    queryFn: () =>
+      api.get('/public/restaurants/explore', {
+        params: { q: restaurantSearch.trim() || undefined, sort: 'rating' }
+      }).then((r) => r.data),
+    staleTime: 60_000,
+  });
+
+  const exploreRestaurants = exploreData?.restaurants || [];
 
   const scannerInstanceRef = useRef(null);
   const { canInstall, promptInstall } = useInstallPrompt();
@@ -341,6 +359,105 @@ export default function Landing() {
             </div>
           </div>
         )}
+
+        {/* ── Search & Discover Restaurants Hub ──────────────────────── */}
+        <div className="mt-7 w-full text-left space-y-3">
+          <div className="flex items-center justify-between px-1">
+            <h2 className="font-display font-bold text-xs uppercase tracking-wider text-ink-muted flex items-center gap-1.5">
+              <Sparkles size={13} className="text-amber-500 fill-amber-400" />
+              Discover Top Cafes & Restaurants
+            </h2>
+            <span className="text-[10px] text-teal font-semibold">
+              Browse Menus
+            </span>
+          </div>
+
+          {/* Search Input Bar */}
+          <div className="relative flex items-center">
+            <Search size={15} className="absolute left-3.5 text-ink-muted/70 pointer-events-none" />
+            <input
+              type="search"
+              value={restaurantSearch}
+              onChange={(e) => setRestaurantSearch(e.target.value)}
+              placeholder="Search by cafe name, food, or location…"
+              className="w-full pl-9 pr-8 py-2.5 rounded-2xl bg-white border border-ink/10 text-xs placeholder:text-ink-muted/60 focus:outline-none focus:border-teal shadow-2xs"
+            />
+            {restaurantSearch && (
+              <button
+                type="button"
+                onClick={() => setRestaurantSearch('')}
+                className="absolute right-2.5 p-1 rounded-full text-ink-muted hover:text-ink"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+
+          {/* Top Rated & Searched Restaurants List */}
+          {exploreLoading ? (
+            <div className="p-4 text-center text-xs text-ink-muted">
+              Finding best venues…
+            </div>
+          ) : exploreRestaurants.length === 0 ? (
+            <div className="p-4 rounded-2xl bg-white/60 border border-ink/6 text-center text-xs text-ink-muted">
+              No matching cafes found for &ldquo;{restaurantSearch}&rdquo;.
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {exploreRestaurants.map((venue) => (
+                <div
+                  key={venue._id}
+                  onClick={() => navigate(`/cafe/${venue._id}`)}
+                  className="w-full p-3.5 rounded-2xl border border-ink/10 bg-white shadow-2xs hover:border-teal/50 hover:shadow-md transition-all flex items-center justify-between gap-3 cursor-pointer group active:scale-[0.99]"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <img
+                      src={venue.logoUrl || cafeLogoPlaceholder}
+                      alt={venue.name}
+                      className="w-11 h-11 rounded-2xl object-cover border border-ink/10 shrink-0 bg-white shadow-2xs"
+                      onError={(e) => {
+                        e.currentTarget.src = cafeLogoPlaceholder;
+                      }}
+                    />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-display font-bold text-sm text-ink truncate group-hover:text-teal transition-colors">
+                          {venue.name}
+                        </p>
+                        {venue.averageRating && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-md bg-amber-50 border border-amber-200/80 text-[10px] font-bold text-amber-800 shrink-0">
+                            <Star size={10} className="fill-amber-400 text-amber-500" />
+                            <span>{venue.averageRating}</span>
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-ink-muted truncate mt-0.5 flex items-center gap-1">
+                        {venue.address ? (
+                          <>
+                            <MapPin size={11} className="shrink-0 text-ink/40" />
+                            <span>{venue.address}</span>
+                          </>
+                        ) : (
+                          <span>Cafe & Restaurant</span>
+                        )}
+                        {venue.reviewCount > 0 && (
+                          <span className="text-[10px] text-ink/40 ml-1">
+                            ({venue.reviewCount} review{venue.reviewCount !== 1 ? 's' : ''})
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0 text-xs font-semibold text-teal group-hover:translate-x-0.5 transition-transform">
+                    <span>Preview</span>
+                    <ArrowRight size={14} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* ── Install App CTA Banner ─────────────────────────────────── */}
         <div className="mt-4 w-full">

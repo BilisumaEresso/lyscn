@@ -4,14 +4,19 @@ const {
   resolveQRCode,
   verifyLocation,
   getPublicRestaurant,
+  exploreRestaurants,
   heartbeatTable,
   releaseTableSession,
 } = require('../controllers/publicController');
 const { resolveTenantFromTable } = require('../middleware/tenantResolver');
 const { tableResolveLimiter, publicWriteLimiter } = require('../middleware/rateLimit');
 
+// GET /api/public/restaurants/explore
+// Returns list of restaurants ranked by ratings/reviews, supports search & sorting
+router.get('/restaurants/explore', tableResolveLimiter, exploreRestaurants);
+
 // GET /api/public/restaurant/:identifier
-// Returns restaurant info, branch details & live table availability (without table occupation)
+// Returns restaurant info, branch details, reviews summary & live table availability
 router.get('/restaurant/:identifier', tableResolveLimiter, getPublicRestaurant);
 
 // GET /api/public/table/:qrToken
