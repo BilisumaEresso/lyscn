@@ -11,7 +11,7 @@ const {
   updateTablePayment,
   submitOrderFeedback,
 } = require('../controllers/orderController');
-const { protect }               = require('../middleware/auth');
+const { protect, restrictTo }   = require('../middleware/auth');
 const { resolveTenantFromAuth } = require('../middleware/tenantResolver');
 const { publicWriteLimiter, tableResolveLimiter } = require('../middleware/rateLimit');
 
@@ -28,7 +28,7 @@ router.use(protect, resolveTenantFromAuth);
 router.get('/',                            listOrders);
 router.patch('/:id/status',                updateOrderStatus);
 router.patch('/:id/assign',                assignOrder);
-router.patch('/:id/payment',               updateOrderPayment);
-router.patch('/table/:tableId/payment',    updateTablePayment);
+router.patch('/:id/payment',               restrictTo('owner', 'manager'), updateOrderPayment);
+router.patch('/table/:tableId/payment',    restrictTo('owner', 'manager'), updateTablePayment);
 
 module.exports = router;

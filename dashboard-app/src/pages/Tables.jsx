@@ -170,39 +170,26 @@ function QRModal({ table, open, onClose }) {
     }
     const pageOrientation = orientation === 'landscape' ? 'landscape' : 'portrait';
     const printTitle = orientation === 'menu_board' ? 'Menu Board' : (orientation === 'landscape' ? 'Table Tent' : 'QR Stand');
-    printWin.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Print ${printTitle} - ${table?.label || 'Table'}</title>
-          <style>
-            @page {
-              size: ${pageOrientation};
-              margin: 0;
-            }
-            body {
-              margin: 0;
-              padding: 0;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              min-height: 100vh;
-              background: #FFFFFF;
-            }
-            img {
-              max-width: 100vw;
-              max-height: 100vh;
-              object-fit: contain;
-            }
-          </style>
-        </head>
-        <body>
-          <img src="${previewUrl}" onload="window.print();window.close();" />
-        </body>
-      </html>
-    `);
-    printWin.document.close();
+
+    // Build the document with DOM APIs so table.label (user-controlled) cannot
+    // inject script. document.write concatenation is the XSS path.
+    const doc = printWin.document;
+    doc.title = `Print ${printTitle} - ${table?.label || 'Table'}`;
+
+    const style = doc.createElement('style');
+    style.textContent = [
+      `@page { size: ${pageOrientation}; margin: 0; }`,
+      'body { margin: 0; padding: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #FFFFFF; }',
+      'img { max-width: 100vw; max-height: 100vh; object-fit: contain; }',
+    ].join(' ');
+    doc.head.appendChild(style);
+
+    const img = doc.createElement('img');
+    img.src = previewUrl;
+    img.onload = () => { printWin.print(); printWin.close(); };
+    doc.body.appendChild(img);
   };
+
 
   const formattedCode = formatTableCode(table?.qrToken);
 

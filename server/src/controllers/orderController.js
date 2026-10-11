@@ -466,17 +466,33 @@ const getTableOrders = async (req, res, next) => {
 // PATCH /api/orders/public/:id/feedback — customer feedback after service
 const submitOrderFeedback = async (req, res, next) => {
   try {
-    const { rating, feedback } = req.body;
+    const { rating, feedback, sessionToken } = req.body;
+
+    // Verify the caller owns the session that placed this order (mirrors getOrderStatus)
+    if (!sessionToken) {
+      return res.status(400).json({ success: false, message: 'sessionToken is required.' });
+    }
+
     const numericRating = Number(rating);
 
     if (!Number.isInteger(numericRating) || numericRating < 1 || numericRating > 5) {
       return res.status(400).json({ success: false, message: 'rating must be an integer from 1 to 5.' });
     }
 
-    const existingOrder = await Order.findOne({ _id: req.params.id }).select('status rating feedback');
+    const existingOrder = await Order.findOne({ _id: req.params.id }).select('status rating feedback tableId');
     if (!existingOrder) {
       return res.status(404).json({ success: false, message: 'Order not found.' });
     }
+
+    // Confirm the sessionToken matches the table that owns this order
+    const table = await Table.findById(existingOrder.tableId).select('activeSessionToken');
+    if (!table || table.activeSessionToken !== sessionToken) {
+      return res.status(403).json({
+        success: false,
+        message: 'Session does not match this order. Please scan the QR code again.',
+      });
+    }
+
     if (existingOrder.rating != null) {
       return res.json({
         success: true,
@@ -518,6 +534,7 @@ const submitOrderFeedback = async (req, res, next) => {
   } catch (err) {
     return next(err);
   }
+
 };
 
 // ── PATCH /api/orders/:id/assign ──────────────────────────────────────────────

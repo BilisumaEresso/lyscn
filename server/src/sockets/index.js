@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 const Order = require('../models/Order');
 const Table = require('../models/Table');
 
@@ -15,7 +16,7 @@ const logger = require('../config/logger');
  */
 function initSockets(io) {
   // ── Auth middleware ───────────────────────────────────────────────────────────
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     const token = socket.handshake.auth?.token;
 
     if (!token) {
@@ -25,12 +26,23 @@ function initSockets(io) {
 
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      socket.data.restaurantId = decoded.restaurantId;
-      socket.data.role         = decoded.role;
-      socket.data.userId       = decoded.userId;
+
+      // Mirror HTTP auth.js: re-check DB so deactivated staff are immediately
+      // rejected even if their JWT has not yet expired.
+      const user = await User.findById(decoded.userId).select('isActive role restaurantId');
+      if (!user || !user.isActive) {
+        return next(new Error('unauthorized'));
+      }
+
+      // Derive identity from DB, not from JWT claims, so a role change takes
+      // effect immediately without waiting for token rotation.
+      socket.data.restaurantId = String(user.restaurantId);
+      socket.data.role         = user.role;
+      socket.data.userId       = String(user._id);
     } catch {
-      // Invalid / expired token: treat as unauthenticated rather than
-      // rejecting — customer sockets never send one anyway
+      // Invalid or expired token: reject rather than downgrading to anonymous,
+      // so stolen credentials produce a visible error rather than a silent probe.
+      return next(new Error('unauthorized'));
     }
 
     next();
@@ -58,10 +70,19 @@ function initSockets(io) {
     socket.on('join:order', async ({ orderId, sessionToken } = {}) => {
       if (!orderId || !/^[a-f\d]{24}$/i.test(orderId)) return;
 
-      // Authenticated staff can always join order rooms for their restaurant
+      // Authenticated staff can join order rooms for their restaurant only
       if (socket.data.restaurantId) {
-        socket.join(`order:${orderId}`);
-        logger.debug({ socketId: socket.id, orderId }, 'Staff socket joined order room');
+        try {
+          const order = await Order.findById(orderId).select('restaurantId').lean();
+          if (!order || String(order.restaurantId) !== socket.data.restaurantId) {
+            logger.debug({ socketId: socket.id, orderId }, 'Staff socket denied order room — tenant mismatch');
+            return;
+          }
+          socket.join(`order:${orderId}`);
+          logger.debug({ socketId: socket.id, orderId }, 'Staff socket joined order room');
+        } catch (err) {
+          logger.error({ err, orderId }, 'Socket join:order staff lookup error');
+        }
         return;
       }
 
@@ -93,8 +114,17 @@ function initSockets(io) {
       if (!tableId || !/^[a-f\d]{24}$/i.test(tableId)) return;
 
       if (socket.data.restaurantId) {
-        socket.join(`table:${tableId}`);
-        logger.debug({ socketId: socket.id, tableId }, 'Staff socket joined table room');
+        try {
+          const table = await Table.findById(tableId).select('restaurantId').lean();
+          if (!table || String(table.restaurantId) !== socket.data.restaurantId) {
+            logger.debug({ socketId: socket.id, tableId }, 'Staff socket denied table room — tenant mismatch');
+            return;
+          }
+          socket.join(`table:${tableId}`);
+          logger.debug({ socketId: socket.id, tableId }, 'Staff socket joined table room');
+        } catch (err) {
+          logger.error({ err, tableId }, 'Socket join:table staff lookup error');
+        }
         return;
       }
 

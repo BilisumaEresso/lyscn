@@ -15,6 +15,11 @@ export function exportToCSV(filename, headers, rows) {
   const formatCell = (val) => {
     if (val === null || val === undefined) return '';
     let str = String(val);
+    // Neutralise CSV formula injection: prefix dangerous leading characters with
+    // a single quote so spreadsheet apps treat the value as text, not a formula.
+    // Pure numbers (including negatives and decimals) are exempt.
+    const RISKY = /^[=+\-@\t\r]/;
+    if (RISKY.test(str) && !/^-?\d+(\.\d+)?$/.test(str)) str = `'${str}`;
     // If string contains comma, double-quote, or newline, wrap in quotes and escape internal quotes
     if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
       str = `"${str.replace(/"/g, '""')}"`;

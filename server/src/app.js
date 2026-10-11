@@ -45,7 +45,7 @@ app.use(
       if (!origin) return callback(null, true);
 
       const isLocalhostOrigin = /^http:\/\/localhost:\d+$/.test(origin);
-      return isLocalhostOrigin ? callback(null, true) : callback(null, true);
+      return isLocalhostOrigin ? callback(null, true) : callback(null, false);
     },
     credentials: true,
   }),

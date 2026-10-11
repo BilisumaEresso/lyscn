@@ -48,6 +48,14 @@ const resolveQRCode = async (req, res, next) => {
       });
 
       if (prevTable) {
+        // A caller may only act on a table whose session they can prove they own.
+        if (!previousSessionToken || previousSessionToken !== prevTable.activeSessionToken) {
+          return res.status(403).json({
+            success: false,
+            message: 'You can only manage the table session you are connected to.',
+          });
+        }
+
         const prevUnpaidOrders = await Order.find({
           tableId: prevTable._id,
           restaurantId: req.tenantId,
