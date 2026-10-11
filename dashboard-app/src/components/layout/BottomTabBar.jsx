@@ -2,13 +2,13 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
-  LayoutDashboard, UtensilsCrossed, QrCode, ClipboardList, Settings,
-  ChefHat, Utensils
+  LayoutDashboard, UtensilsCrossed, QrCode, ClipboardList,
+  ChefHat, Utensils, MoreHorizontal
 } from 'lucide-react';
 import api from '../../lib/api';
 import { useAuthStore } from '../../store/authStore';
 
-export default function BottomTabBar() {
+export default function BottomTabBar({ onOpenMore }) {
   const { user } = useAuthStore();
 
   const { data: ordersData } = useQuery({
@@ -35,75 +35,147 @@ export default function BottomTabBar() {
 
   if (role === 'kitchen') {
     navItems = [
-      { to: '/kds', icon: ChefHat, label: 'KDS', badge: acceptedOrdersCount },
-      { to: '/orders', icon: ClipboardList, label: 'Orders' },
+      {
+        to: '/kds',
+        icon: ChefHat,
+        label: 'Kitchen KDS',
+        badge: acceptedOrdersCount,
+        badgeColor: 'bg-amber-500 text-ink',
+      },
+      { to: '/orders', icon: ClipboardList, label: 'Order History' },
     ];
   } else if (role === 'waiter') {
     navItems = [
-      { to: '/waiter', icon: Utensils, label: 'Floor', badge: readyOrdersCount },
-      { to: '/tables', icon: QrCode, label: 'Tables', badge: pendingAssistanceCount },
+      {
+        to: '/waiter',
+        icon: Utensils,
+        label: 'Floor',
+        badge: readyOrdersCount,
+        badgeColor: 'bg-emerald-500 text-white',
+      },
+      {
+        to: '/tables',
+        icon: QrCode,
+        label: 'Tables',
+        badge: pendingAssistanceCount,
+        badgeColor: 'bg-rose-500 text-white animate-pulse',
+      },
       { to: '/orders', icon: ClipboardList, label: 'Orders' },
     ];
   } else if (role === 'coordinator') {
     navItems = [
       { to: '/', icon: LayoutDashboard, label: 'Desk', end: true },
-      { to: '/orders', icon: ClipboardList, label: 'Orders', badge: placedOrdersCount },
-      { to: '/tables', icon: QrCode, label: 'Tables', badge: pendingAssistanceCount },
+      {
+        to: '/orders',
+        icon: ClipboardList,
+        label: 'Orders',
+        badge: placedOrdersCount,
+        badgeColor: 'bg-amber-500 text-ink',
+      },
+      {
+        to: '/tables',
+        icon: QrCode,
+        label: 'Tables',
+        badge: pendingAssistanceCount,
+        badgeColor: 'bg-rose-500 text-white animate-pulse',
+      },
       { to: '/kds', icon: ChefHat, label: 'KDS' },
       { to: '/waiter', icon: Utensils, label: 'Floor' },
     ];
   } else {
-    // owner or manager
+    // owner or manager: 4 primary quick-action tabs + 1 "More" action
     navItems = [
       { to: '/', icon: LayoutDashboard, label: 'Dashboard', end: true },
-      { to: '/tables', icon: QrCode, label: 'Tables', badge: pendingAssistanceCount },
-      { to: '/orders', icon: ClipboardList, label: 'Orders', badge: placedOrdersCount },
-      { to: '/kds', icon: ChefHat, label: 'KDS' },
-      { to: '/waiter', icon: Utensils, label: 'Floor' },
+      {
+        to: '/orders',
+        icon: ClipboardList,
+        label: 'Orders',
+        badge: placedOrdersCount,
+        badgeColor: 'bg-amber-500 text-ink',
+      },
+      {
+        to: '/tables',
+        icon: QrCode,
+        label: 'Tables',
+        badge: pendingAssistanceCount,
+        badgeColor: 'bg-rose-500 text-white animate-pulse',
+      },
+      { to: '/menu', icon: UtensilsCrossed, label: 'Menu' },
+      {
+        isAction: true,
+        icon: MoreHorizontal,
+        label: 'More',
+        action: onOpenMore,
+      },
     ];
   }
 
   return (
     <nav
-      className="fixed left-0 right-0 bottom-0 z-40 flex lg:hidden items-center justify-between gap-1 px-2"
-      style={{
-        height: '56px',
-        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-      }}
+      className="fixed inset-x-0 bottom-0 z-40 flex lg:hidden items-center justify-center pointer-events-none px-3 pb-[calc(env(safe-area-inset-bottom,0px)+8px)] pt-1"
       aria-label="Primary mobile navigation"
     >
-      <div className="mx-auto w-full max-w-xl px-2">
-        <div className="bg-ink/90 backdrop-blur-md rounded-2xl shadow-xl flex items-center justify-between px-2 h-12 border border-white/10">
-          {navItems.map(({ to, icon: Icon, label, end, badge }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              className={({ isActive }) =>
-                `flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors py-1 px-1 rounded-xl focus:outline-none ` +
-                (isActive
-                  ? ' text-[var(--color-primary-light,var(--color-primary))] font-semibold'
-                  : ' text-white/60 hover:text-white')
-              }
-              style={({ isActive }) =>
-                isActive
-                  ? {
-                      background: 'color-mix(in srgb, var(--color-primary) 18%, transparent)',
-                    }
-                  : undefined
-              }
-            >
-              <div className="relative">
-                <Icon size={17} />
-                {badge > 0 && (
-                  <span className="absolute -top-1 -right-2 min-w-[14px] h-[14px] rounded-full bg-danger text-white text-[8px] font-bold flex items-center justify-center px-0.5 shadow-xs">
-                    {badge > 9 ? '9+' : badge}
-                  </span>
+      <div className="pointer-events-auto mx-auto w-full max-w-md">
+        <div className="bg-ink/95 backdrop-blur-xl rounded-2xl shadow-2xl flex items-center justify-between px-1.5 py-1 border border-white/12 min-h-[52px]">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+
+            if (item.isAction) {
+              return (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={item.action}
+                  className="flex-1 flex flex-col items-center justify-center gap-0.5 min-h-[44px] min-w-[44px] text-[10px] font-medium text-white/70 hover:text-white transition-colors py-1 px-1 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal"
+                  aria-label="Open more menu options"
+                >
+                  <Icon size={18} strokeWidth={1.75} />
+                  <span className="truncate text-[10px]">{item.label}</span>
+                </button>
+              );
+            }
+
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                className={({ isActive }) =>
+                  `flex-1 flex flex-col items-center justify-center gap-0.5 min-h-[44px] min-w-[44px] text-[10px] font-medium transition-all py-1 px-1 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal ` +
+                  (isActive
+                    ? ' text-[var(--color-primary-light,var(--color-primary))] font-semibold shadow-xs'
+                    : ' text-white/60 hover:text-white')
+                }
+                style={({ isActive }) =>
+                  isActive
+                    ? {
+                        background: 'color-mix(in srgb, var(--color-primary) 20%, transparent)',
+                      }
+                    : undefined
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    <div className="relative flex items-center justify-center">
+                      <Icon size={18} strokeWidth={isActive ? 2.25 : 1.75} />
+                      {item.badge > 0 && (
+                        <span
+                          className={`absolute -top-1.5 -right-2 min-w-[14px] h-[14px] rounded-full text-[8px] font-bold flex items-center justify-center px-1 shadow-xs ${
+                            item.badgeColor || 'bg-danger text-white'
+                          }`}
+                        >
+                          {item.badge > 9 ? '9+' : item.badge}
+                        </span>
+                      )}
+                    </div>
+                    <span className="truncate text-[10px] leading-tight mt-0.5">
+                      {item.label}
+                    </span>
+                  </>
                 )}
-              </div>
-              <span className="truncate text-[10px]">{label}</span>
-            </NavLink>
-          ))}
+              </NavLink>
+            );
+          })}
         </div>
       </div>
     </nav>

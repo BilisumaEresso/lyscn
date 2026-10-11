@@ -275,6 +275,7 @@ const placeOrder = async (req, res, next) => {
       branchId,
       tableId,
       sessionId,
+      sessionToken,
       clientOrderId: clientOrderId || null,
       guestName: guestName ? guestName.trim() : null,
       items:     orderItems,
@@ -466,7 +467,8 @@ const getTableOrders = async (req, res, next) => {
 // PATCH /api/orders/public/:id/feedback — customer feedback after service
 const submitOrderFeedback = async (req, res, next) => {
   try {
-    const { rating, feedback, sessionToken } = req.body;
+    const sessionToken = req.body?.sessionToken || req.query?.sessionToken || req.headers['x-session-token'];
+    const { rating, feedback, sessionId } = req.body || {};
 
     // Verify the caller owns the session that placed this order (mirrors getOrderStatus)
     if (!sessionToken) {
@@ -479,14 +481,21 @@ const submitOrderFeedback = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'rating must be an integer from 1 to 5.' });
     }
 
-    const existingOrder = await Order.findOne({ _id: req.params.id }).select('status rating feedback tableId');
+    const existingOrder = await Order.findOne({ _id: req.params.id }).select('status rating feedback tableId sessionId sessionToken');
     if (!existingOrder) {
       return res.status(404).json({ success: false, message: 'Order not found.' });
     }
 
-    // Confirm the sessionToken matches the table that owns this order
+    // Confirm the caller owns the session:
+    // 1) Current table's activeSessionToken matches sessionToken
+    // 2) OR the order's stored sessionToken matches sessionToken
+    // 3) OR the order's sessionId matches sessionId (e.g. staff released table before diner submits review)
     const table = await Table.findById(existingOrder.tableId).select('activeSessionToken');
-    if (!table || table.activeSessionToken !== sessionToken) {
+    const tableMatches = table && table.activeSessionToken && table.activeSessionToken === sessionToken;
+    const orderTokenMatches = existingOrder.sessionToken && existingOrder.sessionToken === sessionToken;
+    const orderSessionMatches = sessionId && existingOrder.sessionId === sessionId;
+
+    if (!tableMatches && !orderTokenMatches && !orderSessionMatches) {
       return res.status(403).json({
         success: false,
         message: 'Session does not match this order. Please scan the QR code again.',

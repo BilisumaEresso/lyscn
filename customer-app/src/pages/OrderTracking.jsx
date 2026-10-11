@@ -229,18 +229,46 @@ export default function OrderTracking() {
   const isServedRound = activeStatus === 'served';
   const feedbackSubmitted = Number(currentRound?.rating) > 0;
 
+  // Reset feedback state when current round changes
+  useEffect(() => {
+    setFeedbackRating(0);
+    setFeedbackText('');
+    setFeedbackDismissed(false);
+  }, [currentRound?.id]);
+
   // Feedback mutation
   const feedbackMutation = useMutation({
-    mutationFn: () =>
-      api.patch(`/orders/public/${currentRound?.id}/feedback`, {
+    mutationFn: () => {
+      const token = session.sessionToken;
+      if (!token) {
+        throw new Error('Table session token not found. Please scan the table QR code again.');
+      }
+      return api.patch(`/orders/public/${currentRound?.id}/feedback`, {
         rating: feedbackRating,
         feedback: feedbackText.trim() || null,
-      }).then((r) => r.data),
-    onSuccess: () => {
+        sessionToken: token,
+        sessionId: session.sessionId,
+      }).then((r) => r.data);
+    },
+    onSuccess: (data) => {
+      // Optimistically update table-orders query cache so UI updates immediately
+      qc.setQueryData(['table-orders', session.sessionToken, session.sessionId], (old) => {
+        if (!old || !Array.isArray(old.rounds)) return old;
+        return {
+          ...old,
+          rounds: old.rounds.map((r) =>
+            r.id === currentRound?.id
+              ? { ...r, rating: data?.rating || feedbackRating, feedback: data?.feedback ?? (feedbackText.trim() || null) }
+              : r
+          ),
+        };
+      });
       qc.invalidateQueries({ queryKey: ['table-orders', session.sessionToken, session.sessionId] });
+      setFeedbackRating(0);
+      setFeedbackText('');
       toast.success('Thanks for your feedback!');
     },
-    onError: (err) => toast.error(err.response?.data?.message || 'Could not save feedback.'),
+    onError: (err) => toast.error(err.response?.data?.message || err.message || 'Could not save feedback.'),
   });
 
   // ── Switch round handler with smooth auto-scroll ─────────────────────────────
@@ -693,7 +721,7 @@ export default function OrderTracking() {
               <button
                 type="button"
                 onClick={() => feedbackMutation.mutate()}
-                disabled={!feedbackRating || feedbackMutation.isPending}
+                disabled={!feedbackRating || feedbackMutation.isPending || !session.sessionToken}
                 className="w-full mt-2.5 py-2.5 rounded-xl text-xs font-semibold disabled:opacity-40"
                 style={{ background: 'var(--color-primary)', color: 'var(--color-on-primary)' }}
               >
