@@ -11,10 +11,16 @@ import Spinner from '../components/ui/Spinner';
 import { exportToCSV } from '../lib/csvExport';
 import { useAuthStore } from '../store/authStore';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 function fmt(n) { return Number(n || 0).toFixed(2); }
 
 function toISO(d) { return d.toISOString().split('T')[0]; }
+
+function formatHour12(h) {
+  if (h === undefined || h === null) return '';
+  if (h === 0) return '12 AM';
+  if (h === 12) return '12 PM';
+  return h > 12 ? `${h - 12} PM` : `${h} AM`;
+}
 
 function getPreset(key) {
   const now  = new Date();
@@ -311,6 +317,8 @@ export default function Analytics() {
     const found = hourly.find((h) => h.hour === i);
     return { hour: i, orders: found?.orders || 0, label: `${i}:00` };
   });
+
+  const busiestHour = hourlyFull.find((h) => h.orders === hourMax && h.orders > 0);
 
   const handleExportFullReport = () => {
     if (!data) {
@@ -681,35 +689,78 @@ export default function Analytics() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Peak hours */}
             <Card>
-              <SectionTitle icon={Calendar}>Peak Hours (order volume by hour)</SectionTitle>
-              <div className="flex items-end gap-0.5 h-24">
+              <div className="flex items-center justify-between mb-4">
+                <SectionTitle icon={Calendar}>Peak Hours (order volume by hour)</SectionTitle>
+                {busiestHour && (
+                  <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <span>🔥 Peak:</span>
+                    <span>{formatHour12(busiestHour.hour)}</span>
+                  </span>
+                )}
+              </div>
+
+              {/* Hourly Bar Chart Container: h-28 with full-height flex column items */}
+              <div className="h-28 pt-6 pb-1 flex items-end gap-1 w-full relative">
                 {hourlyFull.map((h) => {
-                  const pct = Math.max(4, Math.round((h.orders / hourMax) * 100));
+                  const pct = Math.max(h.orders > 0 ? 10 : 3, Math.round((h.orders / hourMax) * 100));
                   const isHot = h.orders === hourMax && h.orders > 0;
+                  const label12 = formatHour12(h.hour);
+
                   return (
-                    <div key={h.hour} className="flex-1 flex flex-col items-center gap-0.5" title={`${h.hour}:00 — ${h.orders} orders`}>
+                    <div
+                      key={h.hour}
+                      className="flex-1 h-full flex flex-col justify-end items-center group relative cursor-pointer"
+                    >
+                      {/* Interactive Floating Hover Tooltip */}
+                      <div className="absolute -top-7 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 z-20 whitespace-nowrap bg-ink text-white text-[10px] py-0.5 px-2 rounded-md shadow-md flex items-center gap-1">
+                        <span>{label12} ({h.hour}:00)</span>
+                        <span className="font-bold text-amber-300">• {h.orders} order{h.orders !== 1 ? 's' : ''}</span>
+                      </div>
+
+                      {/* Visible Bar Graphic */}
                       <div
-                        className="w-full rounded-sm transition-all"
+                        className="w-full rounded-t-sm transition-all duration-300 group-hover:brightness-110"
                         style={{
                           height: `${pct}%`,
-                          backgroundColor: isHot ? '#F59E0B' : '#14B8A6',
-                          opacity: h.orders === 0 ? 0.15 : 0.8,
+                          minHeight: h.orders > 0 ? '8px' : '3px',
+                          backgroundColor: isHot
+                            ? '#F59E0B'
+                            : h.orders > 0
+                            ? '#14B8A6'
+                            : 'rgba(18,26,44,0.08)',
                         }}
                       />
                     </div>
                   );
                 })}
               </div>
-              <div className="flex justify-between text-[10px] text-ink-muted mt-1">
-                <span>12am</span>
-                <span>6am</span>
-                <span>12pm</span>
-                <span>6pm</span>
-                <span>11pm</span>
+
+              {/* Time Axis Labels */}
+              <div className="flex justify-between text-[10px] text-ink-muted mt-2 px-0.5 border-t border-ink/6 pt-1.5 font-medium">
+                <span>12 AM</span>
+                <span>4 AM</span>
+                <span>8 AM</span>
+                <span>12 PM</span>
+                <span>4 PM</span>
+                <span>8 PM</span>
+                <span>11 PM</span>
               </div>
-              {hourMax > 0 && (
-                <p className="text-xs text-ink-muted mt-2">
-                  Busiest hour: <strong className="text-ink">{hourlyFull.find((h) => h.orders === hourMax)?.hour}:00</strong> with <strong className="text-ink">{hourMax} orders</strong>
+
+              {busiestHour ? (
+                <div className="flex items-center gap-1.5 text-xs text-ink-muted mt-3 pt-2.5 border-t border-ink/8">
+                  <span className="text-sm">🔥</span>
+                  <span>
+                    Busiest hour:{' '}
+                    <strong className="text-ink font-semibold">
+                      {formatHour12(busiestHour.hour)} ({busiestHour.hour}:00)
+                    </strong>{' '}
+                    with{' '}
+                    <strong className="text-amber-600 font-bold">{hourMax} orders</strong>
+                  </span>
+                </div>
+              ) : (
+                <p className="text-xs text-ink-muted mt-3 pt-2.5 border-t border-ink/8">
+                  No orders recorded across hours in this date range.
                 </p>
               )}
             </Card>
