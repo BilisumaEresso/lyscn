@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   BarChart2, TrendingUp, Star, Users, CreditCard,
@@ -9,6 +9,7 @@ import api from '../lib/api';
 import Currency from '../components/ui/Currency';
 import Spinner from '../components/ui/Spinner';
 import { exportToCSV } from '../lib/csvExport';
+import { useAuthStore } from '../store/authStore';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmt(n) { return Number(n || 0).toFixed(2); }
@@ -128,14 +129,15 @@ function SectionTitle({ icon: Icon, children }) {
   );
 }
 
-// ── Payment method labels ─────────────────────────────────────────────────────
-const PM_LABEL = {
-  cash:     { label: 'Cash',     color: '#10B981' },
-  pos:      { label: 'POS Card', color: '#6366F1' },
-  telebirr: { label: 'Telebirr', color: '#3B82F6' },
-  cbebirr:  { label: 'CBE Birr', color: '#8B5CF6' },
-  other:    { label: 'Other',    color: '#94A3B8' },
-  unknown:  { label: 'Unknown',  color: '#CBD5E1' },
+// ── Default Payment method labels (Ethiopia standards & cash/pos) ─────────────
+const DEFAULT_PM_LABEL = {
+  cash:     { label: 'Cash',       color: '#10B981' },
+  pos:      { label: 'POS Card',   color: '#6366F1' },
+  telebirr: { label: 'Telebirr',   color: '#3B82F6' },
+  cbebirr:  { label: 'CBE Birr',   color: '#8B5CF6' },
+  awash:    { label: 'Awash Bank', color: '#1E40AF' },
+  other:    { label: 'Other Bank', color: '#D97706' },
+  unknown:  { label: 'Unknown',    color: '#CBD5E1' },
 };
 
 const PRESETS = [
@@ -164,6 +166,16 @@ export default function Analytics() {
     keepPreviousData: true,
   });
 
+  // Pull active bank & payment settings from restaurant profile or analytics payload
+  const { restaurant: authRestaurant } = useAuthStore();
+  const { data: restaurantData } = useQuery({
+    queryKey: ['restaurant-me'],
+    queryFn: () => api.get('/restaurants/me').then((r) => r.data),
+    staleTime: 60_000,
+  });
+  const restaurant = restaurantData?.restaurant || authRestaurant;
+  const paymentAccounts = data?.paymentAccounts || restaurant?.paymentAccounts || {};
+
   const s   = data?.summary    || {};
   const pm  = data?.paymentMethods || [];
   const top = data?.topProducts    || [];
@@ -172,7 +184,125 @@ export default function Analytics() {
   const staff    = data?.staffPerf   || [];
   const hourly   = data?.hourlyDist  || [];
 
-  const pmTotal  = pm.reduce((a, p) => a + p.revenue, 0);
+  // ── Dynamic payment method resolver based on settings ───────────────────────
+  const getMethodMeta = useCallback((method) => {
+    const key = String(method || 'unknown').toLowerCase();
+    if (key === 'cash') {
+      return { label: 'Cash', color: '#10B981', isConfigured: true };
+    }
+    if (key === 'pos' || key === 'card') {
+      return { label: 'POS Card', color: '#6366F1', isConfigured: true };
+    }
+    if (key === 'telebirr') {
+      const isConfigured = Boolean(paymentAccounts.telebirr?.isActive && paymentAccounts.telebirr?.accountNumber);
+      return {
+        label: 'Telebirr',
+        color: '#3B82F6',
+        isConfigured,
+        accountName: paymentAccounts.telebirr?.accountName || '',
+      };
+    }
+    if (key === 'cbebirr' || key === 'cbe') {
+      const isConfigured = Boolean(paymentAccounts.cbeBirr?.isActive && paymentAccounts.cbeBirr?.accountNumber);
+      return {
+        label: 'CBE Birr',
+        color: '#8B5CF6',
+        isConfigured,
+        accountName: paymentAccounts.cbeBirr?.accountName || '',
+      };
+    }
+    if (key === 'awash' || key === 'awashbank') {
+      const isConfigured = Boolean(paymentAccounts.awashBank?.isActive && paymentAccounts.awashBank?.accountNumber);
+      return {
+        label: 'Awash Bank',
+        color: '#1E40AF',
+        isConfigured,
+        accountName: paymentAccounts.awashBank?.accountName || '',
+      };
+    }
+    if (key === 'other' || key === 'otherbank') {
+      const customBankName = paymentAccounts.otherBank?.bankName?.trim();
+      const isConfigured = Boolean(paymentAccounts.otherBank?.isActive && (paymentAccounts.otherBank?.accountNumber || customBankName));
+      return {
+        label: customBankName || 'Other Bank',
+        color: '#D97706',
+        isConfigured,
+        accountName: paymentAccounts.otherBank?.accountName || '',
+      };
+    }
+    return {
+      label: String(method).charAt(0).toUpperCase() + String(method).slice(1),
+      color: '#94A3B8',
+      isConfigured: false,
+    };
+  }, [paymentAccounts]);
+
+  // Build dynamic payment breakdown list including configured banks and default banks
+  const breakdownList = useMemo(() => {
+    const pmMap = new Map();
+    pm.forEach((p) => {
+      const rawKey = String(p.method || 'unknown').toLowerCase();
+      const normKey = (rawKey === 'awashbank')
+        ? 'awash'
+        : (rawKey === 'cbe')
+        ? 'cbebirr'
+        : (rawKey === 'otherbank')
+        ? 'other'
+        : rawKey;
+      const cur = pmMap.get(normKey);
+      if (cur) {
+        pmMap.set(normKey, { method: normKey, count: cur.count + (p.count || 0), revenue: cur.revenue + (p.revenue || 0) });
+      } else {
+        pmMap.set(normKey, { method: normKey, count: p.count || 0, revenue: p.revenue || 0 });
+      }
+    });
+
+    // Default channels: Cash, POS Card, Telebirr, CBE Birr, Awash Bank
+    const defaultKeys = ['cash', 'pos', 'telebirr', 'cbebirr', 'awash'];
+    const keysToInclude = new Set(defaultKeys);
+
+    // If user configured any additional bank in settings under otherBank, include it
+    const hasOtherInSettings = Boolean(
+      paymentAccounts.otherBank?.bankName?.trim() ||
+      paymentAccounts.otherBank?.accountNumber?.trim() ||
+      paymentAccounts.otherBank?.isActive
+    );
+    if (hasOtherInSettings || pmMap.has('other')) {
+      keysToInclude.add('other');
+    }
+
+    // Include any other methods found in orders (e.g. unknown, etc.)
+    pmMap.forEach((_, key) => {
+      keysToInclude.add(key);
+    });
+
+    const list = Array.from(keysToInclude).map((k) => {
+      const stats = pmMap.get(k) || { method: k, count: 0, revenue: 0 };
+      const meta = getMethodMeta(k);
+      return {
+        method: k,
+        label: meta.label,
+        color: meta.color,
+        isConfigured: meta.isConfigured,
+        accountName: meta.accountName,
+        count: stats.count,
+        revenue: stats.revenue,
+      };
+    });
+
+    // Sort: highest revenue first, then highest order count, then alphabetically
+    list.sort((a, b) => {
+      if (b.revenue !== a.revenue) return b.revenue - a.revenue;
+      if (b.count !== a.count) return b.count - a.count;
+      return a.label.localeCompare(b.label);
+    });
+
+    return list;
+  }, [pm, paymentAccounts, getMethodMeta]);
+
+  const pmTotal  = useMemo(() => {
+    return breakdownList.reduce((a, p) => a + (p.revenue || 0), 0);
+  }, [breakdownList]);
   const topMax   = top[0]?.qty || 1;
   const hourMax  = Math.max(...hourly.map((h) => h.orders), 1);
 
@@ -467,25 +597,63 @@ export default function Analytics() {
               )}
             </Card>
 
-            {/* Payment Methods */}
+            {/* Payment Methods Breakdown */}
             <Card>
-              <SectionTitle icon={CreditCard}>Payment Method Breakdown</SectionTitle>
-              {pm.length === 0 ? (
-                <p className="text-sm text-ink-muted">No paid orders in this period.</p>
+              <div className="flex items-center justify-between mb-4">
+                <SectionTitle icon={CreditCard}>Payment Method Breakdown</SectionTitle>
+                <div className="flex items-center gap-2">
+                  {paymentAccounts.otherBank?.bankName && (
+                    <span className="hidden sm:inline-block text-[11px] text-ink-muted bg-paper px-2 py-0.5 rounded-full border border-ink/8">
+                      {paymentAccounts.otherBank.bankName}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!breakdownList.length) {
+                        toast.error('No payment method data to export');
+                        return;
+                      }
+                      const headers = ['Payment Method', 'Orders Count', 'Total Revenue (Br)', 'Share (%)', 'Configured in Settings'];
+                      const rows = breakdownList.map((p) => {
+                        const pct = pmTotal > 0 ? Math.round((p.revenue / pmTotal) * 100) : 0;
+                        return [p.label, p.count, p.revenue, `${pct}%`, p.isConfigured ? 'Yes' : 'No'];
+                      });
+                      exportToCSV(`payment-methods-${from}-to-${to}`, headers, rows);
+                      toast.success('Payment method breakdown exported as CSV!');
+                    }}
+                    className="text-xs text-ink-muted hover:text-ink px-2.5 py-1 rounded-lg border border-ink/10 bg-paper hover:bg-ink/5 transition-colors flex items-center gap-1.5"
+                    title="Export payment methods as CSV"
+                  >
+                    <Download size={12} />
+                    <span>Export</span>
+                  </button>
+                </div>
+              </div>
+
+              {breakdownList.length === 0 ? (
+                <p className="text-sm text-ink-muted">No payment methods configured or recorded.</p>
               ) : (
                 <div className="space-y-4">
-                  {pm.map((p) => {
-                    const meta = PM_LABEL[p.method] || PM_LABEL.other;
-                    const pct  = pmTotal > 0 ? Math.round((p.revenue / pmTotal) * 100) : 0;
+                  {breakdownList.map((p) => {
+                    const pct = pmTotal > 0 ? Math.round((p.revenue / pmTotal) * 100) : 0;
                     return (
                       <div key={p.method} className="space-y-1">
                         <div className="flex items-center justify-between text-xs">
                           <span className="font-semibold text-ink flex items-center gap-1.5">
                             <span
                               className="w-2.5 h-2.5 rounded-full shrink-0"
-                              style={{ backgroundColor: meta.color }}
+                              style={{ backgroundColor: p.color }}
                             />
-                            {meta.label}
+                            <span>{p.label}</span>
+                            {p.isConfigured && ['telebirr', 'cbebirr', 'awash', 'other'].includes(p.method) && (
+                              <span
+                                className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-normal border border-emerald-200/60"
+                                title="Active in Settings"
+                              >
+                                Configured
+                              </span>
+                            )}
                           </span>
                           <span className="text-ink-muted">
                             {p.count} order{p.count !== 1 ? 's' : ''} · Br {fmt(p.revenue)} · {pct}%
@@ -493,15 +661,15 @@ export default function Analytics() {
                         </div>
                         <div className="h-2.5 bg-ink/6 rounded-full overflow-hidden">
                           <div
-                            className="h-full rounded-full"
-                            style={{ width: `${pct}%`, backgroundColor: meta.color }}
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{ width: `${pct}%`, backgroundColor: p.color }}
                           />
                         </div>
                       </div>
                     );
                   })}
                   <div className="pt-2 border-t border-ink/8 flex items-center justify-between text-xs font-semibold">
-                    <span className="text-ink-muted">Total Revenue</span>
+                    <span className="text-ink-muted">Total Paid Revenue</span>
                     <Currency value={pmTotal} className="text-ink" />
                   </div>
                 </div>

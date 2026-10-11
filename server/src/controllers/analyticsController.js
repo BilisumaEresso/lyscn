@@ -1,4 +1,5 @@
 const Order = require('../models/Order');
+const Restaurant = require('../models/Restaurant');
 
 /**
  * GET /api/analytics
@@ -19,6 +20,7 @@ const Order = require('../models/Order');
 const getAnalytics = async (req, res, next) => {
   try {
     const restaurantId = req.tenantId;
+    const restaurant = await Restaurant.findById(restaurantId).select('paymentAccounts').lean();
 
     // ── Date range ────────────────────────────────────────────────────────────
     const toDate = req.query.to
@@ -238,6 +240,7 @@ const getAnalytics = async (req, res, next) => {
       daily,
       topProducts,
       paymentMethods,
+      paymentAccounts: restaurant?.paymentAccounts || null,
       ratings: ratingsAgg,
       staffPerf,
       hourlyDist,

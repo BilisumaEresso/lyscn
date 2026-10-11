@@ -12,6 +12,7 @@ import clsx from 'clsx';
 import api from '../lib/api';
 import socket from '../lib/socket';
 import { exportToCSV } from '../lib/csvExport';
+import { useAuthStore } from '../store/authStore';
 
 // ── Time & Formatting Helpers ────────────────────────────────────────────────
 function timeAgo(date, now = Date.now()) {
@@ -101,11 +102,14 @@ function RatingBadge({ rating }) {
   );
 }
 
-// ── Redesigned Order Card Component ──────────────────────────────────────────
 function OrderCard({ order, highlighted, isShaking, now, index, tableOrderCount = 1 }) {
   const qc = useQueryClient();
+  const { restaurant } = useAuthStore();
   const [isExpanded, setIsExpanded] = useState(true);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
+
+  const otherBank = restaurant?.paymentAccounts?.otherBank;
+  const hasOtherBank = Boolean(otherBank?.isActive && (otherBank?.bankName || otherBank?.accountNumber));
 
   const nextStatus = NEXT_STATUS[order.status];
   const config = STATUS_CONFIG[order.status] || STATUS_CONFIG.placed;
@@ -400,6 +404,16 @@ function OrderCard({ order, highlighted, isShaking, now, index, tableOrderCount 
                   >
                     Awash
                   </button>
+                  {hasOtherBank && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); payMutation.mutate('other'); }}
+                      disabled={payMutation.isPending}
+                      className="py-1.5 rounded-lg text-xs font-semibold text-white bg-amber-700 hover:bg-amber-800 shadow-xs flex items-center justify-center gap-1 col-span-3"
+                    >
+                      {otherBank.bankName || 'Other Bank'}
+                    </button>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-1.5">
                   <button
@@ -813,12 +827,48 @@ function OrderListCard({
                   Settles all {tableOrderCount} rounds for {order.tableId?.label ?? 'Table'}
                 </p>
               )}
+              <div className="grid grid-cols-3 gap-1.5 mb-1.5">
+                <button
+                  type="button"
+                  onClick={() => onPayOrder(order._id, 'telebirr')}
+                  disabled={isPayPending}
+                  className="h-9 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-semibold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1 transition-all"
+                >
+                  Telebirr
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onPayOrder(order._id, 'cbebirr')}
+                  disabled={isPayPending}
+                  className="h-9 bg-purple-600 hover:bg-purple-700 active:scale-[0.98] text-white font-semibold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1 transition-all"
+                >
+                  CBE Birr
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onPayOrder(order._id, 'awash')}
+                  disabled={isPayPending}
+                  className="h-9 bg-blue-800 hover:bg-blue-900 active:scale-[0.98] text-white font-semibold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1 transition-all"
+                >
+                  Awash
+                </button>
+                {restaurant?.paymentAccounts?.otherBank?.isActive && (restaurant?.paymentAccounts?.otherBank?.bankName || restaurant?.paymentAccounts?.otherBank?.accountNumber) && (
+                  <button
+                    type="button"
+                    onClick={() => onPayOrder(order._id, 'other')}
+                    disabled={isPayPending}
+                    className="h-9 bg-amber-700 hover:bg-amber-800 active:scale-[0.98] text-white font-semibold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1 transition-all col-span-3"
+                  >
+                    {restaurant.paymentAccounts.otherBank.bankName || 'Other Bank'}
+                  </button>
+                )}
+              </div>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => onPayOrder(order._id, 'cash')}
                   disabled={isPayPending}
-                  className="h-11 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-all"
+                  className="h-10 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-all"
                 >
                   <DollarSign size={14} />
                   <span>{tableOrderCount > 1 ? `Pay All Cash` : `Paid (Cash)`}</span>
@@ -827,7 +877,7 @@ function OrderListCard({
                   type="button"
                   onClick={() => onPayOrder(order._id, 'pos')}
                   disabled={isPayPending}
-                  className="h-11 bg-teal-600 hover:bg-teal-700 active:scale-[0.98] text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-all"
+                  className="h-10 bg-teal-600 hover:bg-teal-700 active:scale-[0.98] text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-all"
                 >
                   <CreditCard size={14} />
                   <span>{tableOrderCount > 1 ? `Pay All POS` : `Paid (POS)`}</span>

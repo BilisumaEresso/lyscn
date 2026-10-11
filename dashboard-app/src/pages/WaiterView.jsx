@@ -666,6 +666,16 @@ export default function WaiterView() {
                     isDigital: false,
                     isConfigured: true,
                   },
+                  ...(paymentAccounts.otherBank?.isActive && (paymentAccounts.otherBank?.bankName || paymentAccounts.otherBank?.accountNumber) ? [{
+                    id: 'other',
+                    label: paymentAccounts.otherBank?.bankName || 'Other Bank',
+                    fallback: (paymentAccounts.otherBank?.bankName || 'OB').slice(0, 2).toUpperCase(),
+                    bgColor: 'bg-amber-600',
+                    icon: Building,
+                    color: 'text-amber-600',
+                    isDigital: true,
+                    isConfigured: Boolean(paymentAccounts.otherBank?.accountNumber),
+                  }] : []),
                 ].map((m) => {
                   const isSelected = selectedPaymentMethod === m.id;
                   const Icon = m.icon;
@@ -708,24 +718,30 @@ export default function WaiterView() {
               </div>
             </div>
 
-            {/* ── DIGITAL PAYMENT PRESENTATION PANEL (Telebirr, CBE, Awash) ── */}
-            {['telebirr', 'cbebirr', 'awash'].includes(selectedPaymentMethod) && (() => {
+            {/* ── DIGITAL PAYMENT PRESENTATION PANEL (Telebirr, CBE, Awash, Other) ── */}
+            {['telebirr', 'cbebirr', 'awash', 'other'].includes(selectedPaymentMethod) && (() => {
               const accountKey = selectedPaymentMethod === 'telebirr'
                 ? 'telebirr'
                 : selectedPaymentMethod === 'cbebirr'
                 ? 'cbeBirr'
-                : 'awashBank';
+                : selectedPaymentMethod === 'awash'
+                ? 'awashBank'
+                : 'otherBank';
               const bankDetails = paymentAccounts[accountKey] || {};
               const bankName = selectedPaymentMethod === 'telebirr'
                 ? 'Telebirr'
                 : selectedPaymentMethod === 'cbebirr'
                 ? 'Commercial Bank of Ethiopia'
-                : 'Awash Bank';
+                : selectedPaymentMethod === 'awash'
+                ? 'Awash Bank'
+                : (bankDetails.bankName || 'Other Bank Transfer');
               const bankLogo = selectedPaymentMethod === 'telebirr'
                 ? '/banks_logo/telebirr.png'
                 : selectedPaymentMethod === 'cbebirr'
                 ? '/banks_logo/CBE.png'
-                : '/banks_logo/awash.png';
+                : selectedPaymentMethod === 'awash'
+                ? '/banks_logo/awash.png'
+                : null;
 
               const isConfigured = Boolean(bankDetails.isActive && bankDetails.accountNumber);
               const tableRefRemark = `Table ${selectedTableForSettle.label} Bill #${selectedTableForSettle._id ? String(selectedTableForSettle._id).slice(-4).toUpperCase() : ''}`;
