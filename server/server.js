@@ -5,7 +5,7 @@ const { Server } = require("socket.io");
 
 const logger = require("./src/config/logger");
 const { validateEnv, isProduction } = require("./src/config/env");
-const { getAllowedOrigins } = require("./src/config/cors");
+const { isOriginAllowed } = require("./src/config/cors");
 const app = require("./src/app");
 const { initSockets } = require("./src/sockets");
 const Table = require("./src/models/Table");
@@ -33,19 +33,10 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: (origin, callback) => {
-      const allowedOrigins = getAllowedOrigins();
-
-      if (isProduction()) {
-        if (!origin) return callback(null, false);
-        const matches = allowedOrigins.includes(origin);
-        return matches
-          ? callback(null, true)
-          : callback(new Error("Origin not allowed by CORS"));
+      if (isOriginAllowed(origin)) {
+        return callback(null, true);
       }
-
-      if (!origin) return callback(null, true);
-      const isLocalhostOrigin = /^http:\/\/localhost:\d+$/.test(origin);
-      return isLocalhostOrigin ? callback(null, true) : callback(null, true);
+      return callback(null, false);
     },
     methods: ["GET", "POST"],
     credentials: true,

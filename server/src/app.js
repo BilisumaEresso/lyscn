@@ -18,7 +18,7 @@ const analyticsRoutes = require("./routes/analyticsRoutes");
 const { notFound, errorHandler } = require("./middleware/errorHandler");
 const requestLogger = require("./middleware/requestLogger");
 const { isProduction } = require("./config/env");
-const { getAllowedOrigins } = require("./config/cors");
+const { isOriginAllowed } = require("./config/cors");
 
 const app = express();
 app.set("trust proxy", 1);
@@ -32,20 +32,10 @@ app.use(requestLogger);
 app.use(
   cors({
     origin: (origin, callback) => {
-      const allowedOrigins = getAllowedOrigins();
-
-      if (isProduction()) {
-        if (!origin) return callback(null, false);
-        const matches = allowedOrigins.includes(origin);
-        return matches
-          ? callback(null, true)
-          : callback(new Error("Origin not allowed by CORS"));
+      if (isOriginAllowed(origin)) {
+        return callback(null, true);
       }
-
-      if (!origin) return callback(null, true);
-
-      const isLocalhostOrigin = /^http:\/\/localhost:\d+$/.test(origin);
-      return isLocalhostOrigin ? callback(null, true) : callback(null, false);
+      return callback(null, false);
     },
     credentials: true,
   }),
