@@ -1,14 +1,17 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Cart store — persisted to localStorage.
  * Prices are stored for display only; the server recomputes totals on order placement.
+ * clientOrderId is persisted with the cart so offline queuing and retries cannot double-charge.
  */
 export const useCartStore = create(
   persist(
     (set, get) => ({
       items: [], // [{ productId, name, unitPrice, qty, selectedModifiers, subtotal }]
+      clientOrderId: null,
       restaurantId: null,
       branchId:     null,
       tableId:      null,
@@ -40,6 +43,7 @@ export const useCartStore = create(
         if (shouldClear) {
           set({
             items: [],
+            clientOrderId: null,
             restaurantId: restaurantId || null,
             branchId:     branchId || null,
             tableId:      tableId || null,
@@ -57,9 +61,27 @@ export const useCartStore = create(
         }
       },
 
+      /** Get or initialize the persistent clientOrderId for the current cart state */
+      getClientOrderId: () => {
+        let { clientOrderId } = get();
+        if (!clientOrderId) {
+          clientOrderId = uuidv4();
+          set({ clientOrderId });
+        }
+        return clientOrderId;
+      },
+
+      /** Set or reset the clientOrderId explicitly (e.g. after successful order) */
+      resetClientOrderId: () => {
+        const id = uuidv4();
+        set({ clientOrderId: id });
+        return id;
+      },
+
       /** Add an item or increment qty if an identical selection already exists. */
       addItem: (item) => {
-        const { items } = get();
+        const { items, clientOrderId } = get();
+        const activeClientOrderId = clientOrderId || uuidv4();
         // Key: productId + sorted modifier selection + sorted specs + sorted tags + itemNotes
         const key = (it) =>
           it.productId +
@@ -85,13 +107,14 @@ export const useCartStore = create(
             qty:      newQty,
             subtotal: updated[existing].unitPrice * newQty,
           };
-          set({ items: updated, lastActiveAt: Date.now() });
+          set({ items: updated, clientOrderId: activeClientOrderId, lastActiveAt: Date.now() });
         } else {
           set({
             items: [
               ...items,
               { ...item, qty: item.qty ?? 1, subtotal: item.unitPrice * (item.qty ?? 1) },
             ],
+            clientOrderId: activeClientOrderId,
             lastActiveAt: Date.now(),
           });
         }
@@ -101,8 +124,10 @@ export const useCartStore = create(
       updateQty: (productId, modifierKey, qty) => {
         const { items } = get();
         if (qty <= 0) {
+          const remaining = items.filter((i) => !(i.productId === productId && i._modKey === modifierKey));
           set({
-            items: items.filter((i) => !(i.productId === productId && i._modKey === modifierKey)),
+            items: remaining,
+            clientOrderId: remaining.length === 0 ? null : get().clientOrderId,
             lastActiveAt: Date.now(),
           });
         } else {
@@ -120,13 +145,15 @@ export const useCartStore = create(
       /** Remove by array index (safer since the same product can appear multiple times). */
       removeItem: (index) => {
         const { items } = get();
+        const remaining = items.filter((_, i) => i !== index);
         set({
-          items: items.filter((_, i) => i !== index),
+          items: remaining,
+          clientOrderId: remaining.length === 0 ? null : get().clientOrderId,
           lastActiveAt: Date.now(),
         });
       },
 
-      clearCart: () => set({ items: [], lastActiveAt: Date.now() }),
+      clearCart: () => set({ items: [], clientOrderId: null, lastActiveAt: Date.now() }),
     }),
     { name: 'layoscan-cart' }
   )

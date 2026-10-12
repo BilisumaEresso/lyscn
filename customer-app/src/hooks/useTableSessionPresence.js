@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import api from '../lib/api';
 import { useSessionStore } from '../store/sessionStore';
+import { useNetworkStore } from '../store/networkStore';
 import toast from 'react-hot-toast';
 
 const INACTIVITY_LIMIT_MS = 5 * 60 * 1000; // 5 minutes inactivity timeout
@@ -32,7 +33,8 @@ export function useTableSessionPresence() {
   const session = useSessionStore();
   const clearSession = useSessionStore((s) => s.clearSession);
 
-  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const isOnline = useNetworkStore((s) => s.isOnline);
+  const isOffline = !isOnline;
   const [rescanRequired, setRescanRequired] = useState(false);
 
   const lastActivityRef = useRef(Date.now());
@@ -206,30 +208,6 @@ export function useTableSessionPresence() {
     const locTimer = setInterval(checkDistance, LOCATION_CHECK_INTERVAL_MS);
     return () => clearInterval(locTimer);
   }, [tableId, sessionToken, branchLocation, radiusMeters, clearSession]);
-
-  // ── 6. Offline / Online Connectivity Detection ───────────────────────────────
-  useEffect(() => {
-    const handleOnline = () => {
-      setIsOffline(false);
-      toast.success('Internet reconnected', { id: 'network-status' });
-    };
-
-    const handleOffline = () => {
-      setIsOffline(true);
-      toast.error('You went offline. Please check your internet connection.', {
-        id: 'network-status',
-        duration: 5000,
-      });
-    };
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
 
   return {
     isOffline,

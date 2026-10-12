@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
+import { useNetworkStore } from '../store/networkStore';
 
 // ── Configured axios instance ─────────────────────────────────────────────────
 const api = axios.create({
@@ -40,8 +41,14 @@ const processQueue = (error, token = null) => {
 };
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    useNetworkStore.getState().reportNetworkSuccess();
+    return response;
+  },
   async (error) => {
+    if (!error.response || error.code === 'ERR_NETWORK' || error.code === 'ECONNABORTED') {
+      useNetworkStore.getState().reportNetworkFailure();
+    }
     const originalRequest = error.config;
 
     // Do NOT attempt refresh on auth endpoints (login, register, logout, refresh)

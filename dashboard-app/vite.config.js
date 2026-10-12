@@ -31,23 +31,6 @@ export default defineConfig({
       workbox: {
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024, // 8 MiB to support high-res print template assets
         globPatterns: ["**/*.{js,css,html,svg,png,jpg,jpeg,ico,json}"],
-        // Keep API runtime caching intentionally light: order/table/menu data must never be served stale.
-        runtimeCaching: [
-          {
-            urlPattern: ({ url }) =>
-              url.pathname.startsWith("/api/") ||
-              url.pathname.includes("/api/"),
-            handler: "NetworkFirst",
-            options: {
-              networkTimeoutSeconds: 5,
-              cacheName: "layoscan-dashboard-api-cache",
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 300,
-              },
-            },
-          },
-        ],
       },
     }),
   ],

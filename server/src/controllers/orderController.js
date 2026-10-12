@@ -198,8 +198,20 @@ const placeOrder = async (req, res, next) => {
       // Verify the product exists, is available, and belongs to the same restaurant
       const product = await Product.findOne({ _id: productId, restaurantId, isAvailable: true });
       if (!product) {
+        const anyProduct = await Product.findOne({ _id: productId, restaurantId });
+        if (anyProduct && anyProduct.isAvailable === false) {
+          return res.status(409).json({
+            success: false,
+            code: 'ITEM_UNAVAILABLE',
+            unavailableProductId: productId,
+            unavailableProductName: anyProduct.name,
+            message: `"${anyProduct.name}" is currently unavailable.`,
+          });
+        }
         return res.status(404).json({
           success: false,
+          code: 'ITEM_NOT_FOUND',
+          unavailableProductId: productId,
           message: `Product ${productId} not found or unavailable.`,
         });
       }

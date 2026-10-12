@@ -1,4 +1,4 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
@@ -8,6 +8,9 @@ import { useCustomerNotifications } from './hooks/useCustomerNotifications';
 import { useTableSessionPresence } from './hooks/useTableSessionPresence';
 import CustomerNotificationPill from './components/CustomerNotificationPill';
 import RescanModal from './components/RescanModal';
+import OfflineBanner from './components/OfflineBanner';
+import { initNetworkMonitor } from './store/networkStore';
+import { useOrderQueueStore } from './lib/orderQueue';
 
 // ── Code-split pages (loaded on demand) ──────────────────────────────────────
 const Resolve       = lazy(() => import('./pages/Resolve'));
@@ -22,17 +25,13 @@ const NotFound      = lazy(() => import('./pages/NotFound'));
 
 function CustomerNotificationCoordinator() {
   useCustomerNotifications();
-  const { isOffline, rescanRequired, dismissRescan } = useTableSessionPresence();
+  const { rescanRequired, dismissRescan } = useTableSessionPresence();
 
   return (
     <>
+      <OfflineBanner />
       <CustomerNotificationPill />
       {rescanRequired && <RescanModal onDismiss={dismissRescan} />}
-      {isOffline && (
-        <div className="fixed top-0 inset-x-0 z-50 bg-amber-600 text-white text-xs font-semibold py-1 px-4 text-center shadow-md animate-in slide-in-from-top flex items-center justify-center gap-1.5 pointer-events-none">
-          <span>⚠️ You are offline. Please check your internet connection.</span>
-        </div>
-      )}
     </>
   );
 }
@@ -97,6 +96,12 @@ function SessionRoute({ children }) {
 }
 
 export default function App() {
+  useEffect(() => {
+    const cleanup = initNetworkMonitor();
+    useOrderQueueStore.getState().initQueue();
+    return cleanup;
+  }, []);
+
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>

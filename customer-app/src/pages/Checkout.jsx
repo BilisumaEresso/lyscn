@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
-import { v4 as uuidv4 } from 'uuid';
 import toast from 'react-hot-toast';
 import Currency from '../components/Currency';
 import { Minus, Plus, Trash2, ChevronLeft } from 'lucide-react';
@@ -11,6 +10,8 @@ import LoadingIndicator from '../components/ui/LoadingIndicator';
 import { applyBrandColor } from '../lib/theme';
 import { useSessionStore } from '../store/sessionStore';
 import { useCartStore, cartItemCount, cartSubtotal } from '../store/cartStore';
+import { useNetworkStore } from '../store/networkStore';
+import { useOrderQueueStore } from '../lib/orderQueue';
 import StrictLocationGate from '../components/StrictLocationGate';
 import PermissionsPrompt from '../components/PermissionsPrompt';
 import PoweredBy from '../components/PoweredBy';
@@ -23,13 +24,17 @@ export default function Checkout() {
   const items       = useCartStore((s) => s.items);
   const removeItem  = useCartStore((s) => s.removeItem);
   const clearCart   = useCartStore((s) => s.clearCart);
+  const getClientOrderId = useCartStore((s) => s.getClientOrderId);
   const itemCount   = useCartStore(cartItemCount);
   const subtotal    = useCartStore(cartSubtotal);
 
   const [guestName, setGuestName] = useState(session.guestName || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [logoImgError, setLogoImgError] = useState(false);
-  const clientOrderIdRef = useRef(uuidv4());
+
+  // Payload cached for fallback enqueuing on network error
+  const pendingPayloadRef = useRef(null);
+  const pendingSnapshotRef = useRef(null);
 
   const { restaurant, branch, table, sessionId, sessionToken } = session;
 
@@ -62,8 +67,39 @@ export default function Checkout() {
       });
       navigate(`/order/${data.order._id}`, { replace: true });
     },
-    onError: (err) => {
+    onError: async (err) => {
       setIsSubmitting(false);
+
+      // Check if network went down during order placement
+      const isNetworkError =
+        !err.response ||
+        err.code === 'ERR_NETWORK' ||
+        err.code === 'ECONNABORTED' ||
+        (err.response?.status && err.response.status >= 502);
+
+      if (isNetworkError && pendingPayloadRef.current) {
+        useNetworkStore.getState().reportNetworkFailure();
+        await useOrderQueueStore.getState().enqueueOrder(
+          pendingPayloadRef.current,
+          pendingSnapshotRef.current
+        );
+        clearCart();
+        if (guestName.trim()) {
+          useSessionStore.getState().setGuestName(guestName.trim());
+        }
+        saveVisitedRestaurant({
+          restaurant,
+          branch,
+          qrToken: session.qrToken,
+        });
+        toast.success(
+          'Network offline: Your order was safely queued and will automatically sync to the kitchen upon reconnecting!',
+          { duration: 6000, icon: '📥' }
+        );
+        navigate('/orders', { replace: true });
+        return;
+      }
+
       if (err.response?.status === 401 || err.response?.data?.message?.includes('session has expired')) {
         toast.error('Your session has ended — please scan the QR code again to continue ordering.');
         useSessionStore.getState().clearSession();
@@ -75,11 +111,15 @@ export default function Checkout() {
         toast.error('Physical location verification required to place an order.');
         return;
       }
+      if (err.response?.data?.code === 'ITEM_UNAVAILABLE') {
+        toast.error(err.response.data.message || 'An item in your cart is unavailable.');
+        return;
+      }
       toast.error(err.response?.data?.message || 'Failed to place order — please try again.');
     },
   });
 
-  const handlePlaceOrder = () => {
+  const handlePlaceOrder = async () => {
     if (items.length === 0 || isSubmitting || placeMutation.isPending) return;
 
     const hasGps = Number.isFinite(branch?.location?.lat) && Number.isFinite(branch?.location?.lng);
@@ -89,6 +129,8 @@ export default function Checkout() {
     }
 
     setIsSubmitting(true);
+
+    const clientOrderId = getClientOrderId();
 
     const orderItems = items.map((item) => ({
       productId:         item.productId,
@@ -105,16 +147,50 @@ export default function Checkout() {
       itemNotes:         item.itemNotes ? item.itemNotes.trim() : '',
     }));
 
-    placeMutation.mutate({
+    const payload = {
       restaurantId:  restaurant._id,
       branchId:      branch._id,
       tableId:       table._id,
       sessionId,
       sessionToken,
-      clientOrderId: clientOrderIdRef.current,
+      clientOrderId,
       guestName:     guestName.trim() || null,
       items:         orderItems,
-    });
+    };
+
+    const cartSnapshot = {
+      items: [...items],
+      subtotal,
+      restaurantName: restaurant?.name || '',
+      tableName: table?.name || table?.number || '',
+    };
+
+    pendingPayloadRef.current = payload;
+    pendingSnapshotRef.current = cartSnapshot;
+
+    // Check online status before attempting mutation
+    const isOnline = useNetworkStore.getState().isOnline;
+    if (!isOnline) {
+      await useOrderQueueStore.getState().enqueueOrder(payload, cartSnapshot);
+      clearCart();
+      setIsSubmitting(false);
+      if (guestName.trim()) {
+        useSessionStore.getState().setGuestName(guestName.trim());
+      }
+      saveVisitedRestaurant({
+        restaurant,
+        branch,
+        qrToken: session.qrToken,
+      });
+      toast.success(
+        'Offline: Order queued! It will automatically send to the kitchen once internet reconnects.',
+        { duration: 6000, icon: '📥' }
+      );
+      navigate('/orders', { replace: true });
+      return;
+    }
+
+    placeMutation.mutate(payload);
   };
 
   const adjustQty = (idx, delta) => {

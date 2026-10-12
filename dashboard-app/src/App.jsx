@@ -1,12 +1,35 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import { useAuthStore } from './store/authStore';
+import { useNetworkStore, initNetworkMonitor } from './store/networkStore';
 import ErrorBoundary from './components/ErrorBoundary';
 
 // Layout
 import AppShell from './components/layout/AppShell';
+
+function DashboardOfflineBanner() {
+  const isOnline = useNetworkStore((s) => s.isOnline);
+  const isChecking = useNetworkStore((s) => s.isChecking);
+  const checkConnection = useNetworkStore((s) => s.checkConnection);
+
+  if (isOnline) return null;
+
+  return (
+    <div className="fixed top-0 inset-x-0 z-50 bg-amber-600 text-white text-xs font-semibold py-2 px-4 shadow-md flex items-center justify-between">
+      <span>⚠️ Dashboard is offline. Live order updates paused.</span>
+      <button
+        type="button"
+        onClick={() => checkConnection()}
+        disabled={isChecking}
+        className="bg-white/20 hover:bg-white/30 text-white px-2.5 py-1 rounded text-xs transition cursor-pointer"
+      >
+        {isChecking ? 'Checking…' : 'Retry'}
+      </button>
+    </div>
+  );
+}
 
 // ── Code-split pages ──────────────────────────────────────────────────────────
 const Login      = lazy(() => import('./pages/Login'));
@@ -77,10 +100,16 @@ function DashboardHome() {
 }
 
 export default function App() {
+  useEffect(() => {
+    const cleanup = initNetworkMonitor();
+    return cleanup;
+  }, []);
+
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
+          <DashboardOfflineBanner />
           <Suspense fallback={<PageSkeleton />}>
             <Routes>
               {/* Public routes */}

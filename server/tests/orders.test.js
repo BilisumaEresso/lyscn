@@ -149,6 +149,40 @@ describe('Orders API', () => {
       expect(res2.body.reused).toBe(true);
       expect(res2.body.order._id).toBe(res1.body.order._id);
     });
+
+    it('should reject with 409 and ITEM_UNAVAILABLE when an item is marked unavailable', async () => {
+      const prodRes = await request(app)
+        .post('/api/products')
+        .set('Authorization', `Bearer ${chainData.accessToken}`)
+        .send({
+          categoryId: chainData.category._id,
+          name: 'Sold Out Special Doro Wat',
+          price: 120,
+        });
+      expect(prodRes.status).toBe(201);
+      const prodId = prodRes.body.product._id;
+
+      await request(app)
+        .patch(`/api/products/${prodId}`)
+        .set('Authorization', `Bearer ${chainData.accessToken}`)
+        .send({ isAvailable: false });
+
+      const payload = {
+        tableId: chainData.table._id,
+        restaurantId: chainData.restaurant._id,
+        branchId: chainData.branch._id,
+        sessionId: chainData.sessionId,
+        sessionToken: chainData.sessionToken,
+        clientOrderId: crypto.randomUUID(),
+        items: [{ productId: prodId, qty: 1 }],
+      };
+
+      const res = await request(app).post('/api/orders/public').send(payload);
+      expect(res.status).toBe(409);
+      expect(res.body.success).toBe(false);
+      expect(res.body.code).toBe('ITEM_UNAVAILABLE');
+      expect(res.body.unavailableProductName).toBe('Sold Out Special Doro Wat');
+    });
   });
 
   describe('Order Status and Management', () => {

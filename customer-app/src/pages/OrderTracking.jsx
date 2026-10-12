@@ -32,6 +32,8 @@ import { applyBrandColor } from '../lib/theme';
 import { useSessionStore } from '../store/sessionStore';
 import { useCartStore } from '../store/cartStore';
 import { useCustomerNotificationStore } from '../store/customerNotificationStore';
+import { useOrderQueueStore } from '../lib/orderQueue';
+import { useNetworkStore } from '../store/networkStore';
 import AssistanceButton from '../components/AssistanceButton';
 import PermissionsPrompt from '../components/PermissionsPrompt';
 import InstallAppCTA from '../components/InstallAppCTA';
@@ -129,6 +131,7 @@ export default function OrderTracking() {
   const [viewingQrModal, setViewingQrModal] = useState(null); // { type, name, qrCodeUrl }
 
   const { soundEnabled, setSoundEnabled } = useCustomerNotificationStore();
+  const queuedOrders = useOrderQueueStore((s) => s.queue.filter((q) => q.status === 'pending' || q.status === 'syncing'));
 
   const handleStartFreshOrder = () => {
     // 1. Immediately empty the cart so fresh order starts with a clean slate
@@ -430,6 +433,52 @@ export default function OrderTracking() {
       <div className="px-4 pt-1 pb-2">
         <InstallAppCTA variant="card" />
       </div>
+
+      {/* ── Offline Queued Orders Notice ─────────────────────────────── */}
+      {queuedOrders.length > 0 && (
+        <div className="mx-4 my-2 px-4 py-3 rounded-2xl bg-amber-50 border-2 border-amber-400 shadow-sm animate-in fade-in">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping" />
+              <h4 className="font-bold text-amber-950 text-xs uppercase tracking-wider">
+                Offline Queued Order{queuedOrders.length > 1 ? 's' : ''} ({queuedOrders.length})
+              </h4>
+            </div>
+            <button
+              onClick={() => {
+                useNetworkStore.getState().checkConnection();
+                useOrderQueueStore.getState().flushQueue();
+              }}
+              className="text-[11px] font-semibold bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+            >
+              Sync Now
+            </button>
+          </div>
+          <p className="text-xs text-amber-900 mb-2">
+            Saved securely in IndexedDB. Will transmit to the kitchen automatically once the network reconnects.
+          </p>
+          <div className="space-y-1.5">
+            {queuedOrders.map((q) => (
+              <div
+                key={q.clientOrderId}
+                className="text-xs bg-white/90 p-2.5 rounded-xl border border-amber-200 flex justify-between items-center shadow-2xs"
+              >
+                <div>
+                  <span className="font-semibold text-ink">
+                    {q.cartSnapshot?.itemCount || q.payload?.items?.length || 1} items
+                  </span>
+                  <span className="text-ink-muted ml-2 text-[11px]">
+                    ID: {q.clientOrderId.slice(0, 8)}…
+                  </span>
+                </div>
+                <span className="font-bold text-ink">
+                  {formatBirr(q.cartSnapshot?.subtotal || 0)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Finished Rounds Settled Notice ───────────────────────────── */}
       {finishedRounds.length > 0 && activeRounds.length > 0 && (

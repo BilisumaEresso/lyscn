@@ -31,23 +31,6 @@ export default defineConfig({
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,png,jpg,jpeg,ico,json}"],
         importScripts: ["/sw-notifications.js"],
-        // Keep API runtime caching intentionally light: order/table/menu data must never be served stale.
-        runtimeCaching: [
-          {
-            urlPattern: ({ url }) =>
-              url.pathname.startsWith("/api/") ||
-              url.pathname.includes("/api/"),
-            handler: "NetworkFirst",
-            options: {
-              networkTimeoutSeconds: 5,
-              cacheName: "layoscan-api-cache",
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 300,
-              },
-            },
-          },
-        ],
       },
     }),
   ],
