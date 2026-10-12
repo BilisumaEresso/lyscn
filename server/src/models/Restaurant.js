@@ -40,6 +40,7 @@ const restaurantSchema = new mongoose.Schema(
 
     paymentAccounts: {
       telebirr: {
+        accountType:   { type: String, enum: ['merchant', 'phone'], default: 'phone' },
         accountNumber: { type: String, trim: true, default: '' },
         accountName:   { type: String, trim: true, default: '' },
         qrCodeUrl:     { type: String, default: null },

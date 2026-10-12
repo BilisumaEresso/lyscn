@@ -149,6 +149,7 @@ export default function Settings() {
     register("logoUrl");
     register("coverUrl");
     register("qrCardTemplate");
+    register("telebirrAccountType");
     register("telebirrQrUrl");
     register("cbeQrUrl");
     register("awashQrUrl");
@@ -159,6 +160,7 @@ export default function Settings() {
   const logoUrl = watch("logoUrl");
   const coverUrl = watch("coverUrl");
   const qrCardTemplate = watch("qrCardTemplate") || "cafe_artisan";
+  const telebirrAccountType = watch("telebirrAccountType") || "phone";
   const telebirrQrUrl = watch("telebirrQrUrl");
   const cbeQrUrl = watch("cbeQrUrl");
   const awashQrUrl = watch("awashQrUrl");
@@ -182,6 +184,7 @@ export default function Settings() {
       tiktok: restaurant.socialLinks?.tiktok ?? "",
       website: restaurant.socialLinks?.website ?? "",
       qrCardTemplate: restaurant.qrCardTemplate ?? "cafe_artisan",
+      telebirrAccountType: pa.telebirr?.accountType || (pa.telebirr?.qrCodeUrl ? 'merchant' : 'phone'),
       telebirrNumber: pa.telebirr?.accountNumber ?? "",
       telebirrName: pa.telebirr?.accountName ?? "",
       telebirrQrUrl: pa.telebirr?.qrCodeUrl ?? "",
@@ -218,6 +221,7 @@ export default function Settings() {
         tiktok: d.restaurant.socialLinks?.tiktok ?? "",
         website: d.restaurant.socialLinks?.website ?? "",
         qrCardTemplate: d.restaurant.qrCardTemplate ?? "cafe_artisan",
+        telebirrAccountType: pa.telebirr?.accountType || (pa.telebirr?.qrCodeUrl ? 'merchant' : 'phone'),
         telebirrNumber: pa.telebirr?.accountNumber ?? "",
         telebirrName: pa.telebirr?.accountName ?? "",
         telebirrQrUrl: pa.telebirr?.qrCodeUrl ?? "",
@@ -259,9 +263,10 @@ export default function Settings() {
       },
       paymentAccounts: {
         telebirr: {
+          accountType: form.telebirrAccountType || "phone",
           accountNumber: form.telebirrNumber?.trim() || "",
           accountName: form.telebirrName?.trim() || "",
-          qrCodeUrl: form.telebirrQrUrl?.trim() || null,
+          qrCodeUrl: form.telebirrAccountType === "merchant" ? (form.telebirrQrUrl?.trim() || null) : null,
           isActive: Boolean(form.telebirrNumber?.trim()),
         },
         cbeBirr: {
@@ -571,30 +576,81 @@ export default function Settings() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                <Input
-                  label="Telebirr Number or Till ID"
-                  placeholder="0911223344 or 123456"
-                  {...register("telebirrNumber")}
-                />
-                <Input
-                  label="Registered Account Name"
-                  placeholder="e.g. Abebe Cafe Enterprise"
-                  {...register("telebirrName")}
-                />
+              <div className="pt-1">
+                <label className="block text-xs font-semibold text-ink-muted mb-1.5">
+                  Telebirr Account Type
+                </label>
+                <div className="grid grid-cols-2 gap-2 bg-white/70 p-1 rounded-xl border border-blue-200/60">
+                  <button
+                    type="button"
+                    onClick={() => setValue("telebirrAccountType", "phone", { shouldDirty: true })}
+                    className={`py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                      telebirrAccountType === "phone"
+                        ? "bg-white text-blue-700 shadow-2xs border border-blue-200 font-bold"
+                        : "text-ink-muted hover:text-ink"
+                    }`}
+                  >
+                    <span>📱 Personal Phone Transfer</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setValue("telebirrAccountType", "merchant", { shouldDirty: true })}
+                    className={`py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                      telebirrAccountType === "merchant"
+                        ? "bg-white text-blue-700 shadow-2xs border border-blue-200 font-bold"
+                        : "text-ink-muted hover:text-ink"
+                    }`}
+                  >
+                    <span>🏪 Merchant / Till Standee</span>
+                  </button>
+                </div>
               </div>
 
-              <div className="pt-2">
-                <label className="block text-xs font-semibold text-ink-muted mb-1.5">
-                  Telebirr Payment QR Image (Optional)
-                </label>
-                <ImageUploader
-                  value={telebirrQrUrl}
-                  onChange={(url) => setValue("telebirrQrUrl", url || "", { shouldDirty: true })}
-                  aspectRatio="1:1"
-                  helperText="Upload your official Telebirr merchant QR code for customer phone-to-phone scanning."
-                />
-              </div>
+              {telebirrAccountType === "phone" ? (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <Input
+                      label="Telebirr Phone Number"
+                      placeholder="0911223344"
+                      {...register("telebirrNumber")}
+                    />
+                    <Input
+                      label="Account Holder Name"
+                      placeholder="e.g. Biniyam"
+                      {...register("telebirrName")}
+                    />
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-blue-100/60 border border-blue-200/70 text-[11px] text-blue-900 leading-relaxed">
+                    💡 <b>Direct Phone Transfer:</b> Guests transfer directly to this number via Telebirr <b>Send Money</b> or dialing <b>*127#</b>. A copiable phone card is displayed on the waiter screen with no broken camera scanner errors.
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <Input
+                      label="Merchant Till Number / Shortcode"
+                      placeholder="e.g. 123456"
+                      {...register("telebirrNumber")}
+                    />
+                    <Input
+                      label="Registered Merchant Name"
+                      placeholder="e.g. Cafe Artisan"
+                      {...register("telebirrName")}
+                    />
+                  </div>
+                  <div className="pt-2">
+                    <label className="block text-xs font-semibold text-ink-muted mb-1.5">
+                      Official Telebirr Merchant QR Image (Optional)
+                    </label>
+                    <ImageUploader
+                      value={telebirrQrUrl}
+                      onChange={(url) => setValue("telebirrQrUrl", url || "", { shouldDirty: true })}
+                      aspectRatio="1:1"
+                      helperText="Upload your official green Telebirr merchant counter standee QR code for customer phone-to-phone scanning."
+                    />
+                  </div>
+                </>
+              )}
             </div>
 
             {/* CBE Birr Section */}

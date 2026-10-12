@@ -760,29 +760,12 @@ export default function WaiterView() {
                   })
                 : '';
 
-              // Generate dynamic EMVCo CPV01 Telebirr QR if Telebirr is selected
-              const telebirrDynamicPayload = isConfigured && selectedPaymentMethod === 'telebirr'
-                ? buildTelebirrDynamicQrPayload({
-                    phone: bankDetails.accountNumber,
-                    amount: selectedTableForSettle?.unpaidTotal,
-                  })
-                : '';
-
               const isDynamicCbe = selectedPaymentMethod === 'cbebirr' && Boolean(cbeDynamicPayload);
               const showDynamicCbe = isDynamicCbe && (cbeQrMode === 'dynamic' || !bankDetails.qrCodeUrl);
 
-              const isDynamicTelebirr = selectedPaymentMethod === 'telebirr' && Boolean(telebirrDynamicPayload);
-              const showDynamicTelebirr = isDynamicTelebirr && (telebirrQrMode === 'dynamic' || !bankDetails.qrCodeUrl);
-
-              const isAnyDynamic = showDynamicCbe || showDynamicTelebirr;
-              const activeDynamicPayload = showDynamicCbe ? cbeDynamicPayload : telebirrDynamicPayload;
-              const activeDynamicLogo = showDynamicCbe ? '/banks_logo/CBE.png' : '/banks_logo/telebirr.png';
-              const activeDynamicBorder = showDynamicCbe ? 'border-purple-200/80' : 'border-blue-200/80';
-              const activeDynamicBadgeBg = showDynamicCbe ? 'bg-purple-50 border-purple-200 text-purple-900' : 'bg-blue-50 border-blue-200 text-blue-900';
-              const activeDynamicIconColor = showDynamicCbe ? 'text-purple-600' : 'text-blue-600';
-              const activeDynamicScanMsg = showDynamicCbe
-                ? 'Hold phone towards guest to scan with CBE Mobile Banking / CBE Birr'
-                : 'Hold phone towards guest to scan with Telebirr App';
+              const isTelebirr = selectedPaymentMethod === 'telebirr';
+              const isTelebirrMerchant = isTelebirr && bankDetails.accountType === 'merchant';
+              const isTelebirrPhone = isTelebirr && !isTelebirrMerchant;
 
               return (
                 <div className="p-3.5 rounded-2xl bg-paper border border-ink/8 space-y-3 animate-fade-in">
@@ -801,10 +784,14 @@ export default function WaiterView() {
                                   <span>Dynamic</span>
                                 </span>
                               )}
-                              {selectedPaymentMethod === 'telebirr' && isDynamicTelebirr && (
+                              {isTelebirrMerchant && (
                                 <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-100 text-blue-700 border border-blue-200">
-                                  <Zap size={9} className="text-blue-600 fill-blue-600" />
-                                  <span>Dynamic</span>
+                                  <span>Till / Merchant</span>
+                                </span>
+                              )}
+                              {isTelebirrPhone && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
+                                  <span>Phone Transfer</span>
                                 </span>
                               )}
                             </div>
@@ -815,7 +802,7 @@ export default function WaiterView() {
                         </div>
 
                         <div className="flex items-center gap-1.5">
-                          {/* Toggle between Dynamic and Static QR if merchant has uploaded an image */}
+                          {/* Toggle between Dynamic and Static QR for CBE if merchant has uploaded an image */}
                           {isDynamicCbe && bankDetails.qrCodeUrl && (
                             <div className="flex items-center bg-ink/5 p-0.5 rounded-lg text-[10px] font-semibold">
                               <button
@@ -839,30 +826,7 @@ export default function WaiterView() {
                             </div>
                           )}
 
-                          {isDynamicTelebirr && bankDetails.qrCodeUrl && (
-                            <div className="flex items-center bg-ink/5 p-0.5 rounded-lg text-[10px] font-semibold">
-                              <button
-                                type="button"
-                                onClick={() => setTelebirrQrMode('dynamic')}
-                                className={`px-2 py-0.5 rounded transition-all ${
-                                  showDynamicTelebirr ? 'bg-white shadow-2xs text-blue-700 font-bold' : 'text-ink-muted hover:text-ink'
-                                }`}
-                              >
-                                Dynamic
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setTelebirrQrMode('static')}
-                                className={`px-2 py-0.5 rounded transition-all ${
-                                  !showDynamicTelebirr ? 'bg-white shadow-2xs text-ink font-bold' : 'text-ink-muted hover:text-ink'
-                                }`}
-                              >
-                                Static
-                              </button>
-                            </div>
-                          )}
-
-                          {(isAnyDynamic || bankDetails.qrCodeUrl) && (
+                          {(showDynamicCbe || (bankDetails.qrCodeUrl && !isTelebirrPhone)) && (
                             <button
                               type="button"
                               onClick={() => setPresentQrFullScreen(!presentQrFullScreen)}
@@ -875,34 +839,66 @@ export default function WaiterView() {
                         </div>
                       </div>
 
-                      {/* Waiter Presentation Zone: QR Code for Diner to Scan from Waiter Screen */}
+                      {/* Waiter Presentation Zone */}
                       <div className="flex flex-col items-center justify-center p-3 bg-white rounded-xl border border-ink/6 shadow-inner text-center">
-                        {isAnyDynamic ? (
+                        {showDynamicCbe ? (
                           <div className={`transition-all duration-200 flex flex-col items-center ${presentQrFullScreen ? 'p-3 bg-white rounded-2xl shadow-lg border-2 border-primary' : ''}`}>
-                            <div className={`p-2.5 bg-white rounded-xl border ${activeDynamicBorder} shadow-xs inline-block`}>
+                            <div className="p-2.5 bg-white rounded-xl border border-purple-200/80 shadow-xs inline-block">
                               <QRCodeSVG
-                                value={activeDynamicPayload}
+                                value={cbeDynamicPayload}
                                 size={presentQrFullScreen ? 230 : 150}
                                 level="H"
                                 includeMargin={true}
                                 imageSettings={{
-                                  src: activeDynamicLogo,
+                                  src: '/banks_logo/CBE.png',
                                   height: presentQrFullScreen ? 32 : 24,
                                   width: presentQrFullScreen ? 32 : 24,
                                   excavate: true,
                                 }}
                               />
                             </div>
-                            <div className={`mt-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-semibold ${activeDynamicBadgeBg}`}>
-                              <Sparkles size={12} className={`${activeDynamicIconColor} shrink-0`} />
+                            <div className="mt-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-semibold bg-purple-50 border-purple-200 text-purple-900">
+                              <Sparkles size={12} className="text-purple-600 shrink-0" />
                               <span>
-                                Prefilled: <b>Br {Number(selectedTableForSettle.unpaidTotal || 0).toLocaleString()}</b>
-                                {showDynamicCbe ? <> & <b>{tableRefRemark}</b></> : ''}
+                                Prefilled: <b>Br {Number(selectedTableForSettle.unpaidTotal || 0).toLocaleString()}</b> & <b>{tableRefRemark}</b>
                               </span>
                             </div>
                             <p className="text-[11px] font-medium text-ink-muted mt-1">
-                              {activeDynamicScanMsg}
+                              Hold phone towards guest to scan with CBE Mobile Banking / CBE Birr
                             </p>
+                          </div>
+                        ) : isTelebirrPhone ? (
+                          <div className="w-full py-1 space-y-2 text-left">
+                            <div className="p-3 bg-blue-50/70 border border-blue-200/80 rounded-xl space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-blue-900">
+                                  Telebirr P2P Transfer
+                                </span>
+                                <span className="px-2 py-0.5 rounded-full bg-blue-200/80 text-blue-900 font-bold text-[10px]">
+                                  Send Money / *127#
+                                </span>
+                              </div>
+                              <p className="text-xs text-blue-950 font-medium leading-relaxed">
+                                Ask guest to open Telebirr &gt; <b>Send Money</b> (or dial <b>*127#</b>) to transfer <b className="text-blue-900"><Currency value={selectedTableForSettle.unpaidTotal} /></b>:
+                              </p>
+                              <div className="flex items-center justify-between bg-white p-2.5 rounded-lg border border-blue-200 shadow-2xs">
+                                <div>
+                                  <span className="text-[9px] uppercase tracking-wider text-ink-muted font-bold block">Phone Number</span>
+                                  <span className="font-mono font-bold text-base text-blue-950">{bankDetails.accountNumber}</span>
+                                  {bankDetails.accountName && (
+                                    <span className="text-[11px] text-ink-muted block mt-0.5">Name: <b>{bankDetails.accountName}</b></span>
+                                  )}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => copyToClipboard(bankDetails.accountNumber, 'account', 'phone number')}
+                                  className="px-3 py-1.5 rounded-lg bg-blue-600 text-white font-semibold text-xs flex items-center gap-1.5 hover:bg-blue-700 shadow-2xs shrink-0"
+                                >
+                                  {copiedKey === 'account' ? <Check size={13} /> : <Copy size={13} />}
+                                  <span>{copiedKey === 'account' ? 'Copied' : 'Copy Phone'}</span>
+                                </button>
+                              </div>
+                            </div>
                           </div>
                         ) : bankDetails.qrCodeUrl ? (
                           <div className={`transition-all duration-200 ${presentQrFullScreen ? 'p-3 bg-white rounded-2xl shadow-lg border-2 border-primary' : ''}`}>
@@ -912,33 +908,37 @@ export default function WaiterView() {
                               className={`object-contain rounded-lg mx-auto ${presentQrFullScreen ? 'w-56 h-56' : 'w-32 h-32'}`}
                             />
                             <p className="text-[11px] font-semibold text-primary mt-1.5 flex items-center justify-center gap-1">
-                              <span>Hold phone towards guest to scan</span>
+                              <span>Hold phone towards guest to scan with {bankName}</span>
                             </p>
                           </div>
                         ) : (
                           <div className="py-2 space-y-1">
                             <span className="text-xs text-ink-muted">No QR image uploaded for {bankName}</span>
-                            <p className="text-[11px] text-ink-muted">Guest can transfer directly to the account number below</p>
+                            <p className="text-[11px] text-ink-muted">Guest can transfer directly to the account / till number below</p>
                           </div>
                         )}
 
-                        {/* Account Number & 1-Tap Copy */}
-                        <div className="mt-2.5 w-full flex items-center justify-between bg-paper p-2 rounded-xl border border-ink/6">
-                          <div className="text-left min-w-0 pr-2">
-                            <span className="text-[9px] uppercase tracking-wider text-ink-muted font-bold block">Account / Phone</span>
-                            <span className="font-mono font-bold text-xs sm:text-sm text-ink truncate block">
-                              {bankDetails.accountNumber}
-                            </span>
+                        {/* Account Number & 1-Tap Copy (rendered for merchant mode, CBE, Awash, etc.) */}
+                        {!isTelebirrPhone && (
+                          <div className="mt-2.5 w-full flex items-center justify-between bg-paper p-2 rounded-xl border border-ink/6">
+                            <div className="text-left min-w-0 pr-2">
+                              <span className="text-[9px] uppercase tracking-wider text-ink-muted font-bold block">
+                                {isTelebirrMerchant ? 'Merchant Till ID' : 'Account / Phone'}
+                              </span>
+                              <span className="font-mono font-bold text-xs sm:text-sm text-ink truncate block">
+                                {bankDetails.accountNumber}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(bankDetails.accountNumber, 'account', 'account number')}
+                              className="px-2.5 py-1 rounded-lg bg-white border border-ink/12 text-xs font-semibold text-ink flex items-center gap-1 hover:bg-ink/5 shadow-2xs shrink-0"
+                            >
+                              {copiedKey === 'account' ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                              <span>{copiedKey === 'account' ? 'Copied' : 'Copy'}</span>
+                            </button>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => copyToClipboard(bankDetails.accountNumber, 'account', 'account number')}
-                            className="px-2.5 py-1 rounded-lg bg-white border border-ink/12 text-xs font-semibold text-ink flex items-center gap-1 hover:bg-ink/5 shadow-2xs shrink-0"
-                          >
-                            {copiedKey === 'account' ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
-                            <span>{copiedKey === 'account' ? 'Copied' : 'Copy'}</span>
-                          </button>
-                        </div>
+                        )}
                       </div>
 
                       {/* Reference Helper */}

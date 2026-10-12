@@ -28,7 +28,7 @@ router.use(protect, resolveTenantFromAuth);
 router.get('/',                            listOrders);
 router.patch('/:id/status',                updateOrderStatus);
 router.patch('/:id/assign',                assignOrder);
-router.patch('/:id/payment',               restrictTo('owner', 'manager'), updateOrderPayment);
-router.patch('/table/:tableId/payment',    restrictTo('owner', 'manager'), updateTablePayment);
+router.patch('/:id/payment',               restrictTo('owner', 'manager', 'coordinator', 'waiter'), updateOrderPayment);
+router.patch('/table/:tableId/payment',    restrictTo('owner', 'manager', 'coordinator', 'waiter'), updateTablePayment);
 
 module.exports = router;
