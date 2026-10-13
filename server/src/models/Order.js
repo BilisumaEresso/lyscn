@@ -19,6 +19,25 @@ const selectedSpecSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const paymentRecordSchema = new mongoose.Schema(
+  {
+    paymentId:        { type: String, required: true },
+    amount:           { type: Number, required: true, min: 0 },
+    tipAmount:        { type: Number, default: 0, min: 0 },
+    paymentMethod:    {
+      type: String,
+      enum: ['cash', 'pos', 'telebirr', 'cbebirr', 'awash', 'other'],
+      required: true,
+    },
+    paymentReference: { type: String, default: null },
+    collectedBy:      { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    waiterId:         { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    notes:            { type: String, default: '' },
+    createdAt:        { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
 const orderItemSchema = new mongoose.Schema(
   {
     productId: {
@@ -26,9 +45,12 @@ const orderItemSchema = new mongoose.Schema(
       ref: 'Product',
       required: true,
     },
-    name:      { type: String, required: true }, // snapshot at time of order
-    qty:       { type: Number, required: true, min: 1 },
-    unitPrice: { type: Number, required: true },
+    name:           { type: String, required: true }, // snapshot at time of order
+    portionName:    { type: String, default: 'Standard' },
+    portionAmharic: { type: String, default: '' },
+    serves:         { type: Number, default: 1 },
+    qty:            { type: Number, required: true, min: 1 },
+    unitPrice:      { type: Number, required: true },
     selectedModifiers: [selectedModifierSchema],
     selectedSpecs:     [selectedSpecSchema],
     quickTags:         [{ type: String, trim: true }],
@@ -60,6 +82,12 @@ const orderSchema = new mongoose.Schema(
       index: true,
     },
 
+    createdSource: {
+      type: String,
+      enum: ['customer_qr', 'waiter_pad', 'cashier_pos'],
+      default: 'customer_qr',
+    },
+
     // Client-generated UUID that groups items from the same ordering session
     sessionId: { type: String, required: true },
     // Session token associated with the table session when the order was placed
@@ -78,7 +106,7 @@ const orderSchema = new mongoose.Schema(
 
     paymentStatus: {
       type: String,
-      enum: ['unpaid', 'paid'],
+      enum: ['unpaid', 'partially_paid', 'paid'],
       default: 'unpaid',
     },
 
@@ -88,6 +116,15 @@ const orderSchema = new mongoose.Schema(
       enum: ['cash', 'pos', 'telebirr', 'cbebirr', 'awash', 'other'],
       default: null,
     },
+
+    // Multi-payment financial breakdown
+    serviceChargeRate:   { type: Number, default: 0 },
+    serviceChargeAmount: { type: Number, default: 0 },
+    grossTotal:          { type: Number, default: 0 },
+    totalPaid:           { type: Number, default: 0 },
+    balanceDue:          { type: Number, default: 0 },
+    totalTips:           { type: Number, default: 0 },
+    payments:            [paymentRecordSchema],
 
     // Distributed workflow audit tracking
     acceptedBy:         { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
@@ -115,5 +152,15 @@ const orderSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+orderSchema.pre('save', function (next) {
+  if (this.grossTotal == null || this.grossTotal === 0) {
+    this.grossTotal = Math.round(((this.totalAmount || 0) + (this.serviceChargeAmount || 0)) * 100) / 100;
+  }
+  if (this.balanceDue == null) {
+    this.balanceDue = Math.max(0, Math.round((this.grossTotal - (this.totalPaid || 0)) * 100) / 100);
+  }
+  next();
+});
 
 module.exports = mongoose.model('Order', orderSchema);

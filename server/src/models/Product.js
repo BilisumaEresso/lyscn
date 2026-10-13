@@ -39,6 +39,17 @@ const specGroupSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const portionOptionSchema = new mongoose.Schema(
+  {
+    name:        { type: String, required: true },
+    nameAmharic: { type: String, default: '' },
+    price:       { type: Number, required: true, min: 0 },
+    serves:      { type: Number, default: 1 },
+    isDefault:   { type: Boolean, default: false },
+  },
+  { _id: false }
+);
+
 // ── Main schema ───────────────────────────────────────────────────────────────
 const productSchema = new mongoose.Schema(
   {
@@ -59,6 +70,13 @@ const productSchema = new mongoose.Schema(
     price:       { type: Number, required: true, min: 0 },
     imageUrl:    { type: String, default: null },
     isAvailable: { type: Boolean, default: true },
+
+    // Fasting & Dietary
+    isFasting:   { type: Boolean, default: false },
+    dietaryTags: [{ type: String, trim: true }],
+
+    // Portions & Shared Dishes (serves N, Half/Full)
+    portions:    [portionOptionSchema],
 
     modifierGroups: [modifierGroupSchema],
     specs:          [specGroupSchema],

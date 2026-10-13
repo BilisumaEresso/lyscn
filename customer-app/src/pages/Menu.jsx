@@ -45,6 +45,10 @@ function ProductSheet({ product, categoryName, onClose }) {
   const specs = product.specs ?? [];
   const quickTagsList = product.quickTags ?? [];
 
+  const portions = product.portions ?? [];
+  const defaultPortion = portions.find((p) => p.isDefault) || portions[0] || null;
+  const [selectedPortion, setSelectedPortion] = useState(defaultPortion);
+
   // Default required specs to first option for an effortless Ethiopian ordering flow
   const [selectedSpecs, setSelectedSpecs] = useState(() => {
     const initial = {};
@@ -87,9 +91,10 @@ function ProductSheet({ product, categoryName, onClose }) {
     return list;
   };
 
+  const basePrice = selectedPortion ? selectedPortion.price : product.price;
   const modifierExtra = getSelectedOptions().reduce((s, m) => s + m.priceDelta, 0);
   const specExtra = getSelectedSpecsList().reduce((s, m) => s + m.priceDelta, 0);
-  const unitPrice = product.price + modifierExtra + specExtra;
+  const unitPrice = basePrice + modifierExtra + specExtra;
   const total = unitPrice * qty;
 
   const allRequiredModifiersMet = groups
@@ -137,6 +142,7 @@ function ProductSheet({ product, categoryName, onClose }) {
     addItem({
       productId: product._id,
       name: product.name,
+      portionName: selectedPortion?.name,
       unitPrice,
       qty,
       selectedModifiers: getSelectedOptions(),
@@ -145,7 +151,7 @@ function ProductSheet({ product, categoryName, onClose }) {
       itemNotes: itemNotes.trim(),
       subtotal: total,
     });
-    toast.success(`Added ${qty}× ${product.name}`);
+    toast.success(`Added ${qty}× ${product.name}${selectedPortion ? ` (${selectedPortion.nameAmharic || selectedPortion.name})` : ''}`);
     onClose();
   };
 
@@ -199,17 +205,70 @@ function ProductSheet({ product, categoryName, onClose }) {
 
           <div className="px-5 pt-4">
             <div className="flex items-start justify-between gap-3 mb-2">
-              <h2 className="font-display font-bold text-xl text-ink leading-tight flex-1">
-                {product.name}
-              </h2>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h2 className="font-display font-bold text-xl text-ink leading-tight">
+                    {product.name}
+                  </h2>
+                  {product.isFasting && (
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300 shrink-0">
+                      🌱 የጾም
+                    </span>
+                  )}
+                </div>
+                {product.nameAmharic && (
+                  <p className="text-sm text-ink-muted mt-0.5">{product.nameAmharic}</p>
+                )}
+              </div>
               <span className="font-display font-bold text-xl text-ink shrink-0">
-                <Currency value={product.price} />
+                <Currency value={basePrice} />
               </span>
             </div>
             {product.description && (
-              <p className="text-ink-muted text-sm leading-relaxed mb-5">
+              <p className="text-ink-muted text-sm leading-relaxed mb-4">
                 {product.description}
               </p>
+            )}
+
+            {/* ── Portion Selector (Half / Full / Serves N) ── */}
+            {portions.length > 0 && (
+              <div className="mb-5 p-3 rounded-2xl bg-teal/5 border border-teal/20">
+                <span className="text-xs font-bold text-ink uppercase tracking-wider block mb-2">
+                  Select Portion / መጠን
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  {portions.map((po) => {
+                    const isChosen = selectedPortion?.name === po.name;
+                    return (
+                      <button
+                        key={po.name}
+                        type="button"
+                        onClick={() => setSelectedPortion(po)}
+                        className={clsx(
+                          'p-2.5 rounded-xl border text-left transition-all flex flex-col justify-between',
+                          isChosen
+                            ? 'border-teal bg-white text-ink shadow-xs ring-2 ring-teal/30'
+                            : 'border-ink/10 bg-white/60 hover:bg-white text-ink-muted hover:text-ink'
+                        )}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-xs text-ink">
+                            {po.nameAmharic || po.name}
+                          </span>
+                          {po.serves && (
+                            <span className="text-[10px] text-ink-muted">
+                              Serves {po.serves}
+                            </span>
+                          )}
+                        </div>
+                        <span className="font-display font-bold text-xs text-teal mt-1">
+                          <Currency value={po.price} />
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             )}
 
             {/* ── Ethiopian Dining Specs (e.g. Ratio, Fat, Doneness, Fasting) ── */}
@@ -538,6 +597,13 @@ function ProductCard({ product, categoryName, onOpen }) {
             />
           )}
 
+          {product.isFasting && (
+            <div className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded-md bg-emerald-950/80 backdrop-blur-md text-emerald-200 text-[10px] font-bold border border-emerald-400/30 flex items-center gap-1 shadow-sm">
+              <span>🌱</span>
+              <span>የጾም</span>
+            </div>
+          )}
+
           {/* Quick-add button or In-Card Stepper */}
           {!hasRequired ? (
             inCartQty > 0 ? (
@@ -836,6 +902,7 @@ export default function Menu() {
   const [activeCat, setActiveCat] = useState(null);
   const [sheetProduct, setSheetProduct] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [onlyFasting, setOnlyFasting] = useState(false);
   const [slideDirection, setSlideDirection] = useState('none'); // 'left' | 'right' | 'none'
   const [coverImgError, setCoverImgError] = useState(false);
   const [logoImgError, setLogoImgError] = useState(false);
@@ -954,21 +1021,26 @@ export default function Menu() {
     }
   }, [categories, activeCat]);
 
-  // Filtered products: if searching, search all products; otherwise filter by active category
+  // Filtered products: if searching, search all products; otherwise filter by active category; filter by onlyFasting if active
   const filteredProducts = useMemo(() => {
+    let list = products;
+    if (onlyFasting) {
+      list = list.filter((p) => p.isFasting);
+    }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
-      return products.filter(
+      return list.filter(
         (p) =>
           p.name.toLowerCase().includes(q) ||
+          (p.nameAmharic && p.nameAmharic.toLowerCase().includes(q)) ||
           (p.description && p.description.toLowerCase().includes(q)) ||
           (p.categoryId?.name && p.categoryId.name.toLowerCase().includes(q))
       );
     }
     return activeCat
-      ? products.filter((p) => p.categoryId?._id === activeCat)
-      : products;
-  }, [products, activeCat, searchQuery]);
+      ? list.filter((p) => p.categoryId?._id === activeCat)
+      : list;
+  }, [products, activeCat, searchQuery, onlyFasting]);
 
   const handleCatClick = (catId, direction = 'none') => {
     setSlideDirection(direction);
@@ -1116,6 +1188,20 @@ export default function Menu() {
             className="flex items-center gap-2 px-4 py-2.5 overflow-x-auto"
             style={{ scrollbarWidth: 'none' }}
           >
+            {/* Fasting Quick Filter Chip */}
+            <button
+              type="button"
+              onClick={() => setOnlyFasting(!onlyFasting)}
+              className={clsx(
+                'shrink-0 px-3.5 py-2 rounded-full text-sm font-semibold transition-all flex items-center gap-1.5 border shadow-2xs active:scale-95',
+                onlyFasting
+                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                  : 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+              )}
+            >
+              <span>🌱</span>
+              <span>የጾም (Fasting)</span>
+            </button>
             {categories.map((cat) => {
               const isActive = activeCat === cat._id;
               const count = products.filter((p) => p.categoryId?._id === cat._id).length;

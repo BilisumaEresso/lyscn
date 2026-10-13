@@ -1,10 +1,12 @@
-const Order   = require('../models/Order');
-const Product = require('../models/Product');
-const Table   = require('../models/Table');
-const Branch  = require('../models/Branch');
-const User    = require('../models/User');
+const crypto    = require('crypto');
+const Order     = require('../models/Order');
+const Product   = require('../models/Product');
+const Table     = require('../models/Table');
+const Branch    = require('../models/Branch');
+const User      = require('../models/User');
+const orderStateMachine = require('../services/orderStateMachine');
 
-const VALID_STATUSES = ['placed', 'accepted', 'preparing', 'ready', 'served', 'cancelled'];
+const VALID_STATUSES = orderStateMachine.VALID_STATUSES;
 
 // A table can be released manually, but once every non-cancelled order has
 // been served and paid it is useful to surface a clear-table suggestion.
@@ -263,13 +265,39 @@ const placeOrder = async (req, res, next) => {
         : [];
       const safeItemNotes = typeof itemNotes === 'string' ? itemNotes.trim().slice(0, 300) : '';
 
-      const unitPrice = product.price + extraCost;
+      let basePrice = product.price;
+      let portionName = 'Standard';
+      let portionAmharic = '';
+      let serves = 1;
+
+      if (item.portionName && product.portions && product.portions.length > 0) {
+        const foundPortion = product.portions.find((p) => p.name.toLowerCase() === String(item.portionName).toLowerCase());
+        if (foundPortion) {
+          basePrice = foundPortion.price;
+          portionName = foundPortion.name;
+          portionAmharic = foundPortion.nameAmharic || '';
+          serves = foundPortion.serves || 1;
+        }
+      } else if (product.portions && product.portions.length > 0) {
+        const defaultPortion = product.portions.find((p) => p.isDefault) || product.portions[0];
+        if (defaultPortion) {
+          basePrice = defaultPortion.price;
+          portionName = defaultPortion.name;
+          portionAmharic = defaultPortion.nameAmharic || '';
+          serves = defaultPortion.serves || 1;
+        }
+      }
+
+      const unitPrice = basePrice + extraCost;
       const subtotal  = Math.round(unitPrice * qty * 100) / 100;
       totalAmount    += subtotal;
 
       orderItems.push({
         productId: product._id,
         name:      product.name,
+        portionName,
+        portionAmharic,
+        serves,
         qty,
         unitPrice,
         selectedModifiers: resolvedModifiers,
@@ -658,21 +686,13 @@ const updateOrderStatus = async (req, res, next) => {
     const userRole = req.user?.role || 'owner';
     const userId = req.user?.userId;
 
-    // RBAC validation
-    if (userRole === 'kitchen') {
-      if (!['preparing', 'ready'].includes(status)) {
-        return res.status(403).json({
-          success: false,
-          message: 'Kitchen staff can only advance orders to "preparing" or "ready".',
-        });
-      }
-    } else if (userRole === 'waiter') {
-      if (status !== 'served') {
-        return res.status(403).json({
-          success: false,
-          message: 'Waiters can only mark orders as "served" once delivered to the table.',
-        });
-      }
+    const transitionCheck = orderStateMachine.validateTransition(order.status, status, userRole, { cancelReason });
+    if (!transitionCheck.isValid) {
+      return res.status(transitionCheck.code === 'ROLE_FORBIDDEN' ? 403 : 400).json({
+        success: false,
+        code: transitionCheck.code,
+        message: transitionCheck.message,
+      });
     }
 
     order.status = status;
@@ -744,6 +764,7 @@ const updateOrderStatus = async (req, res, next) => {
 const updateOrderPayment = async (req, res, next) => {
   try {
     const userRole = req.user?.role || 'owner';
+    const userId = req.user?.userId;
     if (userRole === 'kitchen') {
       return res.status(403).json({
         success: false,
@@ -751,7 +772,7 @@ const updateOrderPayment = async (req, res, next) => {
       });
     }
 
-    const { paymentMethod } = req.body;
+    const { paymentMethod, tipAmount = 0 } = req.body;
     const VALID_METHODS = ['cash', 'pos', 'telebirr', 'cbebirr', 'awash', 'other'];
 
     if (!paymentMethod || !VALID_METHODS.includes(paymentMethod)) {
@@ -761,23 +782,46 @@ const updateOrderPayment = async (req, res, next) => {
       });
     }
 
-    const order = await Order.findOneAndUpdate(
-      { _id: req.params.id, restaurantId: req.tenantId },
-      { paymentStatus: 'paid', paymentMethod },
-      { new: true }
-    )
-      .populate('tableId', 'label')
-      .populate('branchId', 'name')
-      .populate('assignedWaiterId', 'name phone');
+    const order = await Order.findOne({
+      _id: req.params.id,
+      restaurantId: req.tenantId,
+    });
 
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found.' });
     }
 
+    const gross = order.grossTotal || order.totalAmount;
+    const tip = Number(tipAmount) > 0 ? Number(tipAmount) : 0;
+
+    order.paymentStatus = 'paid';
+    order.paymentMethod = paymentMethod;
+    order.grossTotal = gross;
+    order.totalPaid = gross;
+    order.balanceDue = 0;
+    order.totalTips = (order.totalTips || 0) + tip;
+
+    order.payments.push({
+      paymentId: crypto.randomUUID(),
+      amount: gross,
+      tipAmount: tip,
+      paymentMethod,
+      paymentReference: req.body.paymentReference || null,
+      collectedBy: userId,
+      waiterId: order.assignedWaiterId || userId,
+      createdAt: new Date(),
+    });
+
+    await order.save();
+
+    const populated = await Order.findById(order._id)
+      .populate('tableId', 'label')
+      .populate('branchId', 'name')
+      .populate('assignedWaiterId', 'name phone');
+
     const io = req.app.get('io');
 
     // ── Table-wide payment synchronization ─────────────────────────────────
-    // If the order belongs to a table with other unpaid rounds, mark them paid too!
     const targetTableId = order.tableId?._id || order.tableId;
     if (targetTableId) {
       const siblingUnpaid = await Order.find({
@@ -789,34 +833,44 @@ const updateOrderPayment = async (req, res, next) => {
       });
 
       if (siblingUnpaid.length > 0) {
-        await Order.updateMany(
-          { _id: { $in: siblingUnpaid.map((o) => o._id) } },
-          { $set: { paymentStatus: 'paid', paymentMethod } }
-        );
+        for (const sib of siblingUnpaid) {
+          const sibGross = sib.grossTotal || sib.totalAmount;
+          sib.paymentStatus = 'paid';
+          sib.paymentMethod = paymentMethod;
+          sib.grossTotal = sibGross;
+          sib.totalPaid = sibGross;
+          sib.balanceDue = 0;
+          sib.payments.push({
+            paymentId: crypto.randomUUID(),
+            amount: sibGross,
+            tipAmount: 0,
+            paymentMethod,
+            paymentReference: req.body.paymentReference || null,
+            collectedBy: userId,
+            waiterId: sib.assignedWaiterId || userId,
+            createdAt: new Date(),
+          });
+          await sib.save();
 
-        const updatedSiblings = await Order.find({
-          _id: { $in: siblingUnpaid.map((o) => o._id) },
-        })
-          .populate('tableId', 'label')
-          .populate('branchId', 'name')
-          .populate('assignedWaiterId', 'name phone');
+          const popSib = await Order.findById(sib._id)
+            .populate('tableId', 'label')
+            .populate('branchId', 'name')
+            .populate('assignedWaiterId', 'name phone');
 
-        if (io) {
-          for (const sib of updatedSiblings) {
-            io.to(`restaurant:${sib.restaurantId}`).emit('order:updated', sib);
-            io.to(`order:${sib._id}`).emit('order:updated', sib);
-            io.to(`table:${targetTableId}`).emit('order:updated', sib);
+          if (io) {
+            io.to(`restaurant:${sib.restaurantId}`).emit('order:updated', popSib);
+            io.to(`order:${sib._id}`).emit('order:updated', popSib);
+            io.to(`table:${targetTableId}`).emit('order:updated', popSib);
           }
         }
       }
     }
 
-    // ── Realtime: broadcast to restaurant room, order room, and table room ───
     if (io) {
-      io.to(`restaurant:${order.restaurantId}`).emit('order:updated', order);
-      io.to(`order:${order._id}`).emit('order:updated', order);
+      io.to(`restaurant:${order.restaurantId}`).emit('order:updated', populated);
+      io.to(`order:${order._id}`).emit('order:updated', populated);
       if (targetTableId) {
-        io.to(`table:${targetTableId}`).emit('order:updated', order);
+        io.to(`table:${targetTableId}`).emit('order:updated', populated);
       }
     }
 
@@ -825,18 +879,17 @@ const updateOrderPayment = async (req, res, next) => {
         .catch((err) => (req.log || console).error({ err }, 'Unable to evaluate table clear suggestion'));
     }
 
-    return res.json({ success: true, order });
+    return res.json({ success: true, order: populated });
   } catch (err) {
     return next(err);
   }
 };
 
 // ── PATCH /api/orders/table/:tableId/payment — protected, staff ───────────────
-// Updates paymentStatus to 'paid' for ALL unpaid orders at a table at once.
-// Fulfillment status (placed, accepted, preparing, ready, served) stays as it is!
 const updateTablePayment = async (req, res, next) => {
   try {
     const userRole = req.user?.role || 'owner';
+    const userId = req.user?.userId;
     if (userRole === 'kitchen') {
       return res.status(403).json({
         success: false,
@@ -844,7 +897,7 @@ const updateTablePayment = async (req, res, next) => {
       });
     }
 
-    const { paymentMethod } = req.body;
+    const { paymentMethod, tipAmount = 0 } = req.body;
     const VALID_METHODS = ['cash', 'pos', 'telebirr', 'cbebirr', 'awash', 'other'];
 
     if (!paymentMethod || !VALID_METHODS.includes(paymentMethod)) {
@@ -869,27 +922,42 @@ const updateTablePayment = async (req, res, next) => {
       });
     }
 
-    // Bulk update paymentStatus to paid, leave fulfillment status as it is
-    await Order.updateMany(
-      {
-        tableId,
-        restaurantId: req.tenantId,
-        paymentStatus: 'unpaid',
-        status: { $ne: 'cancelled' },
-      },
-      {
-        $set: { paymentStatus: 'paid', paymentMethod },
-      }
-    );
+    const tip = Number(tipAmount) > 0 ? Number(tipAmount) : 0;
+    let tipAssigned = false;
 
-    const updatedOrders = await Order.find({
-      _id: { $in: unpaidOrders.map((o) => o._id) },
-    })
-      .populate('tableId', 'label')
-      .populate('branchId', 'name')
-      .populate('assignedWaiterId', 'name phone');
+    const updatedOrders = [];
+    for (const order of unpaidOrders) {
+      const gross = order.grossTotal || order.totalAmount;
+      const orderTip = !tipAssigned ? tip : 0;
+      tipAssigned = true;
 
-    // ── Realtime: broadcast to restaurant room, table room, and order rooms ───
+      order.paymentStatus = 'paid';
+      order.paymentMethod = paymentMethod;
+      order.grossTotal = gross;
+      order.totalPaid = gross;
+      order.balanceDue = 0;
+      order.totalTips = (order.totalTips || 0) + orderTip;
+
+      order.payments.push({
+        paymentId: crypto.randomUUID(),
+        amount: gross,
+        tipAmount: orderTip,
+        paymentMethod,
+        paymentReference: req.body.paymentReference || null,
+        collectedBy: userId,
+        waiterId: order.assignedWaiterId || userId,
+        createdAt: new Date(),
+      });
+
+      await order.save();
+
+      const pop = await Order.findById(order._id)
+        .populate('tableId', 'label')
+        .populate('branchId', 'name')
+        .populate('assignedWaiterId', 'name phone');
+      updatedOrders.push(pop);
+    }
+
     const io = req.app.get('io');
     if (io) {
       for (const order of updatedOrders) {
@@ -950,6 +1018,489 @@ const exportOrders = async (req, res, next) => {
   }
 };
 
+// ── POST /api/orders/staff — protected, floor staff order creation ──────────
+const createStaffOrder = async (req, res, next) => {
+  try {
+    const { tableId, items, guestName, serviceChargeRate = 0 } = req.body;
+    const userId = req.user?.userId;
+    const userRole = req.user?.role || 'waiter';
+
+    if (!tableId || !items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'tableId and a non-empty items array are required.',
+      });
+    }
+
+    const table = await Table.findOne({
+      _id: tableId,
+      restaurantId: req.tenantId,
+      isActive: true,
+    });
+
+    if (!table) {
+      return res.status(404).json({
+        success: false,
+        message: 'Table not found or inactive in this venue.',
+      });
+    }
+
+    const staffUser = await User.findById(userId).select('name role');
+
+    const orderItems = [];
+    let totalAmount = 0;
+
+    for (const item of items) {
+      const {
+        productId,
+        qty,
+        portionName: reqPortionName,
+        selectedModifiers = [],
+        selectedSpecs = [],
+        quickTags = [],
+        itemNotes = '',
+      } = item;
+
+      if (!productId || !qty || qty < 1) {
+        return res.status(400).json({
+          success: false,
+          message: 'Each item must have a valid productId and qty >= 1.',
+        });
+      }
+
+      const product = await Product.findOne({
+        _id: productId,
+        restaurantId: req.tenantId,
+        isAvailable: true,
+      });
+
+      if (!product) {
+        return res.status(404).json({
+          success: false,
+          code: 'ITEM_NOT_FOUND',
+          message: `Product ${productId} not found or unavailable.`,
+        });
+      }
+
+      let basePrice = product.price;
+      let portionName = 'Standard';
+      let portionAmharic = '';
+      let serves = 1;
+
+      if (reqPortionName && product.portions && product.portions.length > 0) {
+        const found = product.portions.find((p) => p.name.toLowerCase() === String(reqPortionName).toLowerCase());
+        if (found) {
+          basePrice = found.price;
+          portionName = found.name;
+          portionAmharic = found.nameAmharic || '';
+          serves = found.serves || 1;
+        }
+      } else if (product.portions && product.portions.length > 0) {
+        const defaultPortion = product.portions.find((p) => p.isDefault) || product.portions[0];
+        if (defaultPortion) {
+          basePrice = defaultPortion.price;
+          portionName = defaultPortion.name;
+          portionAmharic = defaultPortion.nameAmharic || '';
+          serves = defaultPortion.serves || 1;
+        }
+      }
+
+      let extraCost = 0;
+      const resolvedModifiers = [];
+      for (const sel of selectedModifiers) {
+        const group = (product.modifierGroups || []).find((g) => g.name === sel.groupName);
+        if (!group) continue;
+        const opt = group.options.find((o) => o.name === sel.optionName);
+        if (!opt) continue;
+        resolvedModifiers.push({
+          groupName: group.name,
+          optionName: opt.name,
+          priceDelta: opt.priceDelta,
+        });
+        extraCost += opt.priceDelta;
+      }
+
+      const resolvedSpecs = [];
+      for (const sel of selectedSpecs) {
+        if (!sel || !sel.specName || !sel.optionName) continue;
+        const specGroup = (product.specs || []).find((s) => s.name === sel.specName);
+        if (specGroup) {
+          const opt = (specGroup.options || []).find((o) => o.name === sel.optionName);
+          const delta = opt ? (Number(opt.priceDelta) || 0) : 0;
+          resolvedSpecs.push({
+            specName: specGroup.name,
+            optionName: opt ? opt.name : sel.optionName,
+            priceDelta: delta,
+          });
+          extraCost += delta;
+        } else {
+          resolvedSpecs.push({
+            specName: String(sel.specName).trim(),
+            optionName: String(sel.optionName).trim(),
+            priceDelta: 0,
+          });
+        }
+      }
+
+      const safeQuickTags = Array.isArray(quickTags)
+        ? quickTags.filter((t) => typeof t === 'string' && t.trim().length > 0).map((t) => t.trim())
+        : [];
+      const safeItemNotes = typeof itemNotes === 'string' ? itemNotes.trim().slice(0, 300) : '';
+
+      const unitPrice = basePrice + extraCost;
+      const subtotal = Math.round(unitPrice * qty * 100) / 100;
+      totalAmount += subtotal;
+
+      orderItems.push({
+        productId: product._id,
+        name: product.name,
+        portionName,
+        portionAmharic,
+        serves,
+        qty,
+        unitPrice,
+        selectedModifiers: resolvedModifiers,
+        selectedSpecs: resolvedSpecs,
+        quickTags: safeQuickTags,
+        itemNotes: safeItemNotes,
+        subtotal,
+      });
+    }
+
+    totalAmount = Math.round(totalAmount * 100) / 100;
+    const rate = Number(serviceChargeRate) > 0 ? Number(serviceChargeRate) : 0;
+    const serviceChargeAmount = Math.round(totalAmount * rate * 100) / 100;
+    const grossTotal = Math.round((totalAmount + serviceChargeAmount) * 100) / 100;
+
+    const sessionId = `staff_${crypto.randomUUID()}`;
+
+    const order = await Order.create({
+      restaurantId: req.tenantId,
+      branchId: table.branchId,
+      tableId: table._id,
+      sessionId,
+      sessionToken: table.activeSessionToken || null,
+      createdSource: userRole === 'waiter' ? 'waiter_pad' : 'cashier_pos',
+      assignedWaiterId: userId,
+      assignedWaiterName: staffUser?.name || null,
+      guestName: guestName ? String(guestName).trim() : null,
+      items: orderItems,
+      totalAmount,
+      serviceChargeRate: rate,
+      serviceChargeAmount,
+      grossTotal,
+      balanceDue: grossTotal,
+      status: 'placed',
+      paymentStatus: 'unpaid',
+    });
+
+    if (table.status === 'available') {
+      table.status = 'occupied';
+      table.occupiedSince = new Date();
+      await table.save();
+    }
+
+    const populated = await Order.findById(order._id)
+      .populate('tableId', 'label')
+      .populate('branchId', 'name')
+      .populate('assignedWaiterId', 'name phone');
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`restaurant:${order.restaurantId}`).emit('order:new', populated);
+      io.to(`restaurant:${order.restaurantId}:role:kitchen`).emit('order:new', populated);
+      io.to(`table:${table._id}`).emit('order:new', populated);
+    }
+
+    return res.status(201).json({ success: true, order: populated });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ── POST /api/orders/:id/payments — partial & split payments with tips ───────
+const recordOrderPayment = async (req, res, next) => {
+  try {
+    const userRole = req.user?.role || 'owner';
+    const userId = req.user?.userId;
+    if (userRole === 'kitchen') {
+      return res.status(403).json({
+        success: false,
+        message: 'Kitchen staff cannot process payments.',
+      });
+    }
+
+    const {
+      amount,
+      tipAmount = 0,
+      paymentMethod = 'telebirr',
+      paymentReference,
+      serviceChargeRate,
+      notes,
+    } = req.body;
+
+    const VALID_METHODS = ['cash', 'pos', 'telebirr', 'cbebirr', 'awash', 'other'];
+    if (!VALID_METHODS.includes(paymentMethod)) {
+      return res.status(400).json({
+        success: false,
+        message: `paymentMethod must be one of: ${VALID_METHODS.join(', ')}.`,
+      });
+    }
+
+    const order = await Order.findOne({
+      _id: req.params.id,
+      restaurantId: req.tenantId,
+    });
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found.' });
+    }
+
+    if (serviceChargeRate !== undefined && serviceChargeRate !== null) {
+      const rate = Number(serviceChargeRate) || 0;
+      order.serviceChargeRate = rate;
+      order.serviceChargeAmount = Math.round(order.totalAmount * rate * 100) / 100;
+      order.grossTotal = Math.round((order.totalAmount + order.serviceChargeAmount) * 100) / 100;
+    } else if (!order.grossTotal) {
+      order.grossTotal = Math.round(((order.totalAmount || 0) + (order.serviceChargeAmount || 0)) * 100) / 100;
+    }
+
+    const remainingBefore = Math.max(0, Math.round((order.grossTotal - (order.totalPaid || 0)) * 100) / 100);
+
+    const paymentAmount = amount !== undefined && amount !== null && Number(amount) > 0
+      ? Math.round(Math.min(Number(amount), remainingBefore) * 100) / 100
+      : remainingBefore;
+
+    const tip = Number(tipAmount) > 0 ? Math.round(Number(tipAmount) * 100) / 100 : 0;
+
+    order.payments.push({
+      paymentId: crypto.randomUUID(),
+      amount: paymentAmount,
+      tipAmount: tip,
+      paymentMethod,
+      paymentReference: paymentReference ? String(paymentReference).trim() : null,
+      collectedBy: userId,
+      waiterId: order.assignedWaiterId || userId,
+      notes: notes ? String(notes).trim() : '',
+      createdAt: new Date(),
+    });
+
+    order.totalPaid = Math.round(((order.totalPaid || 0) + paymentAmount) * 100) / 100;
+    order.totalTips = Math.round(((order.totalTips || 0) + tip) * 100) / 100;
+    order.balanceDue = Math.max(0, Math.round((order.grossTotal - order.totalPaid) * 100) / 100);
+
+    if (order.balanceDue <= 0.01) {
+      order.balanceDue = 0;
+      order.paymentStatus = 'paid';
+      order.paymentMethod = paymentMethod;
+    } else {
+      order.paymentStatus = 'partially_paid';
+    }
+
+    await order.save();
+
+    const populated = await Order.findById(order._id)
+      .populate('tableId', 'label')
+      .populate('branchId', 'name')
+      .populate('assignedWaiterId', 'name phone');
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`restaurant:${order.restaurantId}`).emit('order:updated', populated);
+      io.to(`order:${order._id}`).emit('order:updated', populated);
+      const targetTableId = order.tableId?._id || order.tableId;
+      if (targetTableId) {
+        io.to(`table:${targetTableId}`).emit('order:updated', populated);
+      }
+    }
+
+    if (order.status === 'served' && order.paymentStatus === 'paid') {
+      suggestTableReadyToClear(req, order.tableId?._id || order.tableId, order.restaurantId)
+        .catch((err) => (req.log || console).error({ err }, 'Unable to evaluate table clear suggestion'));
+    }
+
+    return res.json({ success: true, order: populated });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ── POST /api/orders/table/:tableId/payments — table-wide partial/full payment
+const recordTablePayment = async (req, res, next) => {
+  try {
+    const userRole = req.user?.role || 'owner';
+    const userId = req.user?.userId;
+    if (userRole === 'kitchen') {
+      return res.status(403).json({
+        success: false,
+        message: 'Kitchen staff cannot process payments.',
+      });
+    }
+
+    const { tableId } = req.params;
+    const {
+      amount,
+      tipAmount = 0,
+      paymentMethod = 'telebirr',
+      paymentReference,
+      serviceChargeRate,
+    } = req.body;
+
+    const VALID_METHODS = ['cash', 'pos', 'telebirr', 'cbebirr', 'awash', 'other'];
+    if (!VALID_METHODS.includes(paymentMethod)) {
+      return res.status(400).json({
+        success: false,
+        message: `paymentMethod must be one of: ${VALID_METHODS.join(', ')}.`,
+      });
+    }
+
+    const unpaidOrders = await Order.find({
+      tableId,
+      restaurantId: req.tenantId,
+      paymentStatus: { $ne: 'paid' },
+      status: { $ne: 'cancelled' },
+    });
+
+    if (unpaidOrders.length === 0) {
+      return res.json({ success: true, message: 'No unpaid orders for this table.', orders: [] });
+    }
+
+    const tip = Number(tipAmount) > 0 ? Math.round(Number(tipAmount) * 100) / 100 : 0;
+    let tipAssigned = false;
+
+    let availableFunds = amount !== undefined && amount !== null && Number(amount) > 0
+      ? Number(amount)
+      : Infinity;
+
+    const updatedOrders = [];
+
+    for (const order of unpaidOrders) {
+      if (serviceChargeRate !== undefined && serviceChargeRate !== null) {
+        const rate = Number(serviceChargeRate) || 0;
+        order.serviceChargeRate = rate;
+        order.serviceChargeAmount = Math.round(order.totalAmount * rate * 100) / 100;
+        order.grossTotal = Math.round((order.totalAmount + order.serviceChargeAmount) * 100) / 100;
+      } else if (!order.grossTotal) {
+        order.grossTotal = Math.round(((order.totalAmount || 0) + (order.serviceChargeAmount || 0)) * 100) / 100;
+      }
+
+      const orderBalance = Math.max(0, Math.round((order.grossTotal - (order.totalPaid || 0)) * 100) / 100);
+      if (orderBalance <= 0) continue;
+
+      const toApply = Math.min(orderBalance, availableFunds);
+      if (toApply <= 0) break;
+
+      const orderTip = !tipAssigned ? tip : 0;
+      tipAssigned = true;
+
+      order.payments.push({
+        paymentId: crypto.randomUUID(),
+        amount: toApply,
+        tipAmount: orderTip,
+        paymentMethod,
+        paymentReference: paymentReference ? String(paymentReference).trim() : null,
+        collectedBy: userId,
+        waiterId: order.assignedWaiterId || userId,
+        createdAt: new Date(),
+      });
+
+      order.totalPaid = Math.round(((order.totalPaid || 0) + toApply) * 100) / 100;
+      order.totalTips = Math.round(((order.totalTips || 0) + orderTip) * 100) / 100;
+      order.balanceDue = Math.max(0, Math.round((order.grossTotal - order.totalPaid) * 100) / 100);
+
+      if (order.balanceDue <= 0.01) {
+        order.balanceDue = 0;
+        order.paymentStatus = 'paid';
+        order.paymentMethod = paymentMethod;
+      } else {
+        order.paymentStatus = 'partially_paid';
+      }
+
+      availableFunds -= toApply;
+      await order.save();
+
+      const pop = await Order.findById(order._id)
+        .populate('tableId', 'label')
+        .populate('branchId', 'name')
+        .populate('assignedWaiterId', 'name phone');
+      updatedOrders.push(pop);
+    }
+
+    const io = req.app.get('io');
+    if (io) {
+      for (const ord of updatedOrders) {
+        io.to(`restaurant:${ord.restaurantId}`).emit('order:updated', ord);
+        io.to(`order:${ord._id}`).emit('order:updated', ord);
+      }
+      io.to(`table:${tableId}`).emit('table:updated', { tableId });
+    }
+
+    suggestTableReadyToClear(req, tableId, req.tenantId)
+      .catch((err) => (req.log || console).error({ err }, 'Unable to evaluate table clear suggestion'));
+
+    return res.json({ success: true, count: updatedOrders.length, orders: updatedOrders });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ── GET /api/orders/waiter/shift-summary ──────────────────────────────────────
+const getWaiterShiftSummary = async (req, res, next) => {
+  try {
+    const userId = req.user?.userId;
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const orders = await Order.find({
+      restaurantId: req.tenantId,
+      createdAt: { $gte: startOfToday },
+      $or: [
+        { assignedWaiterId: userId },
+        { 'payments.waiterId': userId },
+        { 'payments.collectedBy': userId },
+      ],
+    });
+
+    const servedOrders = orders.filter((o) => o.status === 'served');
+    const tableIdSet = new Set(orders.map((o) => String(o.tableId)));
+
+    let totalSales = 0;
+    let totalTips = 0;
+    let cashTips = 0;
+    let digitalTips = 0;
+
+    for (const o of orders) {
+      totalSales += (o.totalAmount || 0);
+      for (const p of (o.payments || [])) {
+        if (String(p.waiterId) === String(userId) || String(p.collectedBy) === String(userId)) {
+          const tip = p.tipAmount || 0;
+          totalTips += tip;
+          if (p.paymentMethod === 'cash') {
+            cashTips += tip;
+          } else {
+            digitalTips += tip;
+          }
+        }
+      }
+    }
+
+    return res.json({
+      success: true,
+      summary: {
+        tablesServed: tableIdSet.size,
+        ordersServed: servedOrders.length,
+        totalOrders: orders.length,
+        totalSales: Math.round(totalSales * 100) / 100,
+        totalTips: Math.round(totalTips * 100) / 100,
+        cashTips: Math.round(cashTips * 100) / 100,
+        digitalTips: Math.round(digitalTips * 100) / 100,
+      },
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
 module.exports = {
   placeOrder,
   listOrders,
@@ -961,4 +1512,8 @@ module.exports = {
   updateTablePayment,
   submitOrderFeedback,
   exportOrders,
+  createStaffOrder,
+  recordOrderPayment,
+  recordTablePayment,
+  getWaiterShiftSummary,
 };

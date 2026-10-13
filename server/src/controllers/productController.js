@@ -51,7 +51,7 @@ const listProducts = async (req, res, next) => {
 // ── POST /api/products ────────────────────────────────────────────────────────
 const createProduct = async (req, res, next) => {
   try {
-    const { categoryId, name, description, price, imageUrl, isAvailable, modifierGroups, specs, quickTags } = req.body;
+    const { categoryId, name, description, price, imageUrl, isAvailable, modifierGroups, specs, quickTags, isFasting, dietaryTags, portions } = req.body;
 
     if (!categoryId || !name || price === undefined) {
       return res.status(400).json({
@@ -75,6 +75,9 @@ const createProduct = async (req, res, next) => {
       price,
       ...(imageUrl       !== undefined && { imageUrl }),
       ...(isAvailable    !== undefined && { isAvailable }),
+      ...(isFasting      !== undefined && { isFasting }),
+      ...(dietaryTags    !== undefined && { dietaryTags }),
+      ...(portions       !== undefined && { portions }),
       ...(modifierGroups !== undefined && { modifierGroups }),
       ...(specs          !== undefined && { specs }),
       ...(quickTags      !== undefined && { quickTags }),

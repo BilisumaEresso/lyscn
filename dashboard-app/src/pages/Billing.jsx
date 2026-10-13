@@ -561,14 +561,14 @@ export default function Billing() {
                     </td>
                     <td className="py-3 px-3 text-right space-x-2">
                       {inv.status !== 'paid' ? (
-                        <Button size="xs" variant="primary" onClick={() => handleOpenPay(inv)}>
+                        <Button size="sm" variant="primary" onClick={() => handleOpenPay(inv)}>
                           Confirm Payment
                         </Button>
                       ) : (
                         <span className="text-[11px] font-semibold text-emerald-700">✓ Settled</span>
                       )}
                       <Button
-                        size="xs"
+                        size="sm"
                         variant="outline"
                         title="Open WhatsApp Reminder link"
                         onClick={() => reminderMutation.mutate(inv._id)}

@@ -406,6 +406,8 @@ function ProductPanel({ product, selectedCategory, restaurantId, onClose, onSave
           price: product.price,
           imageUrl: product.imageUrl ?? '',
           isAvailable: product.isAvailable,
+          isFasting: Boolean(product.isFasting),
+          portions: product.portions ?? [],
           modifierGroups: product.modifierGroups ?? [],
           specs: product.specs ?? [],
           quickTags: product.quickTags ?? [],
@@ -416,6 +418,8 @@ function ProductPanel({ product, selectedCategory, restaurantId, onClose, onSave
           price: '',
           imageUrl: '',
           isAvailable: true,
+          isFasting: false,
+          portions: [],
           modifierGroups: [],
           specs: [],
           quickTags: [],
@@ -724,6 +728,21 @@ function ProductPanel({ product, selectedCategory, restaurantId, onClose, onSave
               checked={isAvailable}
               onChange={(val) => setValue('isAvailable', val)}
               id="product-available"
+            />
+          </div>
+
+          {/* Fasting friendly toggle */}
+          <div className="flex items-center justify-between py-1 border-t border-ink/8 pt-3">
+            <div>
+              <p className="text-sm font-medium text-ink flex items-center gap-1.5">
+                <span className="text-emerald-600">🌱</span> Fasting Friendly (የጾም ምግብ)
+              </p>
+              <p className="text-xs text-ink-muted">Tag as fasting for Ethiopian fasting days (Wed/Fri)</p>
+            </div>
+            <Toggle
+              checked={Boolean(watch('isFasting'))}
+              onChange={(val) => setValue('isFasting', val)}
+              id="product-fasting"
             />
           </div>
 
@@ -1147,6 +1166,11 @@ function ProductCard({ product, categoryName, onEdit }) {
             >
               {product.name}
             </h3>
+            {product.isFasting && (
+              <span className="shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                🌱 የጾም
+              </span>
+            )}
           </div>
 
           {product.description && (

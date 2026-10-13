@@ -3,7 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Utensils, CheckCircle2, Clock, DollarSign, CreditCard,
   PhoneCall, AlertCircle, RefreshCw, Power, UserCheck, ShieldCheck, MapPin, Sparkles,
-  QrCode, Copy, Check, Eye, ExternalLink, Building, Info, ChevronRight, Zap
+  QrCode, Copy, Check, Eye, ExternalLink, Building, Info, ChevronRight, Zap,
+  Plus, Minus, Trash2, Search, Send, Receipt, Coffee
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import toast from 'react-hot-toast';
@@ -28,7 +29,7 @@ export default function WaiterView() {
   const { user } = useAuthStore();
   const qc = useQueryClient();
 
-  const [activeTab, setActiveTab] = useState('ready'); // 'ready' | 'tables' | 'calls'
+  const [activeTab, setActiveTab] = useState('ready'); // 'ready' | 'order' | 'tables' | 'calls' | 'tips'
   const [settleModalOpen, setSettleModalOpen] = useState(false);
   const [selectedTableForSettle, setSelectedTableForSettle] = useState(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('telebirr');
@@ -39,6 +40,21 @@ export default function WaiterView() {
   const [verifiedWithEyes, setVerifiedWithEyes] = useState(false);
   const [txnRefInput, setTxnRefInput] = useState('');
   const [now, setNow] = useState(Date.now());
+
+  // ── Phase 4: Settle Form State ──
+  const [settleMode, setSettleMode] = useState('full'); // 'full' | 'partial'
+  const [applyServiceCharge, setApplyServiceCharge] = useState(false);
+  const [tipPreset, setTipPreset] = useState('5%'); // 0 | '5%' | 50 | 100 | '10%' | 'custom'
+  const [customTipInput, setCustomTipInput] = useState('');
+  const [partialAmountInput, setPartialAmountInput] = useState('');
+
+  // ── Phase 4: Fast Waiter Order Pad State ──
+  const [selectedTableForOrder, setSelectedTableForOrder] = useState(null);
+  const [orderCart, setOrderCart] = useState([]);
+  const [fastOrderGuestName, setFastOrderGuestName] = useState('');
+  const [fastOrderSearch, setFastOrderSearch] = useState('');
+  const [fastOrderCatFilter, setFastOrderCatFilter] = useState('all');
+  const [selectedPortionsMap, setSelectedPortionsMap] = useState({});
 
   // Clock ticker for elapsed time
   useEffect(() => {
@@ -77,9 +93,41 @@ export default function WaiterView() {
     refetchInterval: 30_000,
   });
 
+  // ── Phase 4: Menu products & categories for high-speed waiter pad ──
+  const { data: productsData } = useQuery({
+    queryKey: ['waiter-products'],
+    queryFn: () => api.get('/products').then((r) => r.data?.products || []),
+    staleTime: 60_000,
+  });
+
+  const { data: categoriesData } = useQuery({
+    queryKey: ['waiter-categories'],
+    queryFn: () => api.get('/categories').then((r) => r.data?.categories || []),
+    staleTime: 60_000,
+  });
+
+  // ── Phase 4: Shift summary & tips query ──
+  const { data: shiftSummary, refetch: refetchShift } = useQuery({
+    queryKey: ['waiter-shift-summary'],
+    queryFn: () => api.get('/orders/waiter/shift-summary').then((r) => r.data?.summary),
+    refetchInterval: 30_000,
+  });
+
   const orders = ordersData?.orders || [];
   const assistance = assistanceData?.assistance || [];
   const tables = tablesData?.tables || [];
+  const menuProducts = useMemo(() => {
+    return (productsData || []).filter((p) => p.isAvailable !== false);
+  }, [productsData]);
+  const categories = categoriesData || [];
+
+  // Auto-select first active table for order if none selected
+  useEffect(() => {
+    if (!selectedTableForOrder && tables.length > 0) {
+      const active = tables.find((t) => t.isActive !== false);
+      if (active) setSelectedTableForOrder(active._id);
+    }
+  }, [tables, selectedTableForOrder]);
 
   // Real-time notifications for waiters
   useEffect(() => {
@@ -107,6 +155,7 @@ export default function WaiterView() {
       api.patch(`/orders/${orderId}/status`, { status: 'served' }).then((r) => r.data),
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ['orders-kanban'] });
+      qc.invalidateQueries({ queryKey: ['waiter-shift-summary'] });
       playSound('success');
       toast.success(`Served to ${res.order.tableId?.label || 'Table'}!`);
     },
@@ -128,18 +177,36 @@ export default function WaiterView() {
     },
   });
 
-  // Table Payment Settlement Mutation
+  // Table Payment Settlement Mutation (Phase 4: with partial, tip, and service charge)
   const settleMutation = useMutation({
-    mutationFn: ({ tableId, paymentMethod }) =>
-      api.patch(`/orders/table/${tableId}/payment`, { paymentMethod }).then((r) => r.data),
+    mutationFn: (payload) =>
+      api.post(`/orders/table/${payload.tableId}/payments`, payload).then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['orders-kanban'] });
+      qc.invalidateQueries({ queryKey: ['waiter-shift-summary'] });
       setSettleModalOpen(false);
       playSound('success');
       toast.success('Table bill settled successfully!');
     },
     onError: (err) => {
       toast.error(err.response?.data?.message || 'Failed to settle table bill');
+    },
+  });
+
+  // ── Phase 4: Waiter Fast Order Placement Mutation ──
+  const staffOrderMutation = useMutation({
+    mutationFn: (payload) => api.post('/orders/staff', payload).then((r) => r.data),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['orders-kanban'] });
+      qc.invalidateQueries({ queryKey: ['tables'] });
+      qc.invalidateQueries({ queryKey: ['waiter-shift-summary'] });
+      playSound('success');
+      toast.success(`⚡ Order fired to kitchen for ${res.order?.tableId?.label || 'Table'}!`);
+      setOrderCart([]);
+      setActiveTab('tables');
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.message || 'Failed to place order');
     },
   });
 
@@ -232,10 +299,34 @@ export default function WaiterView() {
 
   const handleConfirmSettle = () => {
     if (!selectedTableForSettle) return;
-    settleMutation.mutate({
+    const baseTotal = Number(selectedTableForSettle.unpaidTotal || 0);
+    const serviceChargeRate = applyServiceCharge ? 0.10 : 0;
+    const serviceChargeAmount = applyServiceCharge ? Math.round(baseTotal * 0.10) : 0;
+    
+    let tipAmount = 0;
+    if (tipPreset === '5%') {
+      tipAmount = Math.round(baseTotal * 0.05);
+    } else if (tipPreset === '10%') {
+      tipAmount = Math.round(baseTotal * 0.10);
+    } else if (tipPreset === 'custom') {
+      tipAmount = Math.max(0, Number(customTipInput || 0));
+    } else if (typeof tipPreset === 'number') {
+      tipAmount = tipPreset;
+    }
+
+    const payload = {
       tableId: selectedTableForSettle._id,
       paymentMethod: selectedPaymentMethod,
-    });
+      serviceChargeRate,
+      tipAmount,
+      paymentReference: txnRefInput.trim(),
+    };
+
+    if (settleMode === 'partial' && Number(partialAmountInput) > 0) {
+      payload.amount = Number(partialAmountInput);
+    }
+
+    settleMutation.mutate(payload);
   };
 
   return (
@@ -273,12 +364,12 @@ export default function WaiterView() {
           </div>
         </div>
 
-        {/* Waiter Navigation Tabs */}
-        <div className="max-w-xl mx-auto grid grid-cols-3 gap-1.5 mt-2 sm:mt-2.5 bg-white/10 p-1 rounded-xl">
+        {/* Waiter Navigation Tabs (Phase 4 Speed Pad & Shift Summary) */}
+        <div className="max-w-xl mx-auto grid grid-cols-5 gap-1 mt-2 sm:mt-2.5 bg-white/10 p-1 rounded-xl">
           <button
             type="button"
             onClick={() => setActiveTab('ready')}
-            className={`py-2 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 min-h-[36px] ${
+            className={`py-2 px-1 rounded-lg text-[11px] sm:text-xs font-semibold transition-all flex flex-col sm:flex-row items-center justify-center gap-1 min-h-[44px] sm:min-h-[36px] ${
               activeTab === 'ready'
                 ? 'bg-teal text-white shadow-sm'
                 : 'text-white/70 hover:text-white'
@@ -294,14 +385,34 @@ export default function WaiterView() {
 
           <button
             type="button"
+            onClick={() => setActiveTab('order')}
+            className={`py-2 px-1 rounded-lg text-[11px] sm:text-xs font-semibold transition-all flex flex-col sm:flex-row items-center justify-center gap-1 min-h-[44px] sm:min-h-[36px] ${
+              activeTab === 'order'
+                ? 'bg-amber-400 text-ink font-bold shadow-sm'
+                : 'text-white/70 hover:text-white'
+            }`}
+          >
+            <span className="flex items-center gap-0.5">
+              <Zap size={12} className="shrink-0" />
+              <span>Fast Order</span>
+            </span>
+            {orderCart.length > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-ink text-white">
+                {orderCart.reduce((s, i) => s + i.qty, 0)}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab('tables')}
-            className={`py-2 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 min-h-[36px] ${
+            className={`py-2 px-1 rounded-lg text-[11px] sm:text-xs font-semibold transition-all flex flex-col sm:flex-row items-center justify-center gap-1 min-h-[44px] sm:min-h-[36px] ${
               activeTab === 'tables'
                 ? 'bg-teal text-white shadow-sm'
                 : 'text-white/70 hover:text-white'
             }`}
           >
-            <span>Tables & Bills</span>
+            <span>Tables</span>
             {tablesWithOrders.filter((t) => t.hasUnpaid).length > 0 && (
               <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-400 text-ink">
                 {tablesWithOrders.filter((t) => t.hasUnpaid).length}
@@ -312,7 +423,7 @@ export default function WaiterView() {
           <button
             type="button"
             onClick={() => setActiveTab('calls')}
-            className={`py-2 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 min-h-[36px] ${
+            className={`py-2 px-1 rounded-lg text-[11px] sm:text-xs font-semibold transition-all flex flex-col sm:flex-row items-center justify-center gap-1 min-h-[44px] sm:min-h-[36px] ${
               activeTab === 'calls'
                 ? 'bg-teal text-white shadow-sm'
                 : 'text-white/70 hover:text-white'
@@ -324,6 +435,21 @@ export default function WaiterView() {
                 {pendingCalls.length}
               </span>
             )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('tips')}
+            className={`py-2 px-1 rounded-lg text-[11px] sm:text-xs font-semibold transition-all flex flex-col sm:flex-row items-center justify-center gap-1 min-h-[44px] sm:min-h-[36px] ${
+              activeTab === 'tips'
+                ? 'bg-teal text-white shadow-sm'
+                : 'text-white/70 hover:text-white'
+            }`}
+          >
+            <span className="flex items-center gap-0.5">
+              <DollarSign size={12} className="shrink-0" />
+              <span>Shift Tips</span>
+            </span>
           </button>
         </div>
       </header>
@@ -594,6 +720,371 @@ export default function WaiterView() {
             )}
           </div>
         )}
+
+        {/* TAB 4: HIGH-SPEED WAITER ORDER PAD (PHASE 4) */}
+        {activeTab === 'order' && (
+          <div className="space-y-3.5 pb-24">
+            {/* Table Selector & Guest Name Row */}
+            <div className="bg-white p-3.5 rounded-2xl border border-ink/8 shadow-xs space-y-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <label className="block text-[11px] font-bold text-ink uppercase tracking-wider mb-1">
+                    Select Table
+                  </label>
+                  <select
+                    value={selectedTableForOrder || ''}
+                    onChange={(e) => setSelectedTableForOrder(e.target.value)}
+                    className="w-full px-3 py-2 text-sm font-semibold rounded-xl border border-ink/15 bg-paper focus:outline-none focus:ring-2 focus:ring-teal"
+                  >
+                    {tables.map((t) => (
+                      <option key={t._id} value={t._id}>
+                        {t.label} {t.capacity ? `(${t.capacity} seats)` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <label className="block text-[11px] font-bold text-ink uppercase tracking-wider mb-1">
+                    Guest Name / Seat (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={fastOrderGuestName}
+                    onChange={(e) => setFastOrderGuestName(e.target.value)}
+                    placeholder="e.g. Ato Dawit / Bar 1"
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-ink/15 bg-paper placeholder-ink/30 focus:outline-none focus:ring-2 focus:ring-teal"
+                  />
+                </div>
+              </div>
+
+              {/* Fast Filter Pills: All, Fasting, & Categories */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pt-1 no-scrollbar">
+                <button
+                  type="button"
+                  onClick={() => setFastOrderCatFilter('all')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+                    fastOrderCatFilter === 'all'
+                      ? 'bg-ink text-white shadow-2xs'
+                      : 'bg-ink/5 text-ink-muted hover:bg-ink/10'
+                  }`}
+                >
+                  All Items
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setFastOrderCatFilter('fasting')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1 ${
+                    fastOrderCatFilter === 'fasting'
+                      ? 'bg-emerald-600 text-white shadow-2xs'
+                      : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
+                  }`}
+                >
+                  <span>🌱 የጾም (Fasting)</span>
+                </button>
+
+                {categories.map((c) => (
+                  <button
+                    key={c._id}
+                    type="button"
+                    onClick={() => setFastOrderCatFilter(c._id)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+                      fastOrderCatFilter === c._id
+                        ? 'bg-teal text-white shadow-2xs'
+                        : 'bg-ink/5 text-ink-muted hover:bg-ink/10'
+                    }`}
+                  >
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+
+              {/* Quick Search */}
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-2.5 text-ink-muted" />
+                <input
+                  type="text"
+                  value={fastOrderSearch}
+                  onChange={(e) => setFastOrderSearch(e.target.value)}
+                  placeholder="Quick search dish or drink…"
+                  className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border border-ink/10 bg-paper placeholder-ink/30 focus:outline-none focus:ring-1 focus:ring-teal"
+                />
+              </div>
+            </div>
+
+            {/* Menu Matrix — Tap to Add */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              {menuProducts
+                .filter((p) => {
+                  if (fastOrderCatFilter === 'fasting' && !p.isFasting) return false;
+                  if (fastOrderCatFilter !== 'all' && fastOrderCatFilter !== 'fasting' && (p.categoryId?._id || p.categoryId) !== fastOrderCatFilter) return false;
+                  if (fastOrderSearch.trim()) {
+                    const q = fastOrderSearch.toLowerCase();
+                    return p.name.toLowerCase().includes(q) || (p.nameAmharic && p.nameAmharic.toLowerCase().includes(q));
+                  }
+                  return true;
+                })
+                .map((product) => {
+                  const hasPortions = product.portions && product.portions.length > 0;
+                  const selectedPortionName = selectedPortionsMap[product._id] || (hasPortions ? (product.portions.find(po => po.isDefault)?.name || product.portions[0].name) : null);
+                  const activePortion = hasPortions ? product.portions.find(po => po.name === selectedPortionName) : null;
+                  const effectivePrice = activePortion ? activePortion.price : product.price;
+
+                  const cartMatch = orderCart.find(
+                    (i) => i.productId === product._id && (!hasPortions || i.portionName === selectedPortionName)
+                  );
+                  const currentQty = cartMatch ? cartMatch.qty : 0;
+
+                  const handleAdd = () => {
+                    setOrderCart((prev) => {
+                      const idx = prev.findIndex(
+                        (i) => i.productId === product._id && (!hasPortions || i.portionName === selectedPortionName)
+                      );
+                      if (idx >= 0) {
+                        const next = [...prev];
+                        next[idx].qty += 1;
+                        return next;
+                      }
+                      return [
+                        ...prev,
+                        {
+                          productId: product._id,
+                          name: product.name,
+                          portionName: selectedPortionName,
+                          portionPrice: effectivePrice,
+                          unitPrice: effectivePrice,
+                          qty: 1,
+                        },
+                      ];
+                    });
+                  };
+
+                  const handleMinus = () => {
+                    setOrderCart((prev) => {
+                      const idx = prev.findIndex(
+                        (i) => i.productId === product._id && (!hasPortions || i.portionName === selectedPortionName)
+                      );
+                      if (idx < 0) return prev;
+                      if (prev[idx].qty <= 1) {
+                        return prev.filter((_, i) => i !== idx);
+                      }
+                      const next = [...prev];
+                      next[idx].qty -= 1;
+                      return next;
+                    });
+                  };
+
+                  return (
+                    <div
+                      key={product._id}
+                      className="bg-white rounded-2xl border border-ink/8 p-3 shadow-2xs flex flex-col justify-between hover:border-teal/50 transition-all space-y-2"
+                    >
+                      <div>
+                        <div className="flex items-start justify-between gap-1">
+                          <p className="font-bold text-xs text-ink leading-tight line-clamp-2">
+                            {product.name}
+                          </p>
+                          {product.isFasting && (
+                            <span className="shrink-0 text-[10px] font-bold px-1 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              🌱 የጾም
+                            </span>
+                          )}
+                        </div>
+                        {product.nameAmharic && (
+                          <p className="text-[11px] text-ink-muted leading-tight mt-0.5">
+                            {product.nameAmharic}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Portion Selector Pills if item has portions */}
+                      {hasPortions && (
+                        <div className="grid grid-cols-2 gap-1 bg-ink/5 p-0.5 rounded-lg text-[10px]">
+                          {product.portions.map((po) => {
+                            const isChosen = selectedPortionName === po.name;
+                            return (
+                              <button
+                                key={po.name}
+                                type="button"
+                                onClick={() => setSelectedPortionsMap((m) => ({ ...m, [product._id]: po.name }))}
+                                className={`py-0.5 px-1 rounded text-center font-semibold transition-all ${
+                                  isChosen
+                                    ? 'bg-white text-ink shadow-2xs font-bold'
+                                    : 'text-ink-muted hover:text-ink'
+                                }`}
+                              >
+                                {po.nameAmharic || po.name}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between pt-1 border-t border-ink/6">
+                        <Currency
+                          value={effectivePrice}
+                          className="font-display font-bold text-xs text-ink"
+                        />
+
+                        {currentQty > 0 ? (
+                          <div className="flex items-center gap-1.5 bg-ink/5 rounded-xl p-0.5">
+                            <button
+                              type="button"
+                              onClick={handleMinus}
+                              className="w-6 h-6 rounded-lg bg-white border border-ink/10 flex items-center justify-center text-ink hover:bg-ink/5 active:scale-90"
+                            >
+                              <Minus size={11} />
+                            </button>
+                            <span className="text-xs font-bold font-mono px-1 min-w-[14px] text-center">
+                              {currentQty}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={handleAdd}
+                              className="w-6 h-6 rounded-lg bg-teal text-white flex items-center justify-center hover:bg-teal/90 active:scale-90"
+                            >
+                              <Plus size={11} />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={handleAdd}
+                            className="px-2.5 py-1 rounded-xl bg-teal/10 hover:bg-teal text-teal hover:text-white font-bold text-xs flex items-center gap-1 transition-colors"
+                          >
+                            <Plus size={12} />
+                            <span>Add</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+
+            {/* Sticky Floating Fire Button when items in cart */}
+            {orderCart.length > 0 && (
+              <div className="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-ink/10 p-3 shadow-lg z-20">
+                <div className="max-w-xl mx-auto flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-ink">
+                      {orderCart.reduce((s, i) => s + i.qty, 0)} items in ticket
+                    </p>
+                    <p className="text-xs text-ink-muted flex items-center gap-1">
+                      <span>Total:</span>
+                      <Currency
+                        value={orderCart.reduce((s, i) => s + (i.unitPrice * i.qty), 0)}
+                        className="font-bold text-ink"
+                      />
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setOrderCart([])}
+                      className="p-2 rounded-xl text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors"
+                      title="Clear Pad"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        if (!selectedTableForOrder) {
+                          toast.error('Please select a table');
+                          return;
+                        }
+                        staffOrderMutation.mutate({
+                          tableId: selectedTableForOrder,
+                          guestName: fastOrderGuestName.trim() || undefined,
+                          items: orderCart.map((i) => ({
+                            productId: i.productId,
+                            portionName: i.portionName || undefined,
+                            qty: i.qty,
+                          })),
+                        });
+                      }}
+                      loading={staffOrderMutation.isPending}
+                      className="bg-amber-500 hover:bg-amber-600 text-ink font-bold px-4 py-2 flex items-center gap-1.5 shadow-sm"
+                    >
+                      <Zap size={15} className="fill-ink" />
+                      <span>Fire to Kitchen</span>
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 5: SHIFT TIPS & WAITER ACCOUNTING (PHASE 4) */}
+        {activeTab === 'tips' && (
+          <div className="space-y-3.5">
+            <div className="flex items-center justify-between text-xs text-ink-muted px-1">
+              <span>My Today's Floor Performance & Tips</span>
+              <button
+                type="button"
+                onClick={() => refetchShift()}
+                className="text-teal hover:underline flex items-center gap-1"
+              >
+                <RefreshCw size={12} />
+                <span>Refresh</span>
+              </button>
+            </div>
+
+            {/* Metrics Matrix */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-white p-4 rounded-2xl border border-ink/8 shadow-2xs space-y-1">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-ink-muted">Tables Served</span>
+                <p className="font-display font-bold text-2xl text-ink">
+                  {shiftSummary?.tablesServedToday ?? 0}
+                </p>
+                <p className="text-[11px] text-ink-muted">Unique tables closed</p>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-ink/8 shadow-2xs space-y-1">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-ink-muted">Orders Delivered</span>
+                <p className="font-display font-bold text-2xl text-ink">
+                  {shiftSummary?.ordersDeliveredToday ?? 0}
+                </p>
+                <p className="text-[11px] text-ink-muted">Tickets marked served</p>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-ink/8 shadow-2xs space-y-1">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-ink-muted">Gross Table Sales</span>
+                <p className="font-display font-bold text-2xl text-ink">
+                  <Currency value={shiftSummary?.totalSalesHandled ?? 0} />
+                </p>
+                <p className="text-[11px] text-ink-muted">Bills settled on shift</p>
+              </div>
+
+              <div className="bg-gradient-to-br from-emerald-500 to-teal-700 text-white p-4 rounded-2xl shadow-sm space-y-1">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-100">Total Shift Tips</span>
+                <p className="font-display font-bold text-2xl text-white">
+                  <Currency value={shiftSummary?.totalTipsToday ?? 0} />
+                </p>
+                <div className="flex items-center justify-between text-[10px] text-emerald-100 pt-1 border-t border-white/20">
+                  <span>Cash: <Currency value={shiftSummary?.cashTipsToday ?? 0} /></span>
+                  <span>Digital: <Currency value={shiftSummary?.digitalTipsToday ?? 0} /></span>
+                </div>
+              </div>
+            </div>
+
+            {/* Tip Pooling & Payout Card */}
+            <div className="bg-white p-4 rounded-2xl border border-ink/8 shadow-2xs space-y-2">
+              <h3 className="font-bold text-sm text-ink flex items-center gap-1.5">
+                <Receipt size={16} className="text-teal" />
+                <span>Tip Payout & Handover Policy</span>
+              </h3>
+              <p className="text-xs text-ink-muted leading-relaxed">
+                Cash tips collected stay with you immediately. Digital tips (Telebirr / CBE Birr) are automatically recorded under your account and settled by the cashier at the end of your shift.
+              </p>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* Settle Table Bill Modal — Waiter Assisted Scan & Verify */}
@@ -605,19 +1096,137 @@ export default function WaiterView() {
           size="md"
         >
           <div className="space-y-4">
-            {/* Bill Summary Strip */}
-            <div className="p-3.5 rounded-2xl bg-teal/10 border border-teal/20 flex items-center justify-between">
-              <div>
-                <span className="text-[11px] text-ink-muted uppercase font-bold tracking-wider block">Total Due</span>
-                <span className="text-xs text-ink-muted">
-                  {selectedTableForSettle.unpaidCount} unpaid round{selectedTableForSettle.unpaidCount !== 1 ? 's' : ''}
-                </span>
-              </div>
-              <Currency
-                value={selectedTableForSettle.unpaidTotal}
-                className="font-display font-bold text-2xl text-ink"
-              />
+            {/* Settle Mode Toggle (Full vs Partial Split) */}
+            <div className="grid grid-cols-2 gap-1.5 p-1 bg-ink/5 rounded-xl text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setSettleMode('full')}
+                className={`py-1.5 rounded-lg transition-all ${
+                  settleMode === 'full' ? 'bg-white text-ink shadow-2xs font-bold' : 'text-ink-muted hover:text-ink'
+                }`}
+              >
+                Full Bill Settle
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSettleMode('partial');
+                  if (!partialAmountInput) setPartialAmountInput(String(Math.round((selectedTableForSettle.unpaidTotal || 0) / 2)));
+                }}
+                className={`py-1.5 rounded-lg transition-all ${
+                  settleMode === 'partial' ? 'bg-white text-ink shadow-2xs font-bold' : 'text-ink-muted hover:text-ink'
+                }`}
+              >
+                Partial Payment (Split)
+              </button>
             </div>
+
+            {/* Bill Summary Strip */}
+            {(() => {
+              const baseTotal = Number(selectedTableForSettle.unpaidTotal || 0);
+              const serviceChargeAmount = applyServiceCharge ? Math.round(baseTotal * 0.10) : 0;
+              let tipAmount = 0;
+              if (tipPreset === '5%') tipAmount = Math.round(baseTotal * 0.05);
+              else if (tipPreset === '10%') tipAmount = Math.round(baseTotal * 0.10);
+              else if (tipPreset === 'custom') tipAmount = Math.max(0, Number(customTipInput || 0));
+              else if (typeof tipPreset === 'number') tipAmount = tipPreset;
+              
+              const calculatedTotal = baseTotal + serviceChargeAmount + tipAmount;
+              const effectivePayAmount = settleMode === 'partial' && Number(partialAmountInput) > 0
+                ? Number(partialAmountInput)
+                : calculatedTotal;
+
+              return (
+                <div className="p-3.5 rounded-2xl bg-teal/10 border border-teal/20 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-[11px] text-ink-muted uppercase font-bold tracking-wider block">
+                        {settleMode === 'partial' ? 'Paying Now (Partial)' : 'Total Due'}
+                      </span>
+                      <span className="text-xs text-ink-muted">
+                        {selectedTableForSettle.unpaidCount} unpaid round{selectedTableForSettle.unpaidCount !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    <Currency
+                      value={effectivePayAmount}
+                      className="font-display font-bold text-2xl text-ink"
+                    />
+                  </div>
+
+                  {settleMode === 'partial' && (
+                    <div className="pt-2 border-t border-teal/15 space-y-1">
+                      <label className="block text-[11px] font-bold text-ink-muted uppercase">
+                        Enter Partial Amount to Pay (ETB)
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max={baseTotal}
+                        value={partialAmountInput}
+                        onChange={(e) => setPartialAmountInput(e.target.value)}
+                        className="w-full px-3 py-1.5 text-sm font-semibold rounded-xl border border-teal/30 bg-white focus:outline-none focus:ring-2 focus:ring-teal"
+                        placeholder="e.g. 500"
+                      />
+                      <p className="text-[11px] text-ink-muted">
+                        Remaining balance will stay open on Table {selectedTableForSettle.label}.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Service charge & Tips options (when in Full settle) */}
+                  {settleMode === 'full' && (
+                    <div className="pt-2 border-t border-teal/15 space-y-2 text-xs">
+                      {/* Optional 10% Service Charge */}
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={applyServiceCharge}
+                          onChange={(e) => setApplyServiceCharge(e.target.checked)}
+                          className="w-4 h-4 rounded text-teal focus:ring-teal"
+                        />
+                        <span className="font-semibold text-ink">
+                          Add 10% Service Charge (+{formatBirr(Math.round(baseTotal * 0.10))})
+                        </span>
+                      </label>
+
+                      {/* Tip Presets */}
+                      <div>
+                        <span className="text-[11px] font-bold text-ink-muted uppercase block mb-1">
+                          Waiter Tip (Direct to You)
+                        </span>
+                        <div className="grid grid-cols-6 gap-1 text-[11px] font-semibold">
+                          {[0, '5%', '10%', 50, 100, 'custom'].map((preset) => (
+                            <button
+                              key={String(preset)}
+                              type="button"
+                              onClick={() => setTipPreset(preset)}
+                              className={`py-1 rounded-lg border transition-all ${
+                                tipPreset === preset
+                                  ? 'bg-teal text-white border-teal font-bold shadow-2xs'
+                                  : 'bg-white text-ink border-ink/10 hover:border-ink/20'
+                              }`}
+                            >
+                              {preset === 0 ? 'No Tip' : preset === '5%' ? '5%' : preset === '10%' ? '10%' : preset === 'custom' ? 'Custom' : `+${preset}`}
+                            </button>
+                          ))}
+                        </div>
+
+                        {tipPreset === 'custom' && (
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="Enter tip in ETB"
+                            value={customTipInput}
+                            onChange={(e) => setCustomTipInput(e.target.value)}
+                            className="mt-1.5 w-full px-2.5 py-1 text-xs rounded-lg border border-teal/30 bg-white focus:outline-none focus:ring-1 focus:ring-teal"
+                          />
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Payment Method Selector Tabs */}
             <div>
