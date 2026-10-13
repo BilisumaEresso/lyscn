@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   LayoutDashboard, UtensilsCrossed, QrCode,
   ClipboardList, Settings, LogOut, X, Download, MapPin, Users,
-  ChefHat, Utensils, BarChart2, PanelLeftClose, PanelLeftOpen
+  ChefHat, Utensils, BarChart2, PanelLeftClose, PanelLeftOpen, CreditCard
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '../../store/authStore';
@@ -173,6 +173,7 @@ export default function Sidebar({ isOpen, onClose }) {
       {
         title: 'Preferences',
         items: [
+          { to: '/billing', icon: CreditCard, label: 'Billing & Plan' },
           { to: '/settings', icon: Settings, label: 'Settings' },
         ],
       },
@@ -445,7 +446,7 @@ export default function Sidebar({ isOpen, onClose }) {
     <>
       {/* Desktop Persistent Sidebar (>= 1024px) with smooth collapse transition */}
       <aside
-        className={`hidden lg:flex shrink-0 bg-ink flex-col h-screen sticky top-0 border-r border-white/5 transition-all duration-300 ease-in-out ${
+        className={`hidden lg:flex shrink-0 bg-ink flex-col h-full border-r border-white/5 transition-all duration-300 ease-in-out ${
           isCollapsed ? 'w-18' : 'w-60'
         }`}
       >

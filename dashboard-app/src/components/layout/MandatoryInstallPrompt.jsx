@@ -1,386 +1,249 @@
 import { useState, useEffect } from 'react';
-import { Download, AlertTriangle, X, Smartphone, ShieldCheck, ChevronRight, Bell, Lock } from 'lucide-react';
+import { Download, X, Smartphone } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useInstallPrompt } from '../../hooks/useInstallPrompt';
-import { useNotificationStore } from '../../store/notificationStore';
+
+const DISMISS_KEY = 'layoscan_staff_install_dismissed_until';
 
 /**
- * MandatoryInstallPrompt — Persistent, frequent PWA installation prompt & system permission enforcement for staff.
- * App installation and notification permissions are essential for staff to ensure background audio chimes,
- * prevent browser sleep throttling, and avoid missed customer orders.
+ * InstallHeaderButton — Responsive quick-action button in the mobile and desktop headers.
+ * Clicking it immediately triggers the browser's native 1-click install prompt.
  */
-export default function MandatoryInstallPrompt() {
+export function InstallHeaderButton({ isMobile = false }) {
   const { canInstall, isInstalled, promptInstall } = useInstallPrompt();
   const [showIOSModal, setShowIOSModal] = useState(false);
-  const [isSnoozed, setIsSnoozed] = useState(false);
-  const [showUnblockGuidance, setShowUnblockGuidance] = useState(false);
-  const [notifPermission, setNotifPermission] = useState(
-    typeof window !== 'undefined' && 'Notification' in window
-      ? Notification.permission
-      : 'granted'
-  );
-  const [requestingNotif, setRequestingNotif] = useState(false);
 
-  // Sync notification permission
-  useEffect(() => {
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      setNotifPermission(Notification.permission);
-      if (Notification.permission === 'granted') {
-        useNotificationStore.getState().setDesktopNotificationsEnabled(true);
-      }
-    }
-  }, []);
-
-  // Detect iOS Safari where beforeinstallprompt does not exist
   const isIOS =
     typeof navigator !== 'undefined' &&
     (/iPhone|iPad|iPod/.test(navigator.userAgent) ||
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
 
-  // When snoozed, auto re-prompt after 90 seconds (frequent prompt as requested)
-  const handleSnooze = (e) => {
-    e.stopPropagation();
-    setIsSnoozed(true);
-    setTimeout(() => {
-      setIsSnoozed(false);
-    }, 90_000);
-  };
+  if (isInstalled) return null;
 
-  const handleInstallClick = async () => {
+  const handleClick = async () => {
     if (canInstall) {
       const accepted = await promptInstall();
-      if (!accepted) {
-        // If user cancelled browser dialog, keep prompting
-        setIsSnoozed(false);
+      if (accepted) {
+        toast.success('LayoScan Staff App installed successfully!');
       }
-    } else if (isIOS) {
-      setShowIOSModal(true);
     } else {
       setShowIOSModal(true);
     }
   };
 
-  const handleRequestNotification = async () => {
-    if (typeof window === 'undefined' || !('Notification' in window)) return;
-    if (Notification.permission === 'denied') {
-      setShowUnblockGuidance((prev) => !prev);
-      return;
-    }
+  return (
+    <>
+      {isMobile ? (
+        <button
+          type="button"
+          onClick={handleClick}
+          className="p-2 min-h-10 min-w-10 rounded-xl bg-teal/15 text-teal hover:bg-teal/25 border border-teal/25 flex items-center justify-center transition-all active:scale-95 shrink-0"
+          title="Install Staff App"
+          aria-label="Install Staff App"
+        >
+          <Download size={17} className="stroke-[2.5]" />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={handleClick}
+          className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold
+                     bg-teal/10 hover:bg-teal text-teal hover:text-ink
+                     border border-teal/25 shadow-xs transition-all active:scale-95 shrink-0"
+          title="Install LayoScan Staff App on this device"
+        >
+          <Download size={14} className="stroke-[2.5]" />
+          <span>Install App</span>
+        </button>
+      )}
 
-    setRequestingNotif(true);
+      {showIOSModal && (
+        <InstallGuideModal isIOS={isIOS} onClose={() => setShowIOSModal(false)} />
+      )}
+    </>
+  );
+}
+
+/**
+ * MandatoryInstallPrompt — Non-blocking, responsive floating card that ensures
+ * staff install the app for real-time sound alarms without pushing or distorting the layout.
+ */
+export default function MandatoryInstallPrompt() {
+  const { canInstall, isInstalled, promptInstall } = useInstallPrompt();
+  const [showIOSModal, setShowIOSModal] = useState(false);
+  const [isDismissed, setIsDismissed] = useState(true);
+
+  const isIOS =
+    typeof navigator !== 'undefined' &&
+    (/iPhone|iPad|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+
+  useEffect(() => {
     try {
-      const res = await Notification.requestPermission();
-      setNotifPermission(res);
-      if (res === 'granted') {
-        useNotificationStore.getState().setDesktopNotificationsEnabled(true);
-        toast.success('Staff notifications enabled! Order alerts are active.');
-        try {
-          new Notification('🔔 LayoScan Staff Alerts Active', {
-            body: 'You will receive immediate alerts when new orders arrive.',
-            icon: '/assets/logo.png',
-          });
-        } catch (_) {}
-      } else if (res === 'denied') {
-        setShowUnblockGuidance(true);
+      const dismissedUntil = localStorage.getItem(DISMISS_KEY);
+      if (dismissedUntil && Number(dismissedUntil) > Date.now()) {
+        setIsDismissed(true);
+      } else {
+        setIsDismissed(false);
       }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setRequestingNotif(false);
+    } catch (_) {
+      setIsDismissed(false);
+    }
+  }, []);
+
+  const handleDismiss = () => {
+    setIsDismissed(true);
+    try {
+      // Dismiss the floating toast for 24 hours so staff aren't annoyed repeatedly
+      localStorage.setItem(DISMISS_KEY, String(Date.now() + 24 * 60 * 60 * 1000));
+    } catch (_) {}
+  };
+
+  const handleInstallClick = async () => {
+    if (canInstall) {
+      const accepted = await promptInstall();
+      if (accepted) {
+        toast.success('LayoScan Staff App installed!');
+      }
+    } else {
+      setShowIOSModal(true);
     }
   };
 
-  const showInstallBanner = !isInstalled && !isSnoozed;
-  const showNotifBanner = notifPermission !== 'granted';
-
-  if (!showInstallBanner && !showNotifBanner) return null;
+  if (isInstalled || isDismissed) {
+    return showIOSModal ? (
+      <InstallGuideModal isIOS={isIOS} onClose={() => setShowIOSModal(false)} />
+    ) : null;
+  }
 
   return (
     <>
-      {/* ── Persistent Sticky Staff Installation Alert Banner ──────────────── */}
-      {showInstallBanner && (
-        <div
-          className="px-4 py-2.5 shadow-md flex items-center justify-between gap-3 text-xs z-50 animate-in fade-in slide-in-from-top-2 duration-300"
-          style={{ background: '#121A2C', borderBottom: '2px solid #F59E0B' }}
-        >
+      {/* ── Responsive Floating Non-blocking Install Card ──────────────── */}
+      <div
+        className="fixed z-40 right-3 sm:right-6 bottom-[calc(env(safe-area-inset-bottom,0px)+4.75rem)] lg:bottom-6 max-w-sm w-[calc(100vw-1.5rem)] sm:w-84 pointer-events-auto animate-in fade-in slide-in-from-bottom-4 duration-300"
+      >
+        <div className="bg-ink/95 backdrop-blur-md text-white border border-white/10 rounded-2xl p-3 sm:p-3.5 shadow-2xl flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div
-              className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-              style={{ background: 'rgba(245, 158, 11, 0.2)' }}
-            >
-              <AlertTriangle size={16} style={{ color: '#F59E0B' }} className="animate-pulse" />
+            <div className="w-8 h-8 rounded-xl bg-teal/20 text-teal flex items-center justify-center shrink-0 border border-teal/30">
+              <Download size={16} className="stroke-[2.5]" />
             </div>
-            <div className="min-w-0 text-left">
-              <p className="font-bold leading-tight truncate sm:whitespace-normal" style={{ color: '#FFFFFF' }}>
-                ⚠️ STAFF ACTION REQUIRED: Install LayoScan Staff App
-              </p>
-              <p className="text-[11px] leading-tight hidden sm:block" style={{ color: '#D1D5DB' }}>
-                Browser tabs throttle sound alarms when hidden. Install as a standalone app to prevent missed orders.
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-white leading-tight">Install Staff App</p>
+              <p className="text-[11px] text-white/60 leading-tight mt-0.5 truncate">
+                Direct access & sound alarms
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"
               onClick={handleInstallClick}
-              className="px-3 py-1.5 rounded-lg font-bold text-xs shadow-sm active:scale-95 transition-all flex items-center gap-1.5 shrink-0"
-              style={{ background: '#F59E0B', color: '#121A2C' }}
+              className="px-3 py-1.5 rounded-xl bg-teal hover:bg-teal-light text-ink font-bold text-xs shadow-xs active:scale-95 transition-all flex items-center gap-1"
             >
-              <Download size={14} style={{ color: '#121A2C' }} />
-              <span style={{ color: '#121A2C', fontWeight: 'bold' }}>Install App Now</span>
+              Install
             </button>
-
             <button
               type="button"
-              onClick={handleSnooze}
-              title="Remind me again in 90 seconds"
-              className="p-1 rounded-md hover:bg-white/10 transition-colors"
-              style={{ color: '#9CA3AF' }}
-              aria-label="Snooze install reminder"
+              onClick={handleDismiss}
+              className="p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+              title="Dismiss for 24 hours"
+              aria-label="Dismiss install card"
             >
-              <X size={15} />
+              <X size={14} />
             </button>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* ── Persistent Staff Notification Permission Banner ─────────────── */}
-      {showNotifBanner && (
-        <div
-          className="px-4 py-2.5 shadow-md flex items-center justify-between gap-3 text-xs z-40 animate-in fade-in slide-in-from-top-2 duration-300"
-          style={{ background: '#991B1B', borderBottom: '1px solid rgba(0,0,0,0.2)' }}
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div
-              className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-              style={{ background: 'rgba(255, 255, 255, 0.2)' }}
-            >
-              <Bell size={16} className="animate-bounce" style={{ color: '#FFFFFF' }} />
-            </div>
-            <div className="min-w-0 text-left">
-              <p className="font-bold leading-tight truncate sm:whitespace-normal" style={{ color: '#FFFFFF' }}>
-                🔔 STAFF ALERT: System Notifications Are Disabled
-              </p>
-              <p className="text-[11px] leading-tight hidden sm:block" style={{ color: '#FEE2E2' }}>
-                {notifPermission === 'denied'
-                  ? 'Notifications are blocked in your browser. Unblock to receive alerts when running in background.'
-                  : 'Enable notifications to receive instant audio and tray alerts for new orders & customer calls.'}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={handleRequestNotification}
-              disabled={requestingNotif}
-              className="px-3 py-1.5 rounded-lg font-bold text-xs shadow-sm active:scale-95 transition-all flex items-center gap-1.5 shrink-0"
-              style={{ background: '#FFFFFF', color: '#991B1B' }}
-            >
-              {notifPermission === 'denied' ? (
-                <>
-                  <Lock size={13} style={{ color: '#991B1B' }} />
-                  <span style={{ color: '#991B1B', fontWeight: 'bold' }}>How to Unblock 🔒</span>
-                </>
-              ) : (
-                <>
-                  <Bell size={13} style={{ color: '#991B1B' }} />
-                  <span style={{ color: '#991B1B', fontWeight: 'bold' }}>
-                    {requestingNotif ? 'Enabling…' : 'Enable Alerts Now'}
-                  </span>
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Unblock Guidance Dialog ────────────────────────────────────── */}
-      {showUnblockGuidance && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-gray-200 relative text-left">
-            <button
-              onClick={() => setShowUnblockGuidance(false)}
-              className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-gray-100"
-              style={{ color: '#6B7280' }}
-            >
-              <X size={18} />
-            </button>
-
-            <div
-              className="w-12 h-12 rounded-2xl flex items-center justify-center mb-4"
-              style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#DC2626' }}
-            >
-              <Lock size={26} />
-            </div>
-
-            <h3 className="font-display font-bold text-base mb-1" style={{ color: '#121A2C' }}>
-              Unblock Notifications
-            </h3>
-            <p className="text-xs leading-relaxed mb-4" style={{ color: '#4B5563' }}>
-              Your browser is currently blocking notifications for LayoScan. Follow these quick steps to receive order alerts:
-            </p>
-
-            <div
-              className="space-y-3 p-3.5 rounded-2xl text-xs mb-5"
-              style={{ background: '#F3F4F6', border: '1px solid #E5E7EB', color: '#1F2937' }}
-            >
-              <div className="flex items-start gap-2.5">
-                <span
-                  className="w-5 h-5 rounded-full font-bold text-[10px] flex items-center justify-center shrink-0"
-                  style={{ background: '#DC2626', color: '#FFFFFF' }}
-                >
-                  1
-                </span>
-                <p style={{ color: '#1F2937' }}>
-                  Click the <strong style={{ color: '#111827' }}>lock 🔒</strong> or <strong style={{ color: '#111827' }}>tune / settings</strong> icon in your browser address bar (next to the website URL).
-                </p>
-              </div>
-              <div className="flex items-start gap-2.5">
-                <span
-                  className="w-5 h-5 rounded-full font-bold text-[10px] flex items-center justify-center shrink-0"
-                  style={{ background: '#DC2626', color: '#FFFFFF' }}
-                >
-                  2
-                </span>
-                <p style={{ color: '#1F2937' }}>
-                  Find <strong style={{ color: '#111827' }}>Notifications</strong> and change it to <strong style={{ color: '#111827' }}>Allow</strong>.
-                </p>
-              </div>
-              <div className="flex items-start gap-2.5">
-                <span
-                  className="w-5 h-5 rounded-full font-bold text-[10px] flex items-center justify-center shrink-0"
-                  style={{ background: '#DC2626', color: '#FFFFFF' }}
-                >
-                  3
-                </span>
-                <p style={{ color: '#1F2937' }}>
-                  Reload this page to apply changes.
-                </p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                setShowUnblockGuidance(false);
-                window.location.reload();
-              }}
-              className="w-full py-3 rounded-xl font-semibold text-xs active:scale-98 transition-all"
-              style={{ background: '#121A2C', color: '#FFFFFF' }}
-            >
-              <span style={{ color: '#FFFFFF', fontWeight: '600' }}>Reload Page</span>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Guidance Modal for iOS & Desktop Browsers ─────────────────────── */}
       {showIOSModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-gray-200 relative text-left">
-            <button
-              onClick={() => setShowIOSModal(false)}
-              className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-gray-100"
-              style={{ color: '#6B7280' }}
-            >
-              <X size={18} />
-            </button>
-
-            <div
-              className="w-12 h-12 rounded-2xl flex items-center justify-center mb-4"
-              style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#D97706' }}
-            >
-              <Smartphone size={26} />
-            </div>
-
-            <h3 className="font-display font-bold text-base mb-1" style={{ color: '#121A2C' }}>
-              Install LayoScan Staff App
-            </h3>
-            <p className="text-xs leading-relaxed mb-4" style={{ color: '#4B5563' }}>
-              Installing the app ensures real-time audible chimes and vibration alerts sound even when your screen is locked.
-            </p>
-
-            <div
-              className="space-y-3 p-3.5 rounded-2xl text-xs mb-5"
-              style={{ background: '#F3F4F6', border: '1px solid #E5E7EB', color: '#1F2937' }}
-            >
-              {isIOS ? (
-                <>
-                  <div className="flex items-start gap-2.5">
-                    <span
-                      className="w-5 h-5 rounded-full font-bold text-[10px] flex items-center justify-center shrink-0"
-                      style={{ background: '#121A2C', color: '#FFFFFF' }}
-                    >
-                      1
-                    </span>
-                    <p style={{ color: '#1F2937' }}>
-                      Tap the <strong style={{ color: '#111827' }}>Share</strong> button <span className="font-mono text-sm">⎋</span> at the bottom of Safari.
-                    </p>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <span
-                      className="w-5 h-5 rounded-full font-bold text-[10px] flex items-center justify-center shrink-0"
-                      style={{ background: '#121A2C', color: '#FFFFFF' }}
-                    >
-                      2
-                    </span>
-                    <p style={{ color: '#1F2937' }}>
-                      Scroll down and tap <strong style={{ color: '#111827' }}>Add to Home Screen</strong> <span className="font-mono text-sm">➕</span>.
-                    </p>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <span
-                      className="w-5 h-5 rounded-full font-bold text-[10px] flex items-center justify-center shrink-0"
-                      style={{ background: '#121A2C', color: '#FFFFFF' }}
-                    >
-                      3
-                    </span>
-                    <p style={{ color: '#1F2937' }}>
-                      Tap <strong style={{ color: '#111827' }}>Add</strong> in the top-right corner to finish.
-                    </p>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="flex items-start gap-2.5">
-                    <span
-                      className="w-5 h-5 rounded-full font-bold text-[10px] flex items-center justify-center shrink-0"
-                      style={{ background: '#121A2C', color: '#FFFFFF' }}
-                    >
-                      1
-                    </span>
-                    <p style={{ color: '#1F2937' }}>
-                      Tap your browser's menu (<strong style={{ color: '#111827' }}>three dots ⋮</strong> or address bar install icon).
-                    </p>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <span
-                      className="w-5 h-5 rounded-full font-bold text-[10px] flex items-center justify-center shrink-0"
-                      style={{ background: '#121A2C', color: '#FFFFFF' }}
-                    >
-                      2
-                    </span>
-                    <p style={{ color: '#1F2937' }}>
-                      Select <strong style={{ color: '#111827' }}>Install app</strong> or <strong style={{ color: '#111827' }}>Add to Home Screen</strong>.
-                    </p>
-                  </div>
-                </>
-              )}
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setShowIOSModal(false)}
-              className="w-full py-3 rounded-xl font-semibold text-xs active:scale-98 transition-all"
-              style={{ background: '#121A2C', color: '#FFFFFF' }}
-            >
-              <span style={{ color: '#FFFFFF', fontWeight: '600' }}>Got it, I will install now</span>
-            </button>
-          </div>
-        </div>
+        <InstallGuideModal isIOS={isIOS} onClose={() => setShowIOSModal(false)} />
       )}
     </>
+  );
+}
+
+function InstallGuideModal({ isIOS, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div className="bg-white rounded-3xl p-5 sm:p-6 max-w-sm w-full shadow-2xl border border-gray-200 relative text-left">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-800 transition-colors"
+          aria-label="Close"
+        >
+          <X size={18} />
+        </button>
+
+        <div className="w-12 h-12 rounded-2xl bg-teal/15 text-teal flex items-center justify-center mb-4">
+          <Smartphone size={24} className="stroke-[2.2]" />
+        </div>
+
+        <h3 className="font-display font-bold text-base text-ink mb-1">
+          Install LayoScan Staff App
+        </h3>
+        <p className="text-xs text-ink-muted leading-relaxed mb-4">
+          Install as a standalone app to ensure loud audible chimes and instant access even with locked screens.
+        </p>
+
+        <div className="space-y-3 p-3.5 rounded-2xl text-xs mb-5 bg-paper-dark border border-ink/8 text-ink">
+          {isIOS ? (
+            <>
+              <div className="flex items-start gap-2.5">
+                <span className="w-5 h-5 rounded-full font-bold text-[10px] flex items-center justify-center shrink-0 bg-ink text-white">
+                  1
+                </span>
+                <p>
+                  Tap the <strong>Share</strong> button <span className="font-mono text-sm">⎋</span> at the bottom of Safari.
+                </p>
+              </div>
+              <div className="flex items-start gap-2.5">
+                <span className="w-5 h-5 rounded-full font-bold text-[10px] flex items-center justify-center shrink-0 bg-ink text-white">
+                  2
+                </span>
+                <p>
+                  Scroll down and tap <strong>Add to Home Screen</strong> <span className="font-mono text-sm">➕</span>.
+                </p>
+              </div>
+              <div className="flex items-start gap-2.5">
+                <span className="w-5 h-5 rounded-full font-bold text-[10px] flex items-center justify-center shrink-0 bg-ink text-white">
+                  3
+                </span>
+                <p>
+                  Tap <strong>Add</strong> in the top-right corner to finish.
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-start gap-2.5">
+                <span className="w-5 h-5 rounded-full font-bold text-[10px] flex items-center justify-center shrink-0 bg-ink text-white">
+                  1
+                </span>
+                <p>
+                  Tap your browser menu (<strong>three dots ⋮</strong> or address bar install icon).
+                </p>
+              </div>
+              <div className="flex items-start gap-2.5">
+                <span className="w-5 h-5 rounded-full font-bold text-[10px] flex items-center justify-center shrink-0 bg-ink text-white">
+                  2
+                </span>
+                <p>
+                  Select <strong>Install app</strong> or <strong>Add to Home Screen</strong>.
+                </p>
+              </div>
+            </>
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={onClose}
+          className="w-full py-2.5 rounded-xl font-bold text-xs bg-ink text-white hover:bg-ink/90 active:scale-98 transition-all"
+        >
+          Got it
+        </button>
+      </div>
+    </div>
   );
 }

@@ -10,6 +10,7 @@ const {
 const { protect, restrictTo } = require('../middleware/auth');
 const { resolveTenantFromAuth } = require('../middleware/tenantResolver');
 const { validate } = require('../middleware/validator');
+const { requirePlan } = require('../middleware/requirePlan');
 
 const { isValidPhone } = require('../utils/phone');
 
@@ -21,6 +22,7 @@ router.get('/', restrictTo('owner', 'manager'), listUsers);
 router.post(
   '/',
   restrictTo('owner', 'manager'),
+  requirePlan('pro', 'staff'),
   [
     body('name').trim().notEmpty().withMessage('Name is required'),
     body().custom((value, { req }) => {

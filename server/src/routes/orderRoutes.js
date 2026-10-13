@@ -10,10 +10,12 @@ const {
   updateOrderPayment,
   updateTablePayment,
   submitOrderFeedback,
+  exportOrders,
 } = require('../controllers/orderController');
 const { protect, restrictTo }   = require('../middleware/auth');
 const { resolveTenantFromAuth } = require('../middleware/tenantResolver');
 const { publicWriteLimiter, tableResolveLimiter } = require('../middleware/rateLimit');
+const { requirePlan } = require('../middleware/requirePlan');
 
 // ── Public routes (customer-facing, no auth) ──────────────────────────────────
 // Registered BEFORE router.use(protect) to skip the auth guard
@@ -26,6 +28,7 @@ router.patch('/public/:id/feedback', publicWriteLimiter, submitOrderFeedback);
 router.use(protect, resolveTenantFromAuth);
 
 router.get('/',                            listOrders);
+router.get('/export',                      restrictTo('owner', 'manager'), requirePlan('pro', 'exports'), exportOrders);
 router.patch('/:id/status',                updateOrderStatus);
 router.patch('/:id/assign',                assignOrder);
 router.patch('/:id/payment',               restrictTo('owner', 'manager', 'coordinator', 'waiter'), updateOrderPayment);

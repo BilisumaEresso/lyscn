@@ -4,6 +4,10 @@ const User = require('../models/User');
 const Branch = require('../models/Branch');
 const Table = require('../models/Table');
 const RefreshToken = require('../models/RefreshToken');
+const Subscription = require('../models/Subscription');
+const Category = require('../models/Category');
+const Product = require('../models/Product');
+const { trackMetric } = require('../services/metering');
 
 const { normalizePhone } = require('../utils/phone');
 
@@ -72,6 +76,47 @@ const register = async (req, res, next) => {
       label:        'Table 1',
     });
 
+    // 4. Auto-provision 14-day Pro Subscription with 5-day grace period
+    const trialDays = 14;
+    const trialEndsAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
+    const gracePeriodEndsAt = new Date(Date.now() + (trialDays + 5) * 24 * 60 * 60 * 1000);
+
+    const subscription = await Subscription.create({
+      restaurantId:       restaurant._id,
+      plan:               'pro',
+      status:             'trialing',
+      trialEndsAt,
+      currentPeriodStart: new Date(),
+      currentPeriodEnd:   trialEndsAt,
+      gracePeriodEndsAt,
+      branchCount:        1,
+      branchLimit:        5,
+      priceETB:           1500,
+      billingCycle:       'monthly',
+      contactEmail:       email.toLowerCase(),
+      contactPhone:       req.body.phone || undefined,
+    });
+
+    // 5. Seed initial Starter Menu item so table 1 is instantly live with zero friction
+    const category = await Category.create({
+      restaurantId: restaurant._id,
+      name:         'Popular Items',
+      sortOrder:    0,
+    });
+
+    const product = await Product.create({
+      restaurantId: restaurant._id,
+      categoryId:   category._id,
+      name:         'House Special Macchiato',
+      price:        45,
+      description:  'Fresh Ethiopian roast espresso with steamed milk froth.',
+      isAvailable:  true,
+    });
+
+    // 6. Record conversion telemetry event
+    trackMetric(restaurant._id, 'trial_started', { plan: 'pro', trialDays }, user._id);
+    trackMetric(restaurant._id, 'table_created', { tableId: table._id, branchId: branch._id }, user._id);
+
     const accessToken  = signAccessToken(user);
     const refreshToken = signRefreshToken(user);
     await persistRefreshToken(user._id, refreshToken);
@@ -86,6 +131,9 @@ const register = async (req, res, next) => {
       restaurant,
       branch,
       table,
+      category,
+      product,
+      subscription,
       accessToken,
       refreshToken,
     });

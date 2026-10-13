@@ -913,6 +913,43 @@ const updateTablePayment = async (req, res, next) => {
   }
 };
 
+// ── GET /api/orders/export ────────────────────────────────────────────────────
+// Exports order history with items, payment, and status details (Pro plan feature).
+const exportOrders = async (req, res, next) => {
+  try {
+    const { from, to, branchId, status } = req.query;
+    const query = { restaurantId: req.tenantId };
+
+    if (branchId) query.branchId = branchId;
+    if (status) query.status = status;
+
+    if (from || to) {
+      query.createdAt = {};
+      if (from) query.createdAt.$gte = new Date(from);
+      if (to) {
+        const toDate = new Date(to);
+        toDate.setHours(23, 59, 59, 999);
+        query.createdAt.$lte = toDate;
+      }
+    }
+
+    const orders = await Order.find(query)
+      .sort({ createdAt: -1 })
+      .populate('tableId', 'label')
+      .populate('branchId', 'name')
+      .populate('assignedWaiterId', 'name')
+      .lean();
+
+    return res.json({
+      success: true,
+      count: orders.length,
+      orders,
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
 module.exports = {
   placeOrder,
   listOrders,
@@ -923,4 +960,5 @@ module.exports = {
   updateOrderPayment,
   updateTablePayment,
   submitOrderFeedback,
+  exportOrders,
 };

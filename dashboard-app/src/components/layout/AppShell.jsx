@@ -4,7 +4,7 @@ import { Menu } from 'lucide-react';
 import Sidebar from './Sidebar';
 import BottomTabBar from './BottomTabBar';
 import NotificationCenter from './NotificationCenter';
-import MandatoryInstallPrompt from './MandatoryInstallPrompt';
+import MandatoryInstallPrompt, { InstallHeaderButton } from './MandatoryInstallPrompt';
 import { useAuthStore } from '../../store/authStore';
 import { useRealtimeNotifications } from '../../hooks/useRealtimeNotifications';
 import { applyBrandColor } from '../../lib/theme';
@@ -45,7 +45,7 @@ export default function AppShell() {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-paper">
-      {/* High-priority Frequent Mandatory Install Prompt */}
+      {/* Responsive Floating Non-blocking Install Card */}
       <MandatoryInstallPrompt />
 
       <div className="flex flex-col lg:flex-row flex-1 overflow-hidden min-h-0">
@@ -77,8 +77,9 @@ export default function AppShell() {
             </div>
           </div>
 
-          {/* Right side: Notification Center */}
+          {/* Right side: Quick Install + Notification Center */}
           <div className="flex items-center gap-2 shrink-0">
+            <InstallHeaderButton isMobile />
             <NotificationCenter />
           </div>
         </header>
@@ -91,8 +92,9 @@ export default function AppShell() {
 
         {/* Main Content Viewport */}
         <main className="relative flex-1 overflow-y-auto min-w-0 pb-[calc(env(safe-area-inset-bottom,0px)+4.75rem)] lg:pb-0">
-          {/* Desktop Top-Right Floating Notification Controls */}
-          <div className="hidden lg:flex absolute top-3.5 right-6 z-30 items-center gap-2">
+          {/* Desktop Top-Right Floating Notification Controls + Quick Install */}
+          <div className="hidden lg:flex absolute top-3.5 right-6 z-30 items-center gap-2.5">
+            <InstallHeaderButton />
             <NotificationCenter />
           </div>
 
