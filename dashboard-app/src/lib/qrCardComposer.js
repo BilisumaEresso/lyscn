@@ -239,7 +239,23 @@ export async function renderPrintCardCanvas({
     backgroundColor: template.backgroundColor || '#FFFFFF',
   });
 
-  const qrBlob = await qrStyling.getRawData('png');
+  let qrBlob = null;
+  try {
+    qrBlob = await qrStyling.getRawData('png');
+  } catch (err) {
+    console.warn('Custom logo QR styling failed, falling back to themed center icon:', err);
+    const fallbackStyling = createStyledQR({
+      url: qrUrl,
+      brandColor: restaurant?.brandColor || template.accentColor,
+      logoUrl: fallbackLogo,
+      size: 600,
+      dotColor: template.dotColor,
+      cornerColor: template.cornerColor,
+      backgroundColor: template.backgroundColor || '#FFFFFF',
+    });
+    qrBlob = await fallbackStyling.getRawData('png');
+  }
+
   const qrBlobUrl = URL.createObjectURL(qrBlob);
   const qrImage = await loadImage(qrBlobUrl);
   URL.revokeObjectURL(qrBlobUrl);
