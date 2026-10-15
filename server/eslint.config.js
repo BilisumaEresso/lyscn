@@ -30,7 +30,7 @@ module.exports = [
   },
   {
     // Relax no-console for files that are migrating or run outside the server
-    files: ['src/utils/**'],
+    files: ['src/utils/**', 'scripts/**'],
     rules: {
       'no-console': 'off',
     },

@@ -134,7 +134,7 @@ const payInvoice = async (req, res, next) => {
     await invoice.save();
 
     // Extend or activate subscription for 30 days + 5 days grace
-    let sub = await Subscription.findOne({ restaurantId });
+    const sub = await Subscription.findOne({ restaurantId });
     const now = new Date();
     const periodEnd = new Date(now.getTime() + 30 * 86400000);
     const graceEnd = new Date(periodEnd.getTime() + 5 * 86400000);

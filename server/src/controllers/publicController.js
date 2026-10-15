@@ -310,7 +310,7 @@ const getPublicRestaurant = async (req, res, next) => {
       Order.find({
         restaurantId: restaurant._id,
         rating: { $gte: 1, $lte: 5 },
-        feedback: { $exists: true, $ne: null, $ne: '' },
+        feedback: { $exists: true, $nin: [null, ''] },
       })
         .select('rating feedback guestName createdAt items')
         .sort({ createdAt: -1 })

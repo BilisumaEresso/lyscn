@@ -18,7 +18,6 @@ const analyticsRoutes = require("./routes/analyticsRoutes");
 const billingRoutes = require("./routes/billingRoutes");
 const { notFound, errorHandler } = require("./middleware/errorHandler");
 const requestLogger = require("./middleware/requestLogger");
-const { isProduction } = require("./config/env");
 const { isOriginAllowed } = require("./config/cors");
 
 const app = express();
