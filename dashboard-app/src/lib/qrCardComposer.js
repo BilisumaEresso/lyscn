@@ -1,174 +1,29 @@
 import QRCodeStyling from 'qr-code-styling';
 import JSZip from 'jszip';
-import { loadImage, sanitizeFilename, formatTableCode, saveAs, getThemedQRIconDataUrl } from './canvasHelpers';
+import {
+  loadImage,
+  sanitizeFilename,
+  formatTableCode,
+  saveAs,
+  getThemedQRIconDataUrl,
+} from './canvasHelpers';
 import logoImg from '../assets/logo.png';
 import cafeLogoPlaceholder from '../assets/cafe_logo_placeholder.png';
-import cafeLatteHeroImg from '../assets/templates/cafe_latte_hero.jpg';
-import greenMartHeroImg from '../assets/templates/green_mart_harvest_hero.jpg';
-import skyViewSuiteHeroImg from '../assets/templates/skyview_hotel_suite_hero.jpg';
-import enatFeastHeroImg from '../assets/templates/enat_feast_hero.jpg';
-import liquorHeroImg from '../assets/templates/liquor_bar_hero.jpg';
-import liquorBgImg from '../assets/templates/liquor_bg.jpg';
 
-// Import Templates
-import {
-  renderCafeArtisanPortrait,
-  renderCafeArtisanLandscape,
-  renderCafeArtisanMenuBoard,
-} from './templates/cafeArtisan';
-import {
-  renderFastCasualPortrait,
-  renderFastCasualLandscape,
-  renderFastCasualMenuBoard,
-} from './templates/fastCasual';
-import {
-  renderFreshMartPortrait,
-  renderFreshMartLandscape,
-  renderFreshMartMenuBoard,
-} from './templates/freshMart';
-import {
-  renderLuxuryHotelPortrait,
-  renderLuxuryHotelLandscape,
-  renderLuxuryHotelMenuBoard,
-} from './templates/luxuryHotel';
-import {
-  renderCulturalHeritagePortrait,
-  renderCulturalHeritageLandscape,
-  renderCulturalHeritageMenuBoard,
-} from './templates/culturalHeritage';
-import {
-  renderLiquorBarPortrait,
-  renderLiquorBarLandscape,
-  renderLiquorBarMenuBoard,
-} from './templates/liquorBar';
+// Import New Declarative Background Engine & Registry
+import { renderCard } from './cards/renderEngine.js';
+import { QR_TEMPLATES, getTemplateById } from './cards/designRegistry.js';
+import { contrastRatio, getRelativeLuminance } from './cards/fitText.js';
 
-const CUSTOMER_URL = import.meta.env.VITE_CUSTOMER_APP_URL || 'https://layoscancustomer.vercel.app';
+const CUSTOMER_URL =
+  import.meta.env.VITE_CUSTOMER_APP_URL || 'https://layoscancustomer.vercel.app';
 
-// ── Master Template Registry (All 5 Archetypes) ──────────────────────────────
-export const QR_TEMPLATES = [
-  {
-    id: 'cafe_artisan',
-    name: 'Artisan Linen',
-    icon: '☕',
-    category: 'Cafe & Bakery',
-    sampleName: 'Elili Cafe',
-    sampleTagline: 'GOOD FOOD • GREAT COFFEE • BETTER DAYS',
-    description: 'Warm textured linen parchment with delicate botanical sprigs and latte art',
-    dotColor: '#1B382B',
-    cornerColor: '#1B382B',
-    accentColor: '#1B382B',
-    badgeBg: '#1B382B',
-    badgeText: '#FFFFFF',
-    backgroundColor: '#FFFFFF',
-    defaultHero: cafeLatteHeroImg,
-    renderPortrait: renderCafeArtisanPortrait,
-    renderLandscape: renderCafeArtisanLandscape,
-    renderMenuBoard: renderCafeArtisanMenuBoard,
-  },
-  {
-    id: 'fast_casual',
-    name: 'Bold Street',
-    icon: '🍔',
-    category: 'Fast Casual & Street Food',
-    sampleName: 'GoodBite',
-    sampleTagline: 'BURGERS • PIZZA • STREET FOOD',
-    description: 'Matte dark charcoal mode with radiant amber-gold ribbon waves and street energy',
-    dotColor: '#FFFFFF',
-    cornerColor: '#FFFFFF',
-    accentColor: '#FFA800',
-    badgeBg: '#FFA800',
-    badgeText: '#141414',
-    backgroundColor: '#1A1A1E',
-    defaultHero: null,
-    renderPortrait: renderFastCasualPortrait,
-    renderLandscape: renderFastCasualLandscape,
-    renderMenuBoard: renderFastCasualMenuBoard,
-  },
-  {
-    id: 'fresh_mart',
-    name: 'Fresh Emerald',
-    icon: '🥗',
-    category: 'Market & Deli',
-    sampleName: 'GreenMart',
-    sampleTagline: 'GROCERY • BAR • DAILY NEEDS',
-    description: 'Lush deep emerald gradient with fresh harvest produce and botanical vitality',
-    dotColor: '#0B3B24',
-    cornerColor: '#0B3B24',
-    accentColor: '#86EFAC',
-    badgeBg: '#86EFAC',
-    badgeText: '#0B3B24',
-    backgroundColor: '#FFFFFF',
-    defaultHero: greenMartHeroImg,
-    renderPortrait: renderFreshMartPortrait,
-    renderLandscape: renderFreshMartLandscape,
-    renderMenuBoard: renderFreshMartMenuBoard,
-  },
-  {
-    id: 'luxury_hotel',
-    name: 'Midnight Gold',
-    icon: '🏨',
-    category: 'Hotel & Fine Dining',
-    sampleName: 'SkyView Hotel',
-    sampleTagline: 'STAY • DINE • RELAX',
-    description: 'Midnight navy with architectural gold framing and refined hospitality',
-    dotColor: '#0C192E',
-    cornerColor: '#0C192E',
-    accentColor: '#E5C583',
-    badgeBg: '#E5C583',
-    badgeText: '#0C192E',
-    backgroundColor: '#FFFFFF',
-    defaultHero: skyViewSuiteHeroImg,
-    renderPortrait: renderLuxuryHotelPortrait,
-    renderLandscape: renderLuxuryHotelLandscape,
-    renderMenuBoard: renderLuxuryHotelMenuBoard,
-  },
-  {
-    id: 'cultural_heritage',
-    name: 'Habesha Heritage',
-    icon: '🍲',
-    category: 'Cultural Dining',
-    sampleName: 'Enat',
-    sampleTagline: 'TRADITIONAL FOOD & DRINK',
-    description: 'Aged Brana parchment with authentic royal Tibeb woven border and Mesob feast',
-    dotColor: '#781812',
-    cornerColor: '#781812',
-    accentColor: '#781812',
-    badgeBg: '#781812',
-    badgeText: '#FFFFFF',
-    backgroundColor: '#FFFFFF',
-    defaultHero: enatFeastHeroImg,
-    renderPortrait: renderCulturalHeritagePortrait,
-    renderLandscape: renderCulturalHeritageLandscape,
-    renderMenuBoard: renderCulturalHeritageMenuBoard,
-  },
-  {
-    id: 'liquor_bar',
-    name: 'Velvet Lounge',
-    icon: '🍸',
-    category: 'Bar, Lounge & Club',
-    sampleName: 'Bar House',
-    sampleTagline: 'GOOD DRINKS • GREAT VIBES • ALWAYS',
-    description: 'Luxurious dark velvet ambiance with amber bokeh, gold brackets, and craft cocktails',
-    dotColor: '#120F0D',
-    cornerColor: '#120F0D',
-    accentColor: '#E5C583',
-    badgeBg: '#E5C583',
-    badgeText: '#0D0B08',
-    backgroundColor: '#FFFDF7',
-    defaultHero: liquorHeroImg,
-    defaultBg: liquorBgImg,
-    renderPortrait: renderLiquorBarPortrait,
-    renderLandscape: renderLiquorBarLandscape,
-    renderMenuBoard: renderLiquorBarMenuBoard,
-  },
-];
-
-export function getTemplateById(id) {
-  return QR_TEMPLATES.find((t) => t.id === id) || QR_TEMPLATES[0];
-}
+// Re-export design registry for UI components (Tables.jsx, QRTemplateSelector, etc.)
+export { QR_TEMPLATES, getTemplateById };
 
 /**
- * Creates and configures a QRCodeStyling instance
+ * Creates and configures a QRCodeStyling instance with high-error-correction (H)
+ * and rounded corners.
  */
 export function createStyledQR({
   url,
@@ -215,28 +70,60 @@ export function createStyledQR({
 
 /**
  * Renders a full high-resolution print card onto an HTMLCanvasElement
- * Supports both 'portrait' (1200x1800) and 'landscape' (1800x1200)
+ * using the new background-image-first declarative render engine.
+ *
+ * Dimensions:
+ * - portrait: 1240 × 1748 (A6 @ 300 DPI)
+ * - landscape: 2480 × 1748 (A5 folded table tent @ 300 DPI)
+ * - menu_board: 1654 × 2339 (A4 @ 200 DPI)
+ *
+ * @param {Object} params
+ * @param {Object} params.table - Table data { label, qrToken }
+ * @param {Object} [params.restaurant] - Restaurant data
+ * @param {string} [params.templateId='artisan_linen'] - Template/design ID or legacy alias
+ * @param {'portrait'|'landscape'|'menu_board'} [params.orientation='portrait']
+ * @param {Object} [params.menuData]
+ * @returns {Promise<HTMLCanvasElement>} Resolves to rendered HTMLCanvasElement
  */
 export async function renderPrintCardCanvas({
   table,
   restaurant,
-  templateId = 'cafe_artisan',
-  orientation = 'portrait', // 'portrait' | 'landscape' | 'menu_board'
+  templateId = 'artisan_linen',
+  orientation = 'portrait',
   menuData = null,
 }) {
   const template = getTemplateById(templateId);
   const qrUrl = `${CUSTOMER_URL}/t/${table.qrToken}`;
 
   // 1. Generate QR Code with custom restaurant logo OR archetype-themed center icon
-  const fallbackLogo = getThemedQRIconDataUrl(templateId);
+  const legacyId =
+    template.id === 'artisan_linen' ? 'cafe_artisan' :
+    template.id === 'bold_street' ? 'fast_casual' :
+    template.id === 'fresh_emerald' ? 'fresh_mart' :
+    template.id === 'midnight_gold' ? 'luxury_hotel' :
+    template.id === 'habesha_heritage' ? 'cultural_heritage' :
+    template.id === 'velvet_lounge' ? 'liquor_bar' :
+    template.id;
+
+  const fallbackLogo = getThemedQRIconDataUrl(legacyId);
+
+  // Guarantee strong scannable contrast (>= 3.5:1) between QR dots and QR background
+  let qrBgColor = template.backgroundColor || '#FFFFFF';
+  let qrDotColor = template.dotColor || restaurant?.brandColor || template.accentColor;
+  let qrCornerColor = template.cornerColor || qrDotColor;
+
+  if (contrastRatio(qrDotColor, qrBgColor) < 3.5) {
+    qrBgColor = getRelativeLuminance(qrDotColor) > 0.5 ? '#1A1A1E' : '#FFFFFF';
+  }
+
   const qrStyling = createStyledQR({
     url: qrUrl,
-    brandColor: restaurant?.brandColor || template.accentColor,
+    brandColor: qrDotColor,
     logoUrl: restaurant?.logoUrl || fallbackLogo,
     size: 600,
-    dotColor: template.dotColor,
-    cornerColor: template.cornerColor,
-    backgroundColor: template.backgroundColor || '#FFFFFF',
+    dotColor: qrDotColor,
+    cornerColor: qrCornerColor,
+    backgroundColor: qrBgColor,
   });
 
   let qrBlob = null;
@@ -246,12 +133,12 @@ export async function renderPrintCardCanvas({
     console.warn('Custom logo QR styling failed, falling back to themed center icon:', err);
     const fallbackStyling = createStyledQR({
       url: qrUrl,
-      brandColor: restaurant?.brandColor || template.accentColor,
+      brandColor: qrDotColor,
       logoUrl: fallbackLogo,
       size: 600,
-      dotColor: template.dotColor,
-      cornerColor: template.cornerColor,
-      backgroundColor: template.backgroundColor || '#FFFFFF',
+      dotColor: qrDotColor,
+      cornerColor: qrCornerColor,
+      backgroundColor: qrBgColor,
     });
     qrBlob = await fallbackStyling.getRawData('png');
   }
@@ -260,90 +147,78 @@ export async function renderPrintCardCanvas({
   const qrImage = await loadImage(qrBlobUrl);
   URL.revokeObjectURL(qrBlobUrl);
 
-  // 2. Load restaurant logo & hero assets
+  // 2. Load restaurant custom logo (only if explicitly configured)
   let logoImage = null;
   if (restaurant?.logoUrl) {
     logoImage = await loadImage(restaurant.logoUrl);
   }
-  if (!logoImage) {
-    logoImage = await loadImage(cafeLogoPlaceholder);
-  }
-  if (!logoImage) {
-    logoImage = await loadImage(logoImg);
-  }
 
-  const heroImage = await loadImage(template.defaultHero);
-  const bgImage = await loadImage(template.defaultBg);
+  const heroImage = template.defaultHero ? await loadImage(template.defaultHero) : null;
 
-  // 3. Create Canvas
-  const isMenuBoard = orientation === 'menu_board';
-  const isLandscape = orientation === 'landscape';
-  const width = isMenuBoard ? 2400 : (isLandscape ? 1800 : 1200);
-  const height = isMenuBoard ? 3400 : (isLandscape ? 1200 : 1800);
-
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-
-  // 4. Delegate to template renderer
-  let renderFn = template.renderPortrait;
-  if (isMenuBoard && template.renderMenuBoard) {
-    renderFn = template.renderMenuBoard;
-  } else if (isLandscape && template.renderLandscape) {
-    renderFn = template.renderLandscape;
-  }
-
-  await renderFn(ctx, {
+  // 3. Delegate to the new high-resolution background engine
+  const canvas = await renderCard({
     table,
     restaurant,
+    templateId: template.id,
+    orientation,
     qrImage,
     logoImage,
     heroImage,
-    bgImage,
     menuData,
-    width,
-    height,
   });
 
   return canvas;
 }
 
 /**
- * Downloads a single table's print card PNG
+ * Downloads a single table's print card PNG.
+ * Releases canvas memory after blob creation (§9.9).
  */
 export async function downloadTableCard({
   table,
   restaurant,
-  templateId = 'cafe_artisan',
+  templateId = 'artisan_linen',
   orientation = 'portrait',
   menuData = null,
 }) {
-  const canvas = await renderPrintCardCanvas({ table, restaurant, templateId, orientation, menuData });
+  const canvas = await renderPrintCardCanvas({
+    table,
+    restaurant,
+    templateId,
+    orientation,
+    menuData,
+  });
 
   return new Promise((resolve) => {
     canvas.toBlob((blob) => {
       if (blob) {
         const restSlug = sanitizeFilename(restaurant?.name || 'restaurant');
         const tableSlug = sanitizeFilename(table.label || 'table');
-        const orientTag = orientation === 'landscape'
-          ? '-tent'
-          : (orientation === 'menu_board' ? '-menu-board' : '-card');
+        const orientTag =
+          orientation === 'landscape'
+            ? '-tent'
+            : orientation === 'menu_board'
+            ? '-menu-board'
+            : '-card';
         const filename = `${restSlug}-${tableSlug}-${templateId}${orientTag}.png`;
         saveAs(blob, filename);
       }
+      // Release memory (§9.9)
+      canvas.width = 0;
+      canvas.height = 0;
       resolve();
     }, 'image/png');
   });
 }
 
 /**
- * Downloads all tables as a ZIP bundle
+ * Downloads all tables as a ZIP bundle.
+ * Releases canvas memory after each table render (§9.9).
  */
 export async function downloadAllTablesZip({
   tables,
   restaurant,
-  templateId = 'cafe_artisan',
+  templateId = 'artisan_linen',
   orientation = 'portrait',
   menuData = null,
   onProgress,
@@ -370,23 +245,34 @@ export async function downloadAllTablesZip({
       orientation,
       menuData,
     });
+
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+
+    // Release memory immediately (§9.9)
+    canvas.width = 0;
+    canvas.height = 0;
 
     if (blob) {
       const tableSlug = sanitizeFilename(table.label || `table-${i + 1}`);
-      const orientTag = orientation === 'landscape'
-        ? '-tent'
-        : (orientation === 'menu_board' ? '-menu-board' : '-card');
+      const orientTag =
+        orientation === 'landscape'
+          ? '-tent'
+          : orientation === 'menu_board'
+          ? '-menu-board'
+          : '-card';
       zip.file(`${restSlug}-${tableSlug}-${templateId}${orientTag}.png`, blob);
     }
   }
 
   const content = await zip.generateAsync({ type: 'blob' });
-  const orientSuffix = orientation === 'landscape'
-    ? '-tent-cards'
-    : (orientation === 'menu_board' ? '-menu-boards' : '-qr-cards');
+  const orientSuffix =
+    orientation === 'landscape'
+      ? '-tent-cards'
+      : orientation === 'menu_board'
+      ? '-menu-boards'
+      : '-qr-cards';
   saveAs(content, `${restSlug}-all-${templateId}${orientSuffix}.zip`);
 }
 
-// Re-export helpers for backward compatibility
+// Re-export helpers for backward compatibility (§7)
 export { formatTableCode, sanitizeFilename };

@@ -45,6 +45,7 @@ const Analytics  = lazy(() => import('./pages/Analytics'));
 const Billing    = lazy(() => import('./pages/Billing'));
 const Settings   = lazy(() => import('./pages/Settings'));
 const NotFound   = lazy(() => import('./pages/NotFound'));
+const CardContactSheet = lazy(() => import('./dev/CardContactSheet'));
 
 // ── Skeleton fallbacks ────────────────────────────────────────────────────────
 function KanbanSkeleton() {
@@ -134,6 +135,9 @@ export default function App() {
                   <Route path="/settings" element={<Suspense fallback={<PageSkeleton />}><Settings /></Suspense>} />
                 </Route>
               </Route>
+
+              {/* Dev Contact Sheet */}
+              <Route path="/dev/cards" element={<CardContactSheet />} />
 
               {/* 404 */}
               <Route path="*" element={<NotFound />} />
