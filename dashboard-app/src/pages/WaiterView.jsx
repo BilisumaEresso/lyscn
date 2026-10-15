@@ -245,8 +245,13 @@ export default function WaiterView() {
       const tableOrders = orders.filter(
         (o) => (o.tableId?._id || o.tableId) === t._id && o.status !== 'cancelled'
       );
-      const unpaidOrders = tableOrders.filter((o) => o.paymentStatus === 'unpaid');
-      const unpaidTotal = unpaidOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+      const unpaidOrders = tableOrders.filter((o) => o.paymentStatus !== 'paid');
+      const unpaidTotal = unpaidOrders.reduce((sum, o) => {
+        if (o.balanceDue != null && o.paymentStatus === 'partially_paid') {
+          return sum + (Number(o.balanceDue) || 0);
+        }
+        return sum + (Number(o.balanceDue != null && o.balanceDue > 0 ? o.balanceDue : (o.grossTotal || o.totalAmount)) || 0);
+      }, 0);
       const isAssignedToCurrentWaiter = (user?.assignedTables || []).some(
         (at) => (at._id || at) === t._id
       );
@@ -256,7 +261,7 @@ export default function WaiterView() {
         orderCount: tableOrders.length,
         unpaidCount: unpaidOrders.length,
         unpaidTotal,
-        hasUnpaid: unpaidOrders.length > 0,
+        hasUnpaid: unpaidOrders.length > 0 && unpaidTotal > 0,
         isAssignedToCurrentWaiter,
       };
     });
@@ -314,17 +319,19 @@ export default function WaiterView() {
       tipAmount = tipPreset;
     }
 
+    const calculatedTotal = baseTotal + serviceChargeAmount + tipAmount;
+    const effectivePayAmount = settleMode === 'partial' && Number(partialAmountInput) > 0
+      ? Number(partialAmountInput)
+      : calculatedTotal;
+
     const payload = {
       tableId: selectedTableForSettle._id,
       paymentMethod: selectedPaymentMethod,
       serviceChargeRate,
       tipAmount,
+      amount: effectivePayAmount,
       paymentReference: txnRefInput.trim(),
     };
-
-    if (settleMode === 'partial' && Number(partialAmountInput) > 0) {
-      payload.amount = Number(partialAmountInput);
-    }
 
     settleMutation.mutate(payload);
   };
@@ -1088,70 +1095,78 @@ export default function WaiterView() {
       </main>
 
       {/* Settle Table Bill Modal — Waiter Assisted Scan & Verify */}
-      {selectedTableForSettle && (
-        <Modal
-          open={settleModalOpen}
-          onClose={() => setSettleModalOpen(false)}
-          title={`Settle Bill — ${selectedTableForSettle.label}`}
-          size="md"
-        >
-          <div className="space-y-4">
-            {/* Settle Mode Toggle (Full vs Partial Split) */}
-            <div className="grid grid-cols-2 gap-1.5 p-1 bg-ink/5 rounded-xl text-xs font-semibold">
-              <button
-                type="button"
-                onClick={() => setSettleMode('full')}
-                className={`py-1.5 rounded-lg transition-all ${
-                  settleMode === 'full' ? 'bg-white text-ink shadow-2xs font-bold' : 'text-ink-muted hover:text-ink'
-                }`}
-              >
-                Full Bill Settle
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSettleMode('partial');
-                  if (!partialAmountInput) setPartialAmountInput(String(Math.round((selectedTableForSettle.unpaidTotal || 0) / 2)));
-                }}
-                className={`py-1.5 rounded-lg transition-all ${
-                  settleMode === 'partial' ? 'bg-white text-ink shadow-2xs font-bold' : 'text-ink-muted hover:text-ink'
-                }`}
-              >
-                Partial Payment (Split)
-              </button>
-            </div>
+      {selectedTableForSettle && (() => {
+        const baseTotal = Number(selectedTableForSettle.unpaidTotal || 0);
+        const serviceChargeAmount = applyServiceCharge ? Math.round(baseTotal * 0.10) : 0;
+        let tipAmount = 0;
+        if (tipPreset === '5%') tipAmount = Math.round(baseTotal * 0.05);
+        else if (tipPreset === '10%') tipAmount = Math.round(baseTotal * 0.10);
+        else if (tipPreset === 'custom') tipAmount = Math.max(0, Number(customTipInput || 0));
+        else if (typeof tipPreset === 'number') tipAmount = tipPreset;
 
-            {/* Bill Summary Strip */}
-            {(() => {
-              const baseTotal = Number(selectedTableForSettle.unpaidTotal || 0);
-              const serviceChargeAmount = applyServiceCharge ? Math.round(baseTotal * 0.10) : 0;
-              let tipAmount = 0;
-              if (tipPreset === '5%') tipAmount = Math.round(baseTotal * 0.05);
-              else if (tipPreset === '10%') tipAmount = Math.round(baseTotal * 0.10);
-              else if (tipPreset === 'custom') tipAmount = Math.max(0, Number(customTipInput || 0));
-              else if (typeof tipPreset === 'number') tipAmount = tipPreset;
-              
-              const calculatedTotal = baseTotal + serviceChargeAmount + tipAmount;
-              const effectivePayAmount = settleMode === 'partial' && Number(partialAmountInput) > 0
-                ? Number(partialAmountInput)
-                : calculatedTotal;
+        const calculatedTotal = baseTotal + serviceChargeAmount + tipAmount;
+        const effectivePayAmount = settleMode === 'partial' && Number(partialAmountInput) > 0
+          ? Number(partialAmountInput)
+          : calculatedTotal;
 
-              return (
-                <div className="p-3.5 rounded-2xl bg-teal/10 border border-teal/20 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-[11px] text-ink-muted uppercase font-bold tracking-wider block">
-                        {settleMode === 'partial' ? 'Paying Now (Partial)' : 'Total Due'}
-                      </span>
-                      <span className="text-xs text-ink-muted">
-                        {selectedTableForSettle.unpaidCount} unpaid round{selectedTableForSettle.unpaidCount !== 1 ? 's' : ''}
-                      </span>
-                    </div>
+        return (
+          <Modal
+            open={settleModalOpen}
+            onClose={() => setSettleModalOpen(false)}
+            title={`Settle Bill — ${selectedTableForSettle.label}`}
+            size="md"
+          >
+            <div className="space-y-4">
+              {/* Settle Mode Toggle (Full vs Partial Split) */}
+              <div className="grid grid-cols-2 gap-1.5 p-1 bg-ink/5 rounded-xl text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setSettleMode('full')}
+                  className={`py-1.5 rounded-lg transition-all ${
+                    settleMode === 'full' ? 'bg-white text-ink shadow-2xs font-bold' : 'text-ink-muted hover:text-ink'
+                  }`}
+                >
+                  Full Bill Settle
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSettleMode('partial');
+                    if (!partialAmountInput) setPartialAmountInput(String(Math.round((selectedTableForSettle.unpaidTotal || 0) / 2)));
+                  }}
+                  className={`py-1.5 rounded-lg transition-all ${
+                    settleMode === 'partial' ? 'bg-white text-ink shadow-2xs font-bold' : 'text-ink-muted hover:text-ink'
+                  }`}
+                >
+                  Partial Payment (Split)
+                </button>
+              </div>
+
+              {/* Bill Summary Strip */}
+              <div className="p-3.5 rounded-2xl bg-teal/10 border border-teal/20 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-[11px] text-ink-muted uppercase font-bold tracking-wider block">
+                      {settleMode === 'partial' ? 'Paying Now (Partial)' : 'Total Due'}
+                    </span>
+                    <span className="text-xs text-ink-muted">
+                      {selectedTableForSettle.unpaidCount} unpaid round{selectedTableForSettle.unpaidCount !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  <div className="text-right">
                     <Currency
                       value={effectivePayAmount}
-                      className="font-display font-bold text-2xl text-ink"
+                      className="font-display font-bold text-2xl text-ink block"
                     />
+                    {settleMode === 'full' && (serviceChargeAmount > 0 || tipAmount > 0) && (
+                      <span className="text-[10px] text-teal-800 font-medium block">
+                        Base: {formatBirr(baseTotal)}
+                        {serviceChargeAmount > 0 ? ` + 10%: ${formatBirr(serviceChargeAmount)}` : ''}
+                        {tipAmount > 0 ? ` + Tip: ${formatBirr(tipAmount)}` : ''}
+                      </span>
+                    )}
                   </div>
+                </div>
 
                   {settleMode === 'partial' && (
                     <div className="pt-2 border-t border-teal/15 space-y-1">
@@ -1225,8 +1240,6 @@ export default function WaiterView() {
                     </div>
                   )}
                 </div>
-              );
-            })()}
 
             {/* Payment Method Selector Tabs */}
             <div>
@@ -1363,7 +1376,7 @@ export default function WaiterView() {
                 ? buildCbeDynamicQrPayload({
                     accountNumber: bankDetails.accountNumber,
                     accountName: bankDetails.accountName || restaurant?.name || 'LayoScan Merchant',
-                    amount: selectedTableForSettle?.unpaidTotal,
+                    amount: effectivePayAmount,
                     reason: `Table ${selectedTableForSettle?.label}`,
                     city: 'Addis Ababa',
                   })
@@ -1469,7 +1482,7 @@ export default function WaiterView() {
                             <div className="mt-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-semibold bg-purple-50 border-purple-200 text-purple-900">
                               <Sparkles size={12} className="text-purple-600 shrink-0" />
                               <span>
-                                Prefilled: <b>Br {Number(selectedTableForSettle.unpaidTotal || 0).toLocaleString()}</b> & <b>{tableRefRemark}</b>
+                                Prefilled: <b>Br {Number(effectivePayAmount || 0).toLocaleString()}</b> & <b>{tableRefRemark}</b>
                               </span>
                             </div>
                             <p className="text-[11px] font-medium text-ink-muted mt-1">
@@ -1488,7 +1501,7 @@ export default function WaiterView() {
                                 </span>
                               </div>
                               <p className="text-xs text-blue-950 font-medium leading-relaxed">
-                                Ask guest to open Telebirr &gt; <b>Send Money</b> (or dial <b>*127#</b>) to transfer <b className="text-blue-900"><Currency value={selectedTableForSettle.unpaidTotal} /></b>:
+                                Ask guest to open Telebirr &gt; <b>Send Money</b> (or dial <b>*127#</b>) to transfer <b className="text-blue-900"><Currency value={effectivePayAmount} /></b>:
                               </p>
                               <div className="flex items-center justify-between bg-white p-2.5 rounded-lg border border-blue-200 shadow-2xs">
                                 <div>
@@ -1578,7 +1591,7 @@ export default function WaiterView() {
                               <span>Verified with my own eyes</span>
                             </span>
                             <p className="text-[11px] text-amber-800 leading-snug mt-0.5">
-                              I inspected the customer's phone transfer screen/SMS confirming <b><Currency value={selectedTableForSettle.unpaidTotal} /></b> was transferred to <b>{bankDetails.accountName || restaurant?.name}</b>.
+                              I inspected the customer's phone transfer screen/SMS confirming <b><Currency value={effectivePayAmount} /></b> was transferred to <b>{bankDetails.accountName || restaurant?.name}</b>.
                             </p>
                           </div>
                         </label>
@@ -1615,7 +1628,7 @@ export default function WaiterView() {
                   <span>Cash Payment Collection</span>
                 </p>
                 <p className="text-[11px] text-emerald-800 leading-snug">
-                  Please collect <b><Currency value={selectedTableForSettle.unpaidTotal} /></b> in cash and provide change if needed before marking settled.
+                  Please collect <b><Currency value={effectivePayAmount} /></b> in cash and provide change if needed before marking settled.
                 </p>
               </div>
             )}
@@ -1627,7 +1640,7 @@ export default function WaiterView() {
                   <span>POS Terminal Payment</span>
                 </p>
                 <p className="text-[11px] text-indigo-800 leading-snug">
-                  Charge the customer's card on the physical terminal and verify the printed slip matches <b><Currency value={selectedTableForSettle.unpaidTotal} /></b>.
+                  Charge the customer's card on the physical terminal and verify the printed slip matches <b><Currency value={effectivePayAmount} /></b>.
                 </p>
               </div>
             )}
@@ -1658,7 +1671,8 @@ export default function WaiterView() {
             </div>
           </div>
         </Modal>
-      )}
+      );
+    })()}
     </div>
   );
 }

@@ -820,9 +820,16 @@ export default function OrderTracking() {
               )}
             </p>
           </div>
-          <span className="font-display font-bold text-xl text-ink">
-            <Currency value={summary.totalAmount || currentRound?.totalAmount || 0} />
-          </span>
+          <div className="text-right">
+            <span className="font-display font-bold text-xl text-ink block">
+              <Currency value={summary.grossTotal || summary.totalAmount || currentRound?.totalAmount || 0} />
+            </span>
+            {summary.serviceChargeTotal > 0 && (
+              <span className="text-[11px] text-teal-800 font-medium block">
+                incl. Br {summary.serviceChargeTotal} service charge
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Payment status badge */}
@@ -877,7 +884,9 @@ export default function OrderTracking() {
             const hasOther = pa?.otherBank?.isActive && pa?.otherBank?.accountNumber;
             const hasAnyAccount = hasTelebirr || hasCbe || hasAwash || hasOther;
 
-            const totalBill = summary.totalAmount || currentRound?.totalAmount || 0;
+            const totalBill = summary.unpaidAmount != null && summary.unpaidAmount > 0
+              ? summary.unpaidAmount
+              : (summary.grossTotal || summary.totalAmount || currentRound?.totalAmount || 0);
             const referenceRemark = `Table ${session.table?.label || ''} Bill #${orderId ? orderId.slice(-4).toUpperCase() : ''}`.trim();
 
             const copyToClipboard = (text, key, label) => {

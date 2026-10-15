@@ -456,16 +456,17 @@ const getTableOrders = async (req, res, next) => {
     }
 
     const orders = await Order.find(query)
-      .select('_id status paymentStatus guestName items totalAmount createdAt sessionId rating feedback')
+      .select('_id status paymentStatus guestName items totalAmount serviceChargeRate serviceChargeAmount grossTotal totalPaid balanceDue totalTips createdAt sessionId rating feedback')
       .sort({ createdAt: 1 });
 
     const totalAmount = Math.round(orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0) * 100) / 100;
+    const serviceChargeTotal = Math.round(orders.reduce((sum, o) => sum + (o.serviceChargeAmount || 0), 0) * 100) / 100;
+    const grossTotal = Math.round(orders.reduce((sum, o) => sum + (o.grossTotal || (o.totalAmount + (o.serviceChargeAmount || 0)) || 0), 0) * 100) / 100;
+    const totalTips = Math.round(orders.reduce((sum, o) => sum + (o.totalTips || 0), 0) * 100) / 100;
     const paidAmount = Math.round(
-      orders
-        .filter((o) => o.paymentStatus === 'paid')
-        .reduce((sum, o) => sum + (o.totalAmount || 0), 0) * 100
+      orders.reduce((sum, o) => sum + (o.totalPaid || (o.paymentStatus === 'paid' ? (o.grossTotal || o.totalAmount) : 0) || 0), 0) * 100
     ) / 100;
-    const unpaidAmount = Math.round((totalAmount - paidAmount) * 100) / 100;
+    const unpaidAmount = Math.max(0, Math.round((grossTotal - paidAmount) * 100) / 100);
     const activeCount = orders.filter((o) => o.status !== 'served').length;
 
     const rounds = orders.map((o, idx) => ({
@@ -476,6 +477,12 @@ const getTableOrders = async (req, res, next) => {
       guestName: o.guestName,
       items: o.items || [],
       totalAmount: o.totalAmount,
+      serviceChargeRate: o.serviceChargeRate || 0,
+      serviceChargeAmount: o.serviceChargeAmount || 0,
+      grossTotal: o.grossTotal || o.totalAmount,
+      totalPaid: o.totalPaid || (o.paymentStatus === 'paid' ? (o.grossTotal || o.totalAmount) : 0),
+      balanceDue: o.balanceDue != null ? o.balanceDue : (o.paymentStatus === 'paid' ? 0 : (o.grossTotal || o.totalAmount)),
+      totalTips: o.totalTips || 0,
       createdAt: o.createdAt,
       rating: o.rating,
       feedback: o.feedback,
@@ -492,6 +499,9 @@ const getTableOrders = async (req, res, next) => {
         roundCount: rounds.length,
         activeCount,
         totalAmount,
+        serviceChargeTotal,
+        grossTotal,
+        totalTips,
         paidAmount,
         unpaidAmount,
         allServed: rounds.length > 0 && activeCount === 0,
@@ -1469,11 +1479,17 @@ const getWaiterShiftSummary = async (req, res, next) => {
     let cashTips = 0;
     let digitalTips = 0;
 
+    const uIdStr = String(userId);
+
     for (const o of orders) {
-      totalSales += (o.totalAmount || 0);
+      // Calculate sales for orders assigned to or served by this waiter
+      if (String(o.assignedWaiterId) === uIdStr || (o.payments || []).some((p) => String(p.waiterId) === uIdStr || String(p.collectedBy) === uIdStr)) {
+        totalSales += (o.grossTotal || o.totalAmount || 0);
+      }
+
       for (const p of (o.payments || [])) {
-        if (String(p.waiterId) === String(userId) || String(p.collectedBy) === String(userId)) {
-          const tip = p.tipAmount || 0;
+        if (String(p.waiterId) === uIdStr || String(p.collectedBy) === uIdStr) {
+          const tip = Number(p.tipAmount) || 0;
           totalTips += tip;
           if (p.paymentMethod === 'cash') {
             cashTips += tip;
@@ -1484,16 +1500,28 @@ const getWaiterShiftSummary = async (req, res, next) => {
       }
     }
 
+    const roundedSales = Math.round(totalSales * 100) / 100;
+    const roundedTips = Math.round(totalTips * 100) / 100;
+    const roundedCash = Math.round(cashTips * 100) / 100;
+    const roundedDigital = Math.round(digitalTips * 100) / 100;
+
     return res.json({
       success: true,
       summary: {
         tablesServed: tableIdSet.size,
         ordersServed: servedOrders.length,
         totalOrders: orders.length,
-        totalSales: Math.round(totalSales * 100) / 100,
-        totalTips: Math.round(totalTips * 100) / 100,
-        cashTips: Math.round(cashTips * 100) / 100,
-        digitalTips: Math.round(digitalTips * 100) / 100,
+        totalSales: roundedSales,
+        totalTips: roundedTips,
+        cashTips: roundedCash,
+        digitalTips: roundedDigital,
+        // UI aliases for WaiterView
+        tablesServedToday: tableIdSet.size,
+        ordersDeliveredToday: servedOrders.length,
+        totalSalesHandled: roundedSales,
+        totalTipsToday: roundedTips,
+        cashTipsToday: roundedCash,
+        digitalTipsToday: roundedDigital,
       },
     });
   } catch (err) {

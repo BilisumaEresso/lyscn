@@ -157,7 +157,7 @@ orderSchema.pre('save', function (next) {
   if (this.grossTotal == null || this.grossTotal === 0) {
     this.grossTotal = Math.round(((this.totalAmount || 0) + (this.serviceChargeAmount || 0)) * 100) / 100;
   }
-  if (this.balanceDue == null) {
+  if (this.balanceDue == null || (this.balanceDue === 0 && this.paymentStatus !== 'paid' && (this.totalPaid || 0) === 0)) {
     this.balanceDue = Math.max(0, Math.round((this.grossTotal - (this.totalPaid || 0)) * 100) / 100);
   }
   next();
