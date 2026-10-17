@@ -10,6 +10,7 @@ import { calculateQRMetrics, MIN_QUIET_ZONE_RATIO } from '../src/lib/cards/qrQui
 import { drawRoundRect, normalizeRadii } from '../src/lib/cards/drawRoundRect.js';
 import { ensureFontsLoaded, DEFAULT_DESCRIPTORS } from '../src/lib/cards/fonts.js';
 import { fitText, contrastRatio, getRelativeLuminance } from '../src/lib/cards/fitText.js';
+import { formatPaymentAccounts } from '../src/lib/cards/slotRenderer.js';
 
 console.log('====================================================');
 console.log('   LayoScan Card Rendering Engine Verification');
@@ -161,6 +162,36 @@ console.log('\nTest 9: Testing font loader in Node environment...');
 let fontLoaded = false;
 await ensureFontsLoaded().then(() => { fontLoaded = true; });
 assert(fontLoaded === true, 'ensureFontsLoaded resolves cleanly without throwing in headless/Node environment');
+
+// ── Test 10: Payment Accounts Formatting (Telebirr-Only) ──────────────────────
+console.log('\nTest 10: Testing formatPaymentAccounts with Telebirr-only requirement...');
+const objectAccounts = {
+  telebirr: { accountNumber: '0902882087', isActive: true, accountName: 'Elili Cafe' },
+  cbeBirr: { accountNumber: '1000594630107', isActive: true, accountName: 'Elili Cafe' },
+};
+const resObj = formatPaymentAccounts(objectAccounts);
+assert(resObj === '0902882087', `formatPaymentAccounts returns only telebirr: "${resObj}"`);
+assert(!resObj.includes('[object Object]'), 'Output never contains "[object Object]"');
+assert(!resObj.includes('1000594630107'), 'Non-telebirr accounts are excluded');
+
+const legacyAccounts = { telebirr: '0902882087', cbe: '1000594630107' };
+const resLegacy = formatPaymentAccounts(legacyAccounts);
+assert(resLegacy === '0902882087', `formatPaymentAccounts handles legacy string format: "${resLegacy}"`);
+
+const inactiveAccounts = {
+  telebirr: { accountNumber: '0902882087', isActive: false },
+  cbeBirr: { accountNumber: '1000594630107', isActive: true },
+};
+const resInactive = formatPaymentAccounts(inactiveAccounts);
+assert(resInactive === '', `formatPaymentAccounts omits inactive telebirr: "${resInactive}"`);
+
+const customBankAccounts = {
+  telebirr: { accountNumber: '0902882087', isActive: true },
+  otherBank: { bankName: 'Dashen Bank', accountNumber: '5002138901', isActive: true },
+  instructions: 'Please show SMS to waiter',
+};
+const resCustom = formatPaymentAccounts(customBankAccounts);
+assert(resCustom === '0902882087', `formatPaymentAccounts handles custom bank ignoring other banks: "${resCustom}"`);
 
 console.log('\n====================================================');
 if (failedTests === 0) {

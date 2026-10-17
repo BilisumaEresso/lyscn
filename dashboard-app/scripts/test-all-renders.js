@@ -10,7 +10,10 @@ const sampleRestaurant = {
   brandColor: '#1B382B',
   description: 'WE SERVE QUALITY, WE THRIVE FOR YOUR SATISFACTION',
   logoUrl: null,
-  paymentAccounts: { telebirr: '0902882087', cbe: '1000594630107' },
+  paymentAccounts: {
+    telebirr: { accountNumber: '0902882087', isActive: true },
+    cbeBirr: { accountNumber: '1000594630107', isActive: true },
+  },
 };
 
 const sampleTable = {
@@ -37,6 +40,9 @@ function createMockCanvas(width, height) {
     beginPath: () => {},
     closePath: () => {},
     rect: () => {},
+    roundRect: () => {},
+    setLineDash: () => {},
+    getLineDash: () => [],
     clip: () => {},
     fill: () => {},
     stroke: () => {},

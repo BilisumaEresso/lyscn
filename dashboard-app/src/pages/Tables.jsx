@@ -221,10 +221,10 @@ function QRModal({ table, open, onClose }) {
                 </label>
                 <span className="text-[11px] font-medium text-ink-muted">
                   {orientation === 'menu_board'
-                    ? '240 × 340 mm (A4/A3)'
+                    ? '210 × 297 mm (A4)'
                     : orientation === 'landscape'
-                    ? '150 × 100 mm'
-                    : '100 × 150 mm'}
+                    ? '210 × 148 mm (A5 Folded)'
+                    : '105 × 148 mm (A6)'}
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-2">
@@ -347,10 +347,10 @@ function QRModal({ table, open, onClose }) {
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span className="text-xs font-bold text-ink">
                 {orientation === 'menu_board'
-                  ? 'Full Menu Board Preview (2400 × 3400 px)'
+                  ? 'Menu Board Preview (1654 × 2339 px · A4)'
                   : orientation === 'landscape'
-                  ? 'Tent Stand Preview (1800 × 1200 px)'
-                  : 'Vertical Stand Preview (1200 × 1800 px)'}
+                  ? 'Folded Tent Preview (2480 × 1748 px · A5)'
+                  : 'A6 Acrylic Stand Preview (1240 × 1748 px · A6)'}
               </span>
             </div>
             <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-white text-ink border border-ink/8 shadow-2xs">
@@ -359,15 +359,15 @@ function QRModal({ table, open, onClose }) {
           </div>
 
           {/* Canvas Viewport Stage */}
-          <div className="w-full flex-1 flex items-center justify-center min-h-[360px] sm:min-h-[420px] relative p-2">
+          <div className="w-full flex-1 flex items-center justify-center min-h-[360px] sm:min-h-[440px] relative p-2">
             {previewUrl ? (
               <div
-                className={`relative transition-all duration-300 shadow-2xl rounded-2xl overflow-hidden border border-black/10 bg-white ${
+                className={`relative transition-all duration-300 shadow-2xl rounded-2xl overflow-hidden border border-black/10 ${
                   orientation === 'landscape'
-                    ? 'w-full max-w-[460px] aspect-[3/2]'
+                    ? 'w-full max-w-[540px] aspect-[2480/1748]'
                     : orientation === 'menu_board'
-                    ? 'w-full max-w-[310px] aspect-[24/34]'
-                    : 'w-full max-w-[310px] aspect-[2/3]'
+                    ? 'w-full max-w-[340px] sm:max-w-[370px] aspect-[1654/2339]'
+                    : 'w-full max-w-[340px] sm:max-w-[370px] aspect-[1240/1748]'
                 }`}
                 style={{
                   boxShadow: '0 20px 48px -10px rgba(18, 26, 44, 0.28)',
@@ -376,12 +376,12 @@ function QRModal({ table, open, onClose }) {
                 <img
                   src={previewUrl}
                   alt={`Table ${table.label} QR Card`}
-                  className={`w-full h-full object-contain transition-opacity duration-200 ${
+                  className={`w-full h-full object-cover block transition-opacity duration-200 select-none ${
                     isGenerating ? 'opacity-30' : 'opacity-100'
                   }`}
                 />
                 {isGenerating && (
-                  <div className="absolute inset-0 bg-white/60 backdrop-blur-2xs flex flex-col items-center justify-center gap-2">
+                  <div className="absolute inset-0 bg-white/70 backdrop-blur-2xs flex flex-col items-center justify-center gap-2">
                     <Spinner />
                     <span className="text-xs font-semibold text-ink">Composing card…</span>
                   </div>

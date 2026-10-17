@@ -70,6 +70,17 @@ export const STANDARD_SAFE_AREAS = {
 
 /**
  * Builds standard slot definitions for Portrait (1240 × 1748)
+ * Safe zone: x 60–1180 · y 60–1688
+ *
+ * Slot layout from top to bottom:
+ *   Logo (optional)  y=75
+ *   Restaurant name  y=200
+ *   Tagline          y=315
+ *   Table pill       y=430
+ *   QR code          y=560  (600×600)
+ *   Table code badge y=1195
+ *   Telebirr payment y=1305
+ *   LayoScan mark    y=1420
  */
 function createPortraitSlots(palette, options = {}) {
   const {
@@ -80,6 +91,7 @@ function createPortraitSlots(palette, options = {}) {
     qrBorderWidth = 0,
     qrShadow = true,
     uppercaseName = false,
+    trademarkStyle = {},
   } = options;
 
   const slots = [
@@ -88,11 +100,11 @@ function createPortraitSlots(palette, options = {}) {
       id: 'logo',
       type: 'image',
       source: 'logo',
-      x: 540,
-      y: 90,
-      w: 160,
-      h: 80,
-      radius: 12,
+      x: 495,
+      y: 70,
+      w: 250,
+      h: 110,
+      radius: 14,
       clip: false,
     },
     // 2. Restaurant Name
@@ -101,11 +113,11 @@ function createPortraitSlots(palette, options = {}) {
       type: 'text',
       source: 'name',
       x: 80,
-      y: 180,
+      y: 195,
       w: 1080,
-      h: 90,
-      maxFontPx: 56,
-      minFontPx: 34,
+      h: 115,
+      maxFontPx: 64,
+      minFontPx: 38,
       font: headerFont,
       weight: 700,
       uppercase: uppercaseName,
@@ -114,17 +126,17 @@ function createPortraitSlots(palette, options = {}) {
       fallback: 'Restaurant',
       contrastCheck: true,
     },
-    // 3. Tagline (maxLines: 1, minFontPx >= 0.6 * maxFontPx)
+    // 3. Tagline (single line, letter-spaced uppercase)
     {
       id: 'tagline',
       type: 'text',
       source: 'tagline',
       x: 100,
-      y: 280,
+      y: 325,
       w: 1040,
-      h: 46,
-      maxFontPx: 26,
-      minFontPx: 16,
+      h: 56,
+      maxFontPx: 28,
+      minFontPx: 18,
       maxLines: 1,
       font: bodyFont,
       weight: 500,
@@ -135,44 +147,44 @@ function createPortraitSlots(palette, options = {}) {
       fallback: 'FINE FOOD & BEVERAGES',
       contrastCheck: true,
     },
-    // 4. Table Number Pill Badge (centered above QR card)
+    // 4. Table Number Pill Badge
     {
       id: 'tableLabel',
       type: 'pill',
       source: 'tableLabel',
-      x: 390,
-      y: 490,
-      w: 460,
-      h: 84,
-      radius: 42,
+      x: 370,
+      y: 420,
+      w: 500,
+      h: 96,
+      radius: 48,
       bgColor: palette.accent,
       color: palette.onAccent,
       font: headerFont,
       weight: 700,
-      maxFontPx: 42,
-      minFontPx: 26,
+      maxFontPx: 46,
+      minFontPx: 28,
       letterSpacing: 2,
       uppercase: true,
-      shadowColor: 'rgba(0,0,0,0.16)',
-      shadowBlur: 16,
+      shadowColor: 'rgba(0,0,0,0.18)',
+      shadowBlur: 20,
       fallback: 'Table 1',
     },
-    // 5. QR Code Slot (600 × 600, centered precisely on crosshair at 620, 920)
+    // 5. QR Code Slot — 660×660, qrSize 554 → 9.56% quiet zone ≥ 8%
     {
       id: 'qr',
       type: 'qr',
       source: 'qr',
-      x: 320,
-      y: 620,
-      w: 600,
-      h: 600,
-      qrSize: 504,
+      x: 290,
+      y: 550,
+      w: 660,
+      h: 660,
+      qrSize: 554,
       bgColor: qrContainerBg,
       borderColor: qrBorderColor,
       borderWidth: qrBorderWidth,
-      radius: 36,
+      radius: 38,
       shadowColor: qrShadow ? 'rgba(0,0,0,0.18)' : null,
-      shadowBlur: qrShadow ? 24 : 0,
+      shadowBlur: qrShadow ? 26 : 0,
       shadowOffsetY: 8,
     },
   ];
@@ -181,78 +193,75 @@ function createPortraitSlots(palette, options = {}) {
   const isDarkContainer = qrContainerBg && getRelativeLuminance(qrContainerBg) < 0.5;
   const tableCodeColor = isDarkContainer ? (palette.onAccent || '#FFFFFF') : '#111827';
   const tableCodeLabelColor = isDarkContainer ? (palette.textMuted || '#A0A0A8') : '#64748B';
+  const tableCodeBorderColor = qrBorderColor || (isDarkContainer ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.1)');
 
   slots.push({
     id: 'tableCode',
     type: 'badge',
     source: 'tableCode',
-    x: 340,
-    y: 1250,
-    w: 560,
-    h: 70,
-    radius: 18,
+    x: 310,
+    y: 1245,
+    w: 620,
+    h: 84,
+    radius: 22,
     bgColor: qrContainerBg,
-    borderColor: qrBorderColor || (isDarkContainer ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)'),
+    borderColor: tableCodeBorderColor,
     borderWidth: 1.5,
     labelColor: tableCodeLabelColor,
     color: tableCodeColor,
     labelPrefix: 'TABLE CODE: ',
-    labelPx: 17,
-    codePx: 22,
+    labelPx: 19,
+    codePx: 25,
     shadowColor: 'rgba(0,0,0,0.08)',
-    shadowBlur: 12,
+    shadowBlur: 14,
     fallback: 'TABLE-CODE',
   });
 
-  // 7. Payment Accounts Info
+  // 7. Telebirr Payment Slot (prominent, high-visibility)
   slots.push({
     id: 'payment',
-    type: 'text',
+    type: 'telebirr',
     source: 'payment',
     x: 80,
-    y: 1355,
+    y: 1365,
     w: 1080,
-    h: 48,
-    maxFontPx: 24,
-    minFontPx: 16,
-    maxLines: 1,
-    font: bodyFont,
-    weight: 600,
+    h: 104,
     color: palette.textPrimary,
-    align: 'center',
-    fallback: 'PAYMENT ACCEPTED: TELEBIRR • CBE BIRR • CASH',
-    contrastCheck: true,
+    labelColor: palette.textMuted,
+    bodyFont,
   });
 
-  // 8. Footer Brand / CTA
+  // 8. LayoScan Trademark Footer (prominent, high-visibility)
   slots.push({
     id: 'footer',
-    type: 'text',
+    type: 'trademark',
     source: 'footer',
     x: 80,
-    y: 1435,
+    y: 1500,
     w: 1080,
-    h: 40,
-    maxFontPx: 20,
-    minFontPx: 14,
-    maxLines: 1,
-    font: bodyFont,
-    weight: 600,
-    letterSpacing: 1.5,
-    uppercase: true,
+    h: 104,
     color: palette.textMuted,
-    align: 'center',
-    fallback: 'POWERED BY LAYOSCAN • SCAN TO VIEW MENU & ORDER',
-    contrastCheck: true,
+    trademarkStyle,
   });
 
   return slots;
 }
 
+
 /**
  * Builds standard slot definitions for Landscape Folded Tent (2480 × 1748)
- * Left panel (x 60..1180): Brand, tagline, instructions, payment accounts, footer.
- * Right panel (x 1300..2420): Table pill, high-contrast QR code, table code badge.
+ * Safe zone: x 60–2420 · y 60–1688 · Fold line at center x=1240
+ *
+ * Left panel (Face A, center x=620):
+ *   - Logo, Restaurant Name, Tagline
+ *   - 3-Step Contactless Ordering Guide Container (eliminates the dead void)
+ *   - Telebirr Payment Badge & LayoScan Trademark
+ *
+ * Right panel (Face B, center x=1860):
+ *   - Mini Venue Header & Table Number Pill Badge
+ *   - Large 700×700 QR Code Container (580px QR, 10.34% quiet zone)
+ *   - Table Code Badge & Scan Prompt Call-to-Action
+ *   - Symmetrical Telebirr Payment Badge & LayoScan Trademark
  */
 function createLandscapeSlots(palette, options = {}) {
   const {
@@ -262,51 +271,66 @@ function createLandscapeSlots(palette, options = {}) {
     qrBorderColor = null,
     qrBorderWidth = 0,
     qrShadow = true,
+    trademarkStyle = {},
   } = options;
 
+  const isDarkContainer = qrContainerBg && getRelativeLuminance(qrContainerBg) < 0.5;
+  const isDarkCard = palette.textPrimary && getRelativeLuminance(palette.textPrimary) > 0.5;
+  const dockBg = isDarkCard ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.035)';
+  const dockBorder = qrBorderColor || (isDarkCard ? 'rgba(255, 255, 255, 0.16)' : 'rgba(0, 0, 0, 0.12)');
+
+  const tableCodeBorderColor = qrBorderColor || (isDarkContainer ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.12)');
+  const tableCodeColor = isDarkContainer ? (palette.onAccent || '#FFFFFF') : '#111827';
+  const tableCodeLabelColor = isDarkContainer ? (palette.textMuted || '#A0A0A8') : '#64748B';
+
   return [
-    // ── LEFT TENT PANEL ──────────────────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════════════
+    // LEFT TENT PANEL (Face A: Brand & Contactless Experience — center x=620)
+    // ════════════════════════════════════════════════════════════════════════
+    // 1. Restaurant Logo
     {
       id: 'logo',
       type: 'image',
       source: 'logo',
-      x: 520,
-      y: 120,
-      w: 200,
-      h: 120,
-      radius: 14,
+      x: 500,
+      y: 75,
+      w: 240,
+      h: 130,
+      radius: 16,
       clip: false,
     },
+    // 2. Restaurant Name
     {
       id: 'name',
       type: 'text',
       source: 'name',
-      x: 100,
-      y: 260,
-      w: 1040,
-      h: 100,
+      x: 80,
+      y: 220,
+      w: 1080,
+      h: 80,
       maxFontPx: 64,
       minFontPx: 38,
       font: headerFont,
-      weight: 700,
+      weight: 800,
       color: palette.textPrimary,
       align: 'center',
       fallback: 'Restaurant',
       contrastCheck: true,
     },
+    // 3. Tagline / Cuisine Descriptor
     {
       id: 'tagline',
       type: 'text',
       source: 'tagline',
-      x: 120,
-      y: 375,
-      w: 1000,
-      h: 52,
-      maxFontPx: 28,
-      minFontPx: 18,
+      x: 100,
+      y: 310,
+      w: 1040,
+      h: 44,
+      maxFontPx: 26,
+      minFontPx: 16,
       maxLines: 1,
       font: bodyFont,
-      weight: 500,
+      weight: 600,
       letterSpacing: 2,
       uppercase: true,
       color: palette.textMuted,
@@ -314,17 +338,236 @@ function createLandscapeSlots(palette, options = {}) {
       fallback: 'DELICIOUS FLAVORS & WARM SERVICE',
       contrastCheck: true,
     },
+    // 4. Contactless Ordering 3-Step Guide Card (fills middle void)
     {
-      id: 'leftInstruction',
+      id: 'leftDockBg',
+      type: 'container',
+      source: 'custom',
+      x: 100,
+      y: 375,
+      w: 1040,
+      h: 790,
+      radius: 26,
+      bgColor: dockBg,
+      borderColor: dockBorder,
+      borderWidth: 1.5,
+    },
+    {
+      id: 'leftGuideTitle',
       type: 'text',
+      source: 'custom',
+      x: 120,
+      y: 405,
+      w: 1000,
+      h: 44,
+      text: '⚡ CONTACTLESS TABLE ORDERING',
+      maxFontPx: 26,
+      minFontPx: 18,
+      maxLines: 1,
+      font: headerFont,
+      weight: 800,
+      letterSpacing: 2,
+      uppercase: true,
+      color: palette.accent,
+      align: 'center',
+      contrastCheck: true,
+    },
+    // Step 01
+    {
+      id: 'step1Badge',
+      type: 'pill',
       source: 'custom',
       x: 140,
       y: 480,
-      w: 960,
-      h: 60,
-      text: '1. Scan QR with your phone   •   2. Browse menu   •   3. Place order',
+      w: 80,
+      h: 56,
+      radius: 28,
+      bgColor: palette.accent,
+      color: palette.onAccent,
+      font: headerFont,
+      weight: 800,
       maxFontPx: 26,
       minFontPx: 18,
+      fallback: '01',
+    },
+    {
+      id: 'step1Title',
+      type: 'text',
+      source: 'custom',
+      x: 245,
+      y: 480,
+      w: 870,
+      h: 30,
+      text: 'POINT CAMERA AT TABLE QR',
+      maxFontPx: 24,
+      minFontPx: 16,
+      maxLines: 1,
+      font: bodyFont,
+      weight: 700,
+      color: palette.textPrimary,
+      align: 'left',
+      contrastCheck: true,
+    },
+    {
+      id: 'step1Desc',
+      type: 'text',
+      source: 'custom',
+      x: 245,
+      y: 514,
+      w: 870,
+      h: 28,
+      text: 'Scan the QR code on the opposite side of this tent stand',
+      maxFontPx: 19,
+      minFontPx: 13,
+      maxLines: 1,
+      font: bodyFont,
+      weight: 500,
+      color: palette.textMuted,
+      align: 'left',
+      contrastCheck: true,
+    },
+    // Step 02
+    {
+      id: 'step2Badge',
+      type: 'pill',
+      source: 'custom',
+      x: 140,
+      y: 585,
+      w: 80,
+      h: 56,
+      radius: 28,
+      bgColor: palette.accent,
+      color: palette.onAccent,
+      font: headerFont,
+      weight: 800,
+      maxFontPx: 26,
+      minFontPx: 18,
+      fallback: '02',
+    },
+    {
+      id: 'step2Title',
+      type: 'text',
+      source: 'custom',
+      x: 245,
+      y: 585,
+      w: 870,
+      h: 30,
+      text: 'EXPLORE LIVE DIGITAL MENU',
+      maxFontPx: 24,
+      minFontPx: 16,
+      maxLines: 1,
+      font: bodyFont,
+      weight: 700,
+      color: palette.textPrimary,
+      align: 'left',
+      contrastCheck: true,
+    },
+    {
+      id: 'step2Desc',
+      type: 'text',
+      source: 'custom',
+      x: 245,
+      y: 619,
+      w: 870,
+      h: 28,
+      text: 'Browse dishes, ingredients, prices, photos & daily chef specials',
+      maxFontPx: 19,
+      minFontPx: 13,
+      maxLines: 1,
+      font: bodyFont,
+      weight: 500,
+      color: palette.textMuted,
+      align: 'left',
+      contrastCheck: true,
+    },
+    // Step 03
+    {
+      id: 'step3Badge',
+      type: 'pill',
+      source: 'custom',
+      x: 140,
+      y: 690,
+      w: 80,
+      h: 56,
+      radius: 28,
+      bgColor: palette.accent,
+      color: palette.onAccent,
+      font: headerFont,
+      weight: 800,
+      maxFontPx: 26,
+      minFontPx: 18,
+      fallback: '03',
+    },
+    {
+      id: 'step3Title',
+      type: 'text',
+      source: 'custom',
+      x: 245,
+      y: 690,
+      w: 870,
+      h: 30,
+      text: 'ORDER & PAY DIRECTLY ON PHONE',
+      maxFontPx: 24,
+      minFontPx: 16,
+      maxLines: 1,
+      font: bodyFont,
+      weight: 700,
+      color: palette.textPrimary,
+      align: 'left',
+      contrastCheck: true,
+    },
+    {
+      id: 'step3Desc',
+      type: 'text',
+      source: 'custom',
+      x: 245,
+      y: 724,
+      w: 870,
+      h: 28,
+      text: 'Send orders straight to kitchen & complete payment with Telebirr',
+      maxFontPx: 19,
+      minFontPx: 13,
+      maxLines: 1,
+      font: bodyFont,
+      weight: 500,
+      color: palette.textMuted,
+      align: 'left',
+      contrastCheck: true,
+    },
+    // Feature highlight badge pill inside container
+    {
+      id: 'leftFeatureBadge',
+      type: 'badge',
+      source: 'custom',
+      x: 140,
+      y: 810,
+      w: 960,
+      h: 68,
+      radius: 18,
+      bgColor: qrContainerBg,
+      borderColor: tableCodeBorderColor,
+      borderWidth: 1.5,
+      labelColor: tableCodeLabelColor,
+      color: tableCodeColor,
+      labelPrefix: 'SPEED: ',
+      fallback: 'INSTANT KITCHEN DISPATCH • NO APP REQUIRED',
+      labelPx: 16,
+      codePx: 20,
+      shadowColor: 'rgba(0,0,0,0.06)',
+      shadowBlur: 10,
+    },
+    // Customer assurance note
+    {
+      id: 'leftCustomerNote',
+      type: 'text',
+      source: 'custom',
+      x: 140,
+      y: 920,
+      w: 960,
+      h: 36,
+      text: 'Scan anytime for refills, add-ons, or bill payment during your visit',
+      maxFontPx: 20,
+      minFontPx: 14,
       maxLines: 1,
       font: bodyFont,
       weight: 600,
@@ -332,130 +575,194 @@ function createLandscapeSlots(palette, options = {}) {
       align: 'center',
       contrastCheck: true,
     },
+    // 5. Telebirr Payment (Left Panel Footer)
     {
       id: 'payment',
-      type: 'text',
+      type: 'telebirr',
       source: 'payment',
-      x: 100,
-      y: 1320,
-      w: 1040,
-      h: 60,
-      maxFontPx: 26,
-      minFontPx: 18,
-      maxLines: 1,
-      font: bodyFont,
-      weight: 600,
+      x: 80,
+      y: 1220,
+      w: 1080,
+      h: 104,
       color: palette.textPrimary,
-      align: 'center',
-      fallback: 'ACCEPTED PAYMENTS: TELEBIRR • CBE BIRR • CASH',
-      contrastCheck: true,
+      labelColor: palette.textMuted,
+      bodyFont,
     },
+    // 6. LayoScan Trademark (Left Panel Bottom)
     {
       id: 'footer',
-      type: 'text',
+      type: 'trademark',
       source: 'footer',
-      x: 100,
-      y: 1420,
-      w: 1040,
-      h: 50,
-      maxFontPx: 22,
-      minFontPx: 15,
-      maxLines: 1,
-      font: bodyFont,
-      weight: 600,
-      letterSpacing: 1.5,
-      uppercase: true,
+      x: 80,
+      y: 1360,
+      w: 1080,
+      h: 104,
       color: palette.textMuted,
-      align: 'center',
-      fallback: 'POWERED BY LAYOSCAN • CONTACTLESS TABLE DINING',
-      contrastCheck: true,
+      trademarkStyle,
     },
 
-    // ── RIGHT TENT PANEL ─────────────────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════════════
+    // RIGHT TENT PANEL (Face B: Digital Ordering & QR Token — center x=1860)
+    // ════════════════════════════════════════════════════════════════════════
+    // 1. Mini Venue Identifier (so Face B identifies the restaurant)
+    {
+      id: 'rightVenueName',
+      type: 'text',
+      source: 'name',
+      x: 1320,
+      y: 75,
+      w: 1080,
+      h: 46,
+      maxFontPx: 36,
+      minFontPx: 22,
+      maxLines: 1,
+      font: headerFont,
+      weight: 800,
+      letterSpacing: 2,
+      uppercase: true,
+      color: palette.textPrimary,
+      align: 'center',
+      fallback: 'Restaurant',
+      contrastCheck: true,
+    },
+    // 2. Table Number Pill Badge
     {
       id: 'tableLabel',
       type: 'pill',
       source: 'tableLabel',
-      x: 1610,
-      y: 180,
-      w: 500,
+      x: 1590,
+      y: 140,
+      w: 540,
       h: 90,
       radius: 45,
       bgColor: palette.accent,
       color: palette.onAccent,
       font: headerFont,
-      weight: 700,
+      weight: 800,
       maxFontPx: 46,
-      minFontPx: 28,
+      minFontPx: 26,
       letterSpacing: 2,
       uppercase: true,
-      shadowColor: 'rgba(0,0,0,0.16)',
-      shadowBlur: 16,
+      shadowColor: 'rgba(0,0,0,0.18)',
+      shadowBlur: 18,
       fallback: 'Table 1',
     },
-    // QR Slot: 660 × 660, qrSize 550 -> 55px quiet zone = 10% >= 8%
+    // 3. QR Code Slot: 700×700, qrSize 580 → 60px quiet zone = 10.34% ≥ 8%
     {
       id: 'qr',
       type: 'qr',
       source: 'qr',
-      x: 1530,
-      y: 320,
-      w: 660,
-      h: 660,
-      qrSize: 550,
+      x: 1510,
+      y: 265,
+      w: 700,
+      h: 700,
+      qrSize: 580,
       bgColor: qrContainerBg,
       borderColor: qrBorderColor,
       borderWidth: qrBorderWidth,
-      radius: 40,
+      radius: 42,
       shadowColor: qrShadow ? 'rgba(0,0,0,0.18)' : null,
       shadowBlur: qrShadow ? 24 : 0,
       shadowOffsetY: 8,
     },
+    // 4. Table Code Badge
     {
       id: 'tableCode',
       type: 'badge',
       source: 'tableCode',
-      x: 1560,
-      y: 1030,
-      w: 600,
-      h: 76,
-      radius: 20,
+      x: 1550,
+      y: 1000,
+      w: 620,
+      h: 84,
+      radius: 22,
       bgColor: qrContainerBg,
-      borderColor: qrBorderColor || ((qrContainerBg && getRelativeLuminance(qrContainerBg) < 0.5) ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)'),
+      borderColor: tableCodeBorderColor,
       borderWidth: 1.5,
-      labelColor: (qrContainerBg && getRelativeLuminance(qrContainerBg) < 0.5) ? (palette.textMuted || '#A0A0A8') : '#64748B',
-      color: (qrContainerBg && getRelativeLuminance(qrContainerBg) < 0.5) ? (palette.onAccent || '#FFFFFF') : '#111827',
+      labelColor: tableCodeLabelColor,
+      color: tableCodeColor,
       labelPrefix: 'TABLE CODE: ',
-      labelPx: 18,
-      codePx: 24,
+      labelPx: 19,
+      codePx: 25,
       shadowColor: 'rgba(0,0,0,0.08)',
       shadowBlur: 12,
       fallback: 'TABLE-CODE',
     },
+    // 5. Scan Prompts
     {
       id: 'scanPrompt',
       type: 'text',
       source: 'custom',
-      x: 1400,
-      y: 1140,
-      w: 920,
-      h: 60,
-      text: 'Scan with camera to view live menu & order',
+      x: 1320,
+      y: 1105,
+      w: 1080,
+      h: 44,
+      text: 'POINT CAMERA AT QR CODE TO VIEW MENU & ORDER',
       maxFontPx: 28,
       minFontPx: 18,
       maxLines: 1,
       font: bodyFont,
-      weight: 600,
+      weight: 700,
+      letterSpacing: 1.5,
       color: palette.textPrimary,
       align: 'center',
       contrastCheck: true,
+    },
+    {
+      id: 'scanSubPrompt',
+      type: 'text',
+      source: 'custom',
+      x: 1320,
+      y: 1155,
+      w: 1080,
+      h: 36,
+      text: 'Instant digital ordering • No app download required',
+      maxFontPx: 20,
+      minFontPx: 14,
+      maxLines: 1,
+      font: bodyFont,
+      weight: 500,
+      color: palette.textMuted,
+      align: 'center',
+      contrastCheck: true,
+    },
+    // 6. Telebirr Payment (Right Panel Footer — Symmetrical with Left)
+    {
+      id: 'paymentRight',
+      type: 'telebirr',
+      source: 'payment',
+      x: 1320,
+      y: 1220,
+      w: 1080,
+      h: 104,
+      color: palette.textPrimary,
+      labelColor: palette.textMuted,
+      bodyFont,
+    },
+    // 7. LayoScan Trademark (Right Panel Bottom — Symmetrical with Left)
+    {
+      id: 'footerRight',
+      type: 'trademark',
+      source: 'footer',
+      x: 1320,
+      y: 1360,
+      w: 1080,
+      h: 104,
+      color: palette.textMuted,
+      trademarkStyle,
     },
   ];
 }
 
 /**
  * Builds standard slot definitions for Menu Board Poster (1654 × 2339)
- * Simpler poster layout (restaurant name, QR, "scan to view menu") without payment slots.
+ * Safe zone: x 80–1574 · y 80–2259
+ *
+ * Slot layout from top to bottom:
+ *   1. Branded Header (y: 80..290): Logo, Restaurant Name, Tagline
+ *   2. Digital Ordering Bridge Dock (y: 312..556): Dock card, Table pill, Table code,
+ *      scan instruction, and compact 220×220 scannable QR (10.4% quiet zone)
+ *   3. Dynamic Two-Column Menu Spread (y: 576..1960): 2-column menu items with dot leaders and prices
+ *   4. Payment & Trademark Dock (y: 1980..2220): Telebirr badge and LayoScan creative trademark mark
  */
 function createMenuBoardSlots(palette, options = {}) {
   const {
@@ -465,17 +772,28 @@ function createMenuBoardSlots(palette, options = {}) {
     qrBorderColor = null,
     qrBorderWidth = 0,
     qrShadow = true,
+    trademarkStyle = {},
   } = options;
 
+  const isDarkContainer = qrContainerBg && getRelativeLuminance(qrContainerBg) < 0.5;
+  const isDarkCard = palette.textPrimary && getRelativeLuminance(palette.textPrimary) > 0.5;
+  const dockBg = isDarkCard ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.035)';
+  const dockBorder = qrBorderColor || (isDarkCard ? 'rgba(255, 255, 255, 0.16)' : 'rgba(0, 0, 0, 0.12)');
+
+  const tableCodeBorderColor = qrBorderColor || (isDarkContainer ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.12)');
+  const tableCodeColor = isDarkContainer ? (palette.onAccent || '#FFFFFF') : '#111827';
+  const tableCodeLabelColor = isDarkContainer ? (palette.textMuted || '#A0A0A8') : '#64748B';
+
   return [
+    // ── 1. BRANDED HEADER ZONE (y: 80..290) ─────────────────────────────────
     {
       id: 'logo',
       type: 'image',
       source: 'logo',
       x: 727,
-      y: 140,
+      y: 80,
       w: 200,
-      h: 140,
+      h: 96,
       radius: 16,
       clip: false,
     },
@@ -483,12 +801,12 @@ function createMenuBoardSlots(palette, options = {}) {
       id: 'name',
       type: 'text',
       source: 'name',
-      x: 100,
-      y: 310,
-      w: 1454,
-      h: 130,
-      maxFontPx: 84,
-      minFontPx: 50,
+      x: 80,
+      y: 185,
+      w: 1494,
+      h: 68,
+      maxFontPx: 56,
+      minFontPx: 36,
       font: headerFont,
       weight: 800,
       color: palette.textPrimary,
@@ -500,111 +818,12 @@ function createMenuBoardSlots(palette, options = {}) {
       id: 'tagline',
       type: 'text',
       source: 'tagline',
-      x: 150,
-      y: 460,
-      w: 1354,
-      h: 64,
-      maxFontPx: 36,
-      minFontPx: 22,
-      maxLines: 1,
-      font: bodyFont,
-      weight: 500,
-      letterSpacing: 2,
-      uppercase: true,
-      color: palette.textMuted,
-      align: 'center',
-      fallback: 'SCAN BELOW TO VIEW FULL DIGITAL MENU & DAILY SPECIALS',
-      contrastCheck: true,
-    },
-    {
-      id: 'tableLabel',
-      type: 'pill',
-      source: 'tableLabel',
-      x: 587,
-      y: 560,
-      w: 480,
-      h: 96,
-      radius: 48,
-      bgColor: palette.accent,
-      color: palette.onAccent,
-      font: headerFont,
-      weight: 700,
-      maxFontPx: 48,
-      minFontPx: 28,
-      letterSpacing: 2,
-      uppercase: true,
-      shadowColor: 'rgba(0,0,0,0.16)',
-      shadowBlur: 18,
-      fallback: 'Table 1',
-    },
-    // QR Slot: 800 × 800, qrSize 672 -> 64px quiet zone = 9.52% >= 8%
-    {
-      id: 'qr',
-      type: 'qr',
-      source: 'qr',
-      x: 427,
-      y: 720,
-      w: 800,
-      h: 800,
-      qrSize: 672,
-      bgColor: qrContainerBg,
-      borderColor: qrBorderColor,
-      borderWidth: qrBorderWidth,
-      radius: 48,
-      shadowColor: qrShadow ? 'rgba(0,0,0,0.22)' : null,
-      shadowBlur: qrShadow ? 32 : 0,
-      shadowOffsetY: 12,
-    },
-    {
-      id: 'scanPrompt',
-      type: 'text',
-      source: 'custom',
       x: 100,
-      y: 1570,
+      y: 258,
       w: 1454,
-      h: 80,
-      text: 'POINT CAMERA AT QR CODE TO VIEW MENU & ORDER',
-      maxFontPx: 38,
-      minFontPx: 24,
-      maxLines: 1,
-      font: bodyFont,
-      weight: 700,
-      letterSpacing: 2,
-      color: palette.textPrimary,
-      align: 'center',
-      contrastCheck: true,
-    },
-    {
-      id: 'tableCode',
-      type: 'badge',
-      source: 'tableCode',
-      x: 527,
-      y: 1690,
-      w: 600,
-      h: 84,
-      radius: 22,
-      bgColor: qrContainerBg,
-      borderColor: qrBorderColor || ((qrContainerBg && getRelativeLuminance(qrContainerBg) < 0.5) ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)'),
-      borderWidth: 1.5,
-      labelColor: (qrContainerBg && getRelativeLuminance(qrContainerBg) < 0.5) ? (palette.textMuted || '#A0A0A8') : '#64748B',
-      color: (qrContainerBg && getRelativeLuminance(qrContainerBg) < 0.5) ? (palette.onAccent || '#FFFFFF') : '#111827',
-      labelPrefix: 'TABLE CODE: ',
-      labelPx: 20,
-      codePx: 26,
-      shadowColor: 'rgba(0,0,0,0.08)',
-      shadowBlur: 14,
-      fallback: 'TABLE-CODE',
-    },
-    {
-      id: 'footer',
-      type: 'text',
-      source: 'footer',
-      x: 100,
-      y: 1840,
-      w: 1454,
-      h: 60,
-      maxFontPx: 26,
-      minFontPx: 18,
+      h: 40,
+      maxFontPx: 24,
+      minFontPx: 16,
       maxLines: 1,
       font: bodyFont,
       weight: 600,
@@ -612,8 +831,170 @@ function createMenuBoardSlots(palette, options = {}) {
       uppercase: true,
       color: palette.textMuted,
       align: 'center',
-      fallback: 'POWERED BY LAYOSCAN • DIGITAL MENU SYSTEM',
+      fallback: 'DELICIOUS FLAVORS & WARM SERVICE',
       contrastCheck: true,
+    },
+
+    // ── 2. DIGITAL ORDERING BRIDGE DOCK (y: 312..556) ───────────────────────
+    {
+      id: 'dockBg',
+      type: 'container',
+      source: 'custom',
+      x: 100,
+      y: 312,
+      w: 1454,
+      h: 244,
+      radius: 24,
+      bgColor: dockBg,
+      borderColor: dockBorder,
+      borderWidth: 1.5,
+    },
+    {
+      id: 'tableLabel',
+      type: 'pill',
+      source: 'tableLabel',
+      x: 140,
+      y: 340,
+      w: 260,
+      h: 64,
+      radius: 32,
+      bgColor: palette.accent,
+      color: palette.onAccent,
+      font: headerFont,
+      weight: 700,
+      maxFontPx: 30,
+      minFontPx: 20,
+      letterSpacing: 2,
+      uppercase: true,
+      shadowColor: 'rgba(0,0,0,0.12)',
+      shadowBlur: 14,
+      fallback: 'Table 1',
+    },
+    {
+      id: 'tableCode',
+      type: 'badge',
+      source: 'tableCode',
+      x: 425,
+      y: 340,
+      w: 460,
+      h: 64,
+      radius: 18,
+      bgColor: qrContainerBg,
+      borderColor: tableCodeBorderColor,
+      borderWidth: 1.5,
+      labelColor: tableCodeLabelColor,
+      color: tableCodeColor,
+      labelPrefix: 'CODE: ',
+      labelPx: 18,
+      codePx: 24,
+      shadowColor: 'rgba(0,0,0,0.06)',
+      shadowBlur: 10,
+      fallback: 'TABLE-CODE',
+    },
+    {
+      id: 'scanPrompt',
+      type: 'text',
+      source: 'custom',
+      x: 140,
+      y: 424,
+      w: 780,
+      h: 40,
+      text: 'Scan QR with phone camera to view live menu & order',
+      maxFontPx: 22,
+      minFontPx: 16,
+      maxLines: 1,
+      font: bodyFont,
+      weight: 600,
+      color: palette.textPrimary,
+      align: 'left',
+      contrastCheck: true,
+    },
+    {
+      id: 'scanSubPrompt',
+      type: 'text',
+      source: 'custom',
+      x: 140,
+      y: 470,
+      w: 780,
+      h: 36,
+      text: 'Instant digital ordering • No app download required',
+      maxFontPx: 17,
+      minFontPx: 13,
+      maxLines: 1,
+      font: bodyFont,
+      weight: 500,
+      color: palette.textMuted,
+      align: 'left',
+      contrastCheck: true,
+    },
+    // QR Code Slot: 220×220, qrSize: 182 → 19px padding → 10.4% quiet zone ≥ 8%
+    {
+      id: 'qr',
+      type: 'qr',
+      source: 'qr',
+      x: 1290,
+      y: 324,
+      w: 220,
+      h: 220,
+      qrSize: 182,
+      bgColor: qrContainerBg,
+      borderColor: qrBorderColor,
+      borderWidth: qrBorderWidth,
+      radius: 20,
+      shadowColor: qrShadow ? 'rgba(0,0,0,0.16)' : null,
+      shadowBlur: qrShadow ? 20 : 0,
+      shadowOffsetY: 6,
+    },
+
+    // ── 3. DYNAMIC TWO-COLUMN MENU SPREAD (y: 576..1960) ────────────────────
+    {
+      id: 'menu',
+      type: 'menu_grid',
+      source: 'menu',
+      x: 100,
+      y: 576,
+      w: 1454,
+      h: 1384,
+      col1X: 110,
+      col2X: 860,
+      colWidth: 684,
+      startY: 576,
+      endY: 1960,
+      headerFont: `700 40px ${headerFont}`,
+      itemFont: `700 26px ${headerFont}`,
+      priceFont: '800 26px "Space Grotesk", monospace',
+      theme: isDarkCard ? 'dark' : 'light',
+      accentColor: palette.accent,
+      titleColor: palette.textPrimary,
+      bodyColor: palette.textMuted,
+      priceColor: palette.accent,
+      showDivider: true,
+      dividerColor: palette.accent,
+    },
+
+    // ── 4. FOOTER & TELEBIRR PAYMENT DOCK (y: 1980..2220) ───────────────────
+    {
+      id: 'payment',
+      type: 'telebirr',
+      source: 'payment',
+      x: 100,
+      y: 1995,
+      w: 1454,
+      h: 96,
+      color: palette.textPrimary,
+      labelColor: palette.textMuted,
+      bodyFont,
+    },
+    {
+      id: 'footer',
+      type: 'trademark',
+      source: 'footer',
+      x: 100,
+      y: 2105,
+      w: 1454,
+      h: 96,
+      color: palette.textMuted,
+      trademarkStyle,
     },
   ];
 }
@@ -657,21 +1038,34 @@ export const CARD_DESIGNS = [
         safeArea: STANDARD_SAFE_AREAS.portrait,
         slots: createPortraitSlots(
           { accent: '#1B382B', onAccent: '#FFFFFF', textPrimary: '#1B382B', textMuted: '#5C6F64' },
-          { hasHero: true, headerFont: '"Playfair Display", Georgia, serif', qrContainerBg: '#FFFFFF' }
+          {
+            hasHero: true,
+            headerFont: '"Playfair Display", Georgia, serif',
+            qrContainerBg: '#FFFFFF',
+            trademarkStyle: { prefix: '✿', textColor: '#1B382B', font: '"Playfair Display", Georgia, serif', italic: true, weight: 700, letterSpacing: 1, showLines: false, subtext: 'Scan. Dine. Done.' },
+          }
         ),
       },
       landscape: {
         safeArea: STANDARD_SAFE_AREAS.landscape,
         slots: createLandscapeSlots(
           { accent: '#1B382B', onAccent: '#FFFFFF', textPrimary: '#1B382B', textMuted: '#5C6F64' },
-          { headerFont: '"Playfair Display", Georgia, serif', qrContainerBg: '#FFFFFF' }
+          {
+            headerFont: '"Playfair Display", Georgia, serif',
+            qrContainerBg: '#FFFFFF',
+            trademarkStyle: { prefix: '✿', textColor: '#1B382B', font: '"Playfair Display", Georgia, serif', italic: true, weight: 700, letterSpacing: 1, showLines: false, subtext: 'Scan. Dine. Done.' },
+          }
         ),
       },
       menu_board: {
         safeArea: STANDARD_SAFE_AREAS.menu_board,
         slots: createMenuBoardSlots(
           { accent: '#1B382B', onAccent: '#FFFFFF', textPrimary: '#1B382B', textMuted: '#5C6F64' },
-          { headerFont: '"Playfair Display", Georgia, serif', qrContainerBg: '#FFFFFF' }
+          {
+            headerFont: '"Playfair Display", Georgia, serif',
+            qrContainerBg: '#FFFFFF',
+            trademarkStyle: { prefix: '✿', textColor: '#1B382B', font: '"Playfair Display", Georgia, serif', italic: true, weight: 700, letterSpacing: 1, showLines: false, subtext: 'Scan. Dine. Done.' },
+          }
         ),
       },
     },
@@ -716,21 +1110,40 @@ export const CARD_DESIGNS = [
         safeArea: STANDARD_SAFE_AREAS.portrait,
         slots: createPortraitSlots(
           { accent: '#FFA800', onAccent: '#141414', textPrimary: '#FFFFFF', textMuted: '#A0A0A8' },
-          { headerFont: '"Space Grotesk", Inter, sans-serif', uppercaseName: true, qrContainerBg: '#1A1A1E', qrBorderColor: '#FFA800', qrBorderWidth: 2 }
+          {
+            headerFont: '"Space Grotesk", Inter, sans-serif',
+            uppercaseName: true,
+            qrContainerBg: '#1A1A1E',
+            qrBorderColor: '#FFA800',
+            qrBorderWidth: 2,
+            trademarkStyle: { prefix: '⚡', textColor: '#FFA800', font: '"Space Grotesk", Inter, sans-serif', weight: 800, letterSpacing: 3, uppercase: true, bgPill: true, bgColor: 'rgba(255,168,0,0.12)', borderColor: 'rgba(255,168,0,0.5)', subtext: 'CONTACTLESS ORDERING' },
+          }
         ),
       },
       landscape: {
         safeArea: STANDARD_SAFE_AREAS.landscape,
         slots: createLandscapeSlots(
           { accent: '#FFA800', onAccent: '#141414', textPrimary: '#FFFFFF', textMuted: '#A0A0A8' },
-          { headerFont: '"Space Grotesk", Inter, sans-serif', qrContainerBg: '#1A1A1E', qrBorderColor: '#FFA800', qrBorderWidth: 2 }
+          {
+            headerFont: '"Space Grotesk", Inter, sans-serif',
+            qrContainerBg: '#1A1A1E',
+            qrBorderColor: '#FFA800',
+            qrBorderWidth: 2,
+            trademarkStyle: { prefix: '⚡', textColor: '#FFA800', font: '"Space Grotesk", Inter, sans-serif', weight: 800, letterSpacing: 3, uppercase: true, bgPill: true, bgColor: 'rgba(255,168,0,0.12)', borderColor: 'rgba(255,168,0,0.5)', subtext: 'CONTACTLESS ORDERING' },
+          }
         ),
       },
       menu_board: {
         safeArea: STANDARD_SAFE_AREAS.menu_board,
         slots: createMenuBoardSlots(
           { accent: '#FFA800', onAccent: '#141414', textPrimary: '#FFFFFF', textMuted: '#A0A0A8' },
-          { headerFont: '"Space Grotesk", Inter, sans-serif', qrContainerBg: '#1A1A1E', qrBorderColor: '#FFA800', qrBorderWidth: 2 }
+          {
+            headerFont: '"Space Grotesk", Inter, sans-serif',
+            qrContainerBg: '#1A1A1E',
+            qrBorderColor: '#FFA800',
+            qrBorderWidth: 2,
+            trademarkStyle: { prefix: '⚡', textColor: '#FFA800', font: '"Space Grotesk", Inter, sans-serif', weight: 800, letterSpacing: 3, uppercase: true, bgPill: true, bgColor: 'rgba(255,168,0,0.12)', borderColor: 'rgba(255,168,0,0.5)', subtext: 'CONTACTLESS ORDERING' },
+          }
         ),
       },
     },
@@ -752,7 +1165,7 @@ export const CARD_DESIGNS = [
       accent: '#86EFAC',
       onAccent: '#0B3B24',
       textPrimary: '#F0FDF4',
-      textMuted: '#86EFAC',
+      textMuted: '#A7F3C0',
       background: '#0B3B24',
     },
     backgrounds: {
@@ -765,22 +1178,41 @@ export const CARD_DESIGNS = [
       portrait: {
         safeArea: STANDARD_SAFE_AREAS.portrait,
         slots: createPortraitSlots(
-          { accent: '#86EFAC', onAccent: '#0B3B24', textPrimary: '#F0FDF4', textMuted: '#86EFAC' },
-          { hasHero: true, headerFont: '"Playfair Display", Georgia, serif', qrContainerBg: '#FFFFFF', qrBorderColor: '#86EFAC', qrBorderWidth: 2 }
+          { accent: '#86EFAC', onAccent: '#0B3B24', textPrimary: '#F0FDF4', textMuted: '#A7F3C0' },
+          {
+            hasHero: true,
+            headerFont: '"Playfair Display", Georgia, serif',
+            qrContainerBg: '#FFFFFF',
+            qrBorderColor: '#86EFAC',
+            qrBorderWidth: 2,
+            trademarkStyle: { prefix: '▲', suffix: '▲', textColor: '#86EFAC', font: '"Playfair Display", Georgia, serif', weight: 700, letterSpacing: 2, showLines: true, lineColor: 'rgba(134,239,172,0.5)', subtext: 'Fresh Tech. Fresh Taste.' },
+          }
         ),
       },
       landscape: {
         safeArea: STANDARD_SAFE_AREAS.landscape,
         slots: createLandscapeSlots(
-          { accent: '#86EFAC', onAccent: '#0B3B24', textPrimary: '#F0FDF4', textMuted: '#86EFAC' },
-          { headerFont: '"Playfair Display", Georgia, serif', qrContainerBg: '#FFFFFF', qrBorderColor: '#86EFAC', qrBorderWidth: 2 }
+          { accent: '#86EFAC', onAccent: '#0B3B24', textPrimary: '#F0FDF4', textMuted: '#A7F3C0' },
+          {
+            headerFont: '"Playfair Display", Georgia, serif',
+            qrContainerBg: '#FFFFFF',
+            qrBorderColor: '#86EFAC',
+            qrBorderWidth: 2,
+            trademarkStyle: { prefix: '▲', suffix: '▲', textColor: '#86EFAC', font: '"Playfair Display", Georgia, serif', weight: 700, letterSpacing: 2, showLines: true, lineColor: 'rgba(134,239,172,0.5)', subtext: 'Fresh Tech. Fresh Taste.' },
+          }
         ),
       },
       menu_board: {
         safeArea: STANDARD_SAFE_AREAS.menu_board,
         slots: createMenuBoardSlots(
-          { accent: '#86EFAC', onAccent: '#0B3B24', textPrimary: '#F0FDF4', textMuted: '#86EFAC' },
-          { headerFont: '"Playfair Display", Georgia, serif', qrContainerBg: '#FFFFFF', qrBorderColor: '#86EFAC', qrBorderWidth: 2 }
+          { accent: '#86EFAC', onAccent: '#0B3B24', textPrimary: '#F0FDF4', textMuted: '#A7F3C0' },
+          {
+            headerFont: '"Playfair Display", Georgia, serif',
+            qrContainerBg: '#FFFFFF',
+            qrBorderColor: '#86EFAC',
+            qrBorderWidth: 2,
+            trademarkStyle: { prefix: '▲', suffix: '▲', textColor: '#86EFAC', font: '"Playfair Display", Georgia, serif', weight: 700, letterSpacing: 2, showLines: true, lineColor: 'rgba(134,239,172,0.5)', subtext: 'Fresh Tech. Fresh Taste.' },
+          }
         ),
       },
     },
@@ -816,21 +1248,40 @@ export const CARD_DESIGNS = [
         safeArea: STANDARD_SAFE_AREAS.portrait,
         slots: createPortraitSlots(
           { accent: '#E5C583', onAccent: '#0C192E', textPrimary: '#FFFFFF', textMuted: '#C5B083' },
-          { hasHero: true, headerFont: '"Playfair Display", Georgia, serif', qrContainerBg: '#FFFFFF', qrBorderColor: '#E5C583', qrBorderWidth: 2 }
+          {
+            hasHero: true,
+            headerFont: '"Playfair Display", Georgia, serif',
+            qrContainerBg: '#FFFFFF',
+            qrBorderColor: '#E5C583',
+            qrBorderWidth: 2,
+            trademarkStyle: { prefix: '—', suffix: '—', textColor: '#E5C583', font: '"Playfair Display", Georgia, serif', italic: true, weight: 600, letterSpacing: 1.5, showLines: true, lineColor: 'rgba(229,197,131,0.4)', subtext: 'Digital Hospitality' },
+          }
         ),
       },
       landscape: {
         safeArea: STANDARD_SAFE_AREAS.landscape,
         slots: createLandscapeSlots(
           { accent: '#E5C583', onAccent: '#0C192E', textPrimary: '#FFFFFF', textMuted: '#C5B083' },
-          { headerFont: '"Playfair Display", Georgia, serif', qrContainerBg: '#FFFFFF', qrBorderColor: '#E5C583', qrBorderWidth: 2 }
+          {
+            headerFont: '"Playfair Display", Georgia, serif',
+            qrContainerBg: '#FFFFFF',
+            qrBorderColor: '#E5C583',
+            qrBorderWidth: 2,
+            trademarkStyle: { prefix: '—', suffix: '—', textColor: '#E5C583', font: '"Playfair Display", Georgia, serif', italic: true, weight: 600, letterSpacing: 1.5, showLines: true, lineColor: 'rgba(229,197,131,0.4)', subtext: 'Digital Hospitality' },
+          }
         ),
       },
       menu_board: {
         safeArea: STANDARD_SAFE_AREAS.menu_board,
         slots: createMenuBoardSlots(
           { accent: '#E5C583', onAccent: '#0C192E', textPrimary: '#FFFFFF', textMuted: '#C5B083' },
-          { headerFont: '"Playfair Display", Georgia, serif', qrContainerBg: '#FFFFFF', qrBorderColor: '#E5C583', qrBorderWidth: 2 }
+          {
+            headerFont: '"Playfair Display", Georgia, serif',
+            qrContainerBg: '#FFFFFF',
+            qrBorderColor: '#E5C583',
+            qrBorderWidth: 2,
+            trademarkStyle: { prefix: '—', suffix: '—', textColor: '#E5C583', font: '"Playfair Display", Georgia, serif', italic: true, weight: 600, letterSpacing: 1.5, showLines: true, lineColor: 'rgba(229,197,131,0.4)', subtext: 'Digital Hospitality' },
+          }
         ),
       },
     },
@@ -866,21 +1317,40 @@ export const CARD_DESIGNS = [
         safeArea: STANDARD_SAFE_AREAS.portrait,
         slots: createPortraitSlots(
           { accent: '#781812', onAccent: '#FFFFFF', textPrimary: '#381E11', textMuted: '#784931' },
-          { hasHero: true, headerFont: '"Noto Sans Ethiopic", "Playfair Display", Georgia, serif', qrContainerBg: '#FFFDF9', qrBorderColor: '#781812', qrBorderWidth: 2 }
+          {
+            hasHero: true,
+            headerFont: '"Noto Sans Ethiopic", "Playfair Display", Georgia, serif',
+            qrContainerBg: '#FFFDF9',
+            qrBorderColor: '#781812',
+            qrBorderWidth: 2,
+            trademarkStyle: { prefix: '✦', suffix: '✦', textColor: '#781812', font: '"Noto Sans Ethiopic", "Playfair Display", serif', weight: 700, letterSpacing: 2, bgPill: true, bgColor: 'rgba(120,24,18,0.07)', borderColor: 'rgba(120,24,18,0.25)', subtext: 'ዲጂታል ምናሌ · Digital Menu' },
+          }
         ),
       },
       landscape: {
         safeArea: STANDARD_SAFE_AREAS.landscape,
         slots: createLandscapeSlots(
           { accent: '#781812', onAccent: '#FFFFFF', textPrimary: '#381E11', textMuted: '#784931' },
-          { headerFont: '"Noto Sans Ethiopic", "Playfair Display", Georgia, serif', qrContainerBg: '#FFFDF9', qrBorderColor: '#781812', qrBorderWidth: 2 }
+          {
+            headerFont: '"Noto Sans Ethiopic", "Playfair Display", Georgia, serif',
+            qrContainerBg: '#FFFDF9',
+            qrBorderColor: '#781812',
+            qrBorderWidth: 2,
+            trademarkStyle: { prefix: '✦', suffix: '✦', textColor: '#781812', font: '"Noto Sans Ethiopic", "Playfair Display", serif', weight: 700, letterSpacing: 2, bgPill: true, bgColor: 'rgba(120,24,18,0.07)', borderColor: 'rgba(120,24,18,0.25)', subtext: 'ዲጂታል ምናሌ · Digital Menu' },
+          }
         ),
       },
       menu_board: {
         safeArea: STANDARD_SAFE_AREAS.menu_board,
         slots: createMenuBoardSlots(
           { accent: '#781812', onAccent: '#FFFFFF', textPrimary: '#381E11', textMuted: '#784931' },
-          { headerFont: '"Noto Sans Ethiopic", "Playfair Display", Georgia, serif', qrContainerBg: '#FFFDF9', qrBorderColor: '#781812', qrBorderWidth: 2 }
+          {
+            headerFont: '"Noto Sans Ethiopic", "Playfair Display", Georgia, serif',
+            qrContainerBg: '#FFFDF9',
+            qrBorderColor: '#781812',
+            qrBorderWidth: 2,
+            trademarkStyle: { prefix: '✦', suffix: '✦', textColor: '#781812', font: '"Noto Sans Ethiopic", "Playfair Display", serif', weight: 700, letterSpacing: 2, bgPill: true, bgColor: 'rgba(120,24,18,0.07)', borderColor: 'rgba(120,24,18,0.25)', subtext: 'ዲጂታል ምናሌ · Digital Menu' },
+          }
         ),
       },
     },
@@ -916,21 +1386,40 @@ export const CARD_DESIGNS = [
         safeArea: STANDARD_SAFE_AREAS.portrait,
         slots: createPortraitSlots(
           { accent: '#E5C583', onAccent: '#0D0B08', textPrimary: '#FFFDF7', textMuted: '#C5B083' },
-          { hasHero: true, headerFont: '"Playfair Display", Georgia, serif', qrContainerBg: '#FFFDF7', qrBorderColor: '#E5C583', qrBorderWidth: 1.5 }
+          {
+            hasHero: true,
+            headerFont: '"Playfair Display", Georgia, serif',
+            qrContainerBg: '#FFFDF7',
+            qrBorderColor: '#E5C583',
+            qrBorderWidth: 1.5,
+            trademarkStyle: { prefix: '✦', suffix: '✦', textColor: '#E5C583', font: '"Playfair Display", Georgia, serif', italic: true, weight: 700, letterSpacing: 2, bgPill: true, bgColor: 'rgba(229,197,131,0.07)', borderColor: 'rgba(229,197,131,0.3)', subtext: 'Premium Digital Experience' },
+          }
         ),
       },
       landscape: {
         safeArea: STANDARD_SAFE_AREAS.landscape,
         slots: createLandscapeSlots(
           { accent: '#E5C583', onAccent: '#0D0B08', textPrimary: '#FFFDF7', textMuted: '#C5B083' },
-          { headerFont: '"Playfair Display", Georgia, serif', qrContainerBg: '#FFFDF7', qrBorderColor: '#E5C583', qrBorderWidth: 1.5 }
+          {
+            headerFont: '"Playfair Display", Georgia, serif',
+            qrContainerBg: '#FFFDF7',
+            qrBorderColor: '#E5C583',
+            qrBorderWidth: 1.5,
+            trademarkStyle: { prefix: '✦', suffix: '✦', textColor: '#E5C583', font: '"Playfair Display", Georgia, serif', italic: true, weight: 700, letterSpacing: 2, bgPill: true, bgColor: 'rgba(229,197,131,0.07)', borderColor: 'rgba(229,197,131,0.3)', subtext: 'Premium Digital Experience' },
+          }
         ),
       },
       menu_board: {
         safeArea: STANDARD_SAFE_AREAS.menu_board,
         slots: createMenuBoardSlots(
           { accent: '#E5C583', onAccent: '#0D0B08', textPrimary: '#FFFDF7', textMuted: '#C5B083' },
-          { headerFont: '"Playfair Display", Georgia, serif', qrContainerBg: '#FFFDF7', qrBorderColor: '#E5C583', qrBorderWidth: 1.5 }
+          {
+            headerFont: '"Playfair Display", Georgia, serif',
+            qrContainerBg: '#FFFDF7',
+            qrBorderColor: '#E5C583',
+            qrBorderWidth: 1.5,
+            trademarkStyle: { prefix: '✦', suffix: '✦', textColor: '#E5C583', font: '"Playfair Display", Georgia, serif', italic: true, weight: 700, letterSpacing: 2, bgPill: true, bgColor: 'rgba(229,197,131,0.07)', borderColor: 'rgba(229,197,131,0.3)', subtext: 'Premium Digital Experience' },
+          }
         ),
       },
     },
@@ -966,21 +1455,40 @@ export const CARD_DESIGNS = [
         safeArea: STANDARD_SAFE_AREAS.portrait,
         slots: createPortraitSlots(
           { accent: '#FF5722', onAccent: '#FFFFFF', textPrimary: '#1E1B18', textMuted: '#6E6760' },
-          { hasHero: true, headerFont: 'Inter, sans-serif', qrContainerBg: '#FFFFFF', qrBorderColor: '#FFCCBC', qrBorderWidth: 1.5 }
+          {
+            hasHero: true,
+            headerFont: 'Inter, sans-serif',
+            qrContainerBg: '#FFFFFF',
+            qrBorderColor: '#FFCCBC',
+            qrBorderWidth: 1.5,
+            trademarkStyle: { prefix: '☀', textColor: '#FF5722', font: 'Inter, sans-serif', weight: 800, letterSpacing: 1, showLines: false, subtext: 'Fresh Order. Fast Service.' },
+          }
         ),
       },
       landscape: {
         safeArea: STANDARD_SAFE_AREAS.landscape,
         slots: createLandscapeSlots(
           { accent: '#FF5722', onAccent: '#FFFFFF', textPrimary: '#1E1B18', textMuted: '#6E6760' },
-          { headerFont: 'Inter, sans-serif', qrContainerBg: '#FFFFFF', qrBorderColor: '#FFCCBC', qrBorderWidth: 1.5 }
+          {
+            headerFont: 'Inter, sans-serif',
+            qrContainerBg: '#FFFFFF',
+            qrBorderColor: '#FFCCBC',
+            qrBorderWidth: 1.5,
+            trademarkStyle: { prefix: '☀', textColor: '#FF5722', font: 'Inter, sans-serif', weight: 800, letterSpacing: 1, showLines: false, subtext: 'Fresh Order. Fast Service.' },
+          }
         ),
       },
       menu_board: {
         safeArea: STANDARD_SAFE_AREAS.menu_board,
         slots: createMenuBoardSlots(
           { accent: '#FF5722', onAccent: '#FFFFFF', textPrimary: '#1E1B18', textMuted: '#6E6760' },
-          { headerFont: 'Inter, sans-serif', qrContainerBg: '#FFFFFF', qrBorderColor: '#FFCCBC', qrBorderWidth: 1.5 }
+          {
+            headerFont: 'Inter, sans-serif',
+            qrContainerBg: '#FFFFFF',
+            qrBorderColor: '#FFCCBC',
+            qrBorderWidth: 1.5,
+            trademarkStyle: { prefix: '☀', textColor: '#FF5722', font: 'Inter, sans-serif', weight: 800, letterSpacing: 1, showLines: false, subtext: 'Fresh Order. Fast Service.' },
+          }
         ),
       },
     },
@@ -1016,21 +1524,34 @@ export const CARD_DESIGNS = [
         safeArea: STANDARD_SAFE_AREAS.portrait,
         slots: createPortraitSlots(
           { accent: '#2E7D32', onAccent: '#FFFFFF', textPrimary: '#1B382B', textMuted: '#4F6A5B' },
-          { hasHero: true, headerFont: '"Playfair Display", Georgia, serif', qrContainerBg: '#FFFFFF' }
+          {
+            hasHero: true,
+            headerFont: '"Playfair Display", Georgia, serif',
+            qrContainerBg: '#FFFFFF',
+            trademarkStyle: { prefix: '●', textColor: '#2E7D32', font: '"Playfair Display", Georgia, serif', weight: 700, letterSpacing: 1, showLines: true, lineColor: 'rgba(46,125,50,0.4)', subtext: 'Contactless Table Dining' },
+          }
         ),
       },
       landscape: {
         safeArea: STANDARD_SAFE_AREAS.landscape,
         slots: createLandscapeSlots(
           { accent: '#2E7D32', onAccent: '#FFFFFF', textPrimary: '#1B382B', textMuted: '#4F6A5B' },
-          { headerFont: '"Playfair Display", Georgia, serif', qrContainerBg: '#FFFFFF' }
+          {
+            headerFont: '"Playfair Display", Georgia, serif',
+            qrContainerBg: '#FFFFFF',
+            trademarkStyle: { prefix: '●', textColor: '#2E7D32', font: '"Playfair Display", Georgia, serif', weight: 700, letterSpacing: 1, showLines: true, lineColor: 'rgba(46,125,50,0.4)', subtext: 'Contactless Table Dining' },
+          }
         ),
       },
       menu_board: {
         safeArea: STANDARD_SAFE_AREAS.menu_board,
         slots: createMenuBoardSlots(
           { accent: '#2E7D32', onAccent: '#FFFFFF', textPrimary: '#1B382B', textMuted: '#4F6A5B' },
-          { headerFont: '"Playfair Display", Georgia, serif', qrContainerBg: '#FFFFFF' }
+          {
+            headerFont: '"Playfair Display", Georgia, serif',
+            qrContainerBg: '#FFFFFF',
+            trademarkStyle: { prefix: '●', textColor: '#2E7D32', font: '"Playfair Display", Georgia, serif', weight: 700, letterSpacing: 1, showLines: true, lineColor: 'rgba(46,125,50,0.4)', subtext: 'Contactless Table Dining' },
+          }
         ),
       },
     },
@@ -1078,21 +1599,43 @@ export const CARD_DESIGNS = [
         safeArea: STANDARD_SAFE_AREAS.portrait,
         slots: createPortraitSlots(
           { accent: '#18181B', onAccent: '#FFFFFF', textPrimary: '#18181B', textMuted: '#71717A' },
-          { hasHero: false, headerFont: 'Inter, -apple-system, sans-serif', qrContainerBg: '#FFFFFF', qrBorderColor: '#E4E4E7', qrBorderWidth: 1.5, qrShadow: true }
+          {
+            hasHero: false,
+            headerFont: 'Inter, -apple-system, sans-serif',
+            qrContainerBg: '#FFFFFF',
+            qrBorderColor: '#D4D4D8',
+            qrBorderWidth: 1.5,
+            qrShadow: true,
+            trademarkStyle: { prefix: '·', suffix: '·', textColor: '#18181B', font: 'Inter, -apple-system, sans-serif', weight: 600, letterSpacing: 4, uppercase: true, showLines: true, lineColor: 'rgba(24,24,27,0.18)', subtext: 'Scan to Order' },
+          }
         ),
       },
       landscape: {
         safeArea: STANDARD_SAFE_AREAS.landscape,
         slots: createLandscapeSlots(
           { accent: '#18181B', onAccent: '#FFFFFF', textPrimary: '#18181B', textMuted: '#71717A' },
-          { headerFont: 'Inter, -apple-system, sans-serif', qrContainerBg: '#FFFFFF', qrBorderColor: '#E4E4E7', qrBorderWidth: 1.5, qrShadow: true }
+          {
+            headerFont: 'Inter, -apple-system, sans-serif',
+            qrContainerBg: '#FFFFFF',
+            qrBorderColor: '#D4D4D8',
+            qrBorderWidth: 1.5,
+            qrShadow: true,
+            trademarkStyle: { prefix: '·', suffix: '·', textColor: '#18181B', font: 'Inter, -apple-system, sans-serif', weight: 600, letterSpacing: 4, uppercase: true, showLines: true, lineColor: 'rgba(24,24,27,0.18)', subtext: 'Scan to Order' },
+          }
         ),
       },
       menu_board: {
         safeArea: STANDARD_SAFE_AREAS.menu_board,
         slots: createMenuBoardSlots(
           { accent: '#18181B', onAccent: '#FFFFFF', textPrimary: '#18181B', textMuted: '#71717A' },
-          { headerFont: 'Inter, -apple-system, sans-serif', qrContainerBg: '#FFFFFF', qrBorderColor: '#E4E4E7', qrBorderWidth: 1.5, qrShadow: true }
+          {
+            headerFont: 'Inter, -apple-system, sans-serif',
+            qrContainerBg: '#FFFFFF',
+            qrBorderColor: '#D4D4D8',
+            qrBorderWidth: 1.5,
+            qrShadow: true,
+            trademarkStyle: { prefix: '·', suffix: '·', textColor: '#18181B', font: 'Inter, -apple-system, sans-serif', weight: 600, letterSpacing: 4, uppercase: true, showLines: true, lineColor: 'rgba(24,24,27,0.18)', subtext: 'Scan to Order' },
+          }
         ),
       },
     },

@@ -9,6 +9,60 @@ import { getTemplateById } from './designRegistry.js';
 import { renderSlots } from './slotRenderer.js';
 import { ensureFontsLoaded } from './fonts.js';
 
+// ── LayoScan Trademark Logo Preload ───────────────────────────────────────────
+// Resolved at module level for Vite bundler compatibility (same pattern as layoutSpec.js assets)
+const _layoscanLogoSrc = new URL('../../assets/logo.png', import.meta.url).href;
+let _layoscanLogoPromise = null;
+
+/**
+ * Loads and caches the LayoScan brand mark logo used in trademark footer slots.
+ * Safe in non-browser environments (returns null).
+ */
+function preloadLayoScanLogo() {
+  if (_layoscanLogoPromise) return _layoscanLogoPromise;
+  _layoscanLogoPromise = (typeof Image !== 'undefined')
+    ? new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => resolve(null);
+        img.src = _layoscanLogoSrc;
+      })
+    : Promise.resolve(null);
+  return _layoscanLogoPromise;
+}
+
+// ── Telebirr Payment Logo Preload ─────────────────────────────────────────────
+// Sourced from public/banks_logo/telebirr.png
+const _telebirrLogoSrc = '/banks_logo/telebirr.png';
+let _telebirrLogoPromise = null;
+
+/**
+ * Loads and caches the official Telebirr logo from public/banks_logo/telebirr.png.
+ * Safe in non-browser environments (returns null).
+ */
+function preloadTelebirrLogo() {
+  if (_telebirrLogoPromise) return _telebirrLogoPromise;
+  _telebirrLogoPromise = (typeof Image !== 'undefined')
+    ? new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => resolve(img);
+        img.onerror = () => {
+          // Fallback if accessed via non-root origin
+          const altImg = new Image();
+          altImg.crossOrigin = 'anonymous';
+          altImg.onload = () => resolve(altImg);
+          altImg.onerror = () => resolve(null);
+          altImg.src = typeof window !== 'undefined'
+            ? `${window.location.origin}/banks_logo/telebirr.png`
+            : './banks_logo/telebirr.png';
+        };
+        img.src = _telebirrLogoSrc;
+      })
+    : Promise.resolve(null);
+  return _telebirrLogoPromise;
+}
+
 /**
  * Safely loads an image in browser environments; returns null in headless/Node.
  */
@@ -202,6 +256,12 @@ export async function renderCard({
   // 6. Format dynamic Table Code
   const formattedTableCode = formatTableCode(table?.qrToken);
 
+  // 6b. Pre-load LayoScan trademark mark & Telebirr logo
+  const [layoscanLogoImage, telebirrLogoImage] = await Promise.all([
+    preloadLayoScanLogo(),
+    preloadTelebirrLogo(),
+  ]);
+
   // 7. Composite Dynamic Slots
   // Deep clone references to guarantee input objects are never mutated (§9.8)
   const slotPayload = {
@@ -212,6 +272,8 @@ export async function renderCard({
     heroImage,
     formattedTableCode,
     menuData,
+    layoscanLogoImage, // LayoScan brand mark for trademark slots
+    telebirrLogoImage, // Official Telebirr logo from public/banks_logo/telebirr.png
   };
 
   renderSlots(ctx, layout.slots, slotPayload, {

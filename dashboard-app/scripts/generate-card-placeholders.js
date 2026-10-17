@@ -60,45 +60,18 @@ async function generate() {
       const escapedName = escapeXml(design.name.toUpperCase());
       const escapedLabel = escapeXml(label);
 
-      // SVG with flat colors and clean lines
+      // Clean, production-ready background without broken dashed lines or debug text annotations
       const svg = `
 <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
-  <!-- Background Base -->
-  <rect width="${width}" height="${height}" fill="${bg}"/>
+  <defs>
+    <radialGradient id="ambientGrad_${design.id}_${orient.key}" cx="50%" cy="40%" r="65%">
+      <stop offset="0%" stop-color="${bg}" stop-opacity="1"/>
+      <stop offset="100%" stop-color="${bg}" stop-opacity="0.96"/>
+    </radialGradient>
+  </defs>
 
-  <!-- Safe Area Trim Border -->
-  <rect x="${safeInset}" y="${safeInset}" width="${safeW}" height="${safeH}"
-        fill="none" stroke="${fg}" stroke-opacity="0.15" stroke-width="2" stroke-dasharray="16,12" rx="20"/>
-
-  <!-- Subtle Top Margin Labels (outside dynamic text zones) -->
-  <text x="${safeInset + 20}" y="${safeInset - 16}"
-        fill="${fg}" fill-opacity="0.35" font-family="sans-serif" font-size="14" font-weight="bold">
-    TRIM SAFE AREA (${safeInset}px)
-  </text>
-  <text x="${width - safeInset - 20}" y="${safeInset - 16}" text-anchor="end"
-        fill="${fg}" fill-opacity="0.35" font-family="sans-serif" font-size="14" font-weight="bold">
-    ${escapedName} · ${escapedLabel}
-  </text>
-
-  <!-- QR Slot Guide & Crosshair -->
-  <g transform="translate(${qrCenter.x}, ${qrCenter.y})">
-    <!-- QR Slot quiet zone outer frame -->
-    <rect x="-300" y="-300" width="600" height="600" rx="36"
-          fill="${fg}" fill-opacity="0.02" stroke="${fg}" stroke-opacity="0.18" stroke-width="2" stroke-dasharray="8,8"/>
-
-    <!-- Subtle Crosshairs -->
-    <line x1="-360" y1="0" x2="360" y2="0" stroke="${accent}" stroke-width="1.5" stroke-opacity="0.3"/>
-    <line x1="0" y1="-360" x2="0" y2="360" stroke="${accent}" stroke-width="1.5" stroke-opacity="0.3"/>
-
-    <circle cx="0" cy="0" r="48" fill="none" stroke="${accent}" stroke-width="1.5" stroke-opacity="0.35"/>
-    <circle cx="0" cy="0" r="4" fill="${accent}" fill-opacity="0.5"/>
-  </g>
-
-  <!-- Footer notice -->
-  <text x="${width / 2}" y="${height - (safeInset - 24)}" text-anchor="middle"
-        fill="${fg}" fill-opacity="0.3" font-family="sans-serif" font-size="14" font-weight="500">
-    LayoScan Background Engine · Target Artwork: ${width}×${height} px
-  </text>
+  <!-- Clean Background Base -->
+  <rect width="${width}" height="${height}" fill="url(#ambientGrad_${design.id}_${orient.key})"/>
 </svg>
 `;
 

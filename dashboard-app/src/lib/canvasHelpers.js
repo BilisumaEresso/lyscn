@@ -1,5 +1,5 @@
 import fileSaver from 'file-saver';
-import logoImg from '../assets/logo.png';
+const logoImg = new URL('../assets/logo.png', import.meta.url).href;
 
 export const saveAs = fileSaver.saveAs || fileSaver;
 

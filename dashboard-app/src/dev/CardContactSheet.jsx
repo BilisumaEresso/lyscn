@@ -10,7 +10,10 @@ const sampleRestaurant = {
   brandColor: '#1B382B',
   description: 'WE SERVE QUALITY, WE THRIVE FOR YOUR SATISFACTION',
   logoUrl: null,
-  paymentAccounts: { telebirr: '0902882087', cbe: '1000594630107' },
+  paymentAccounts: {
+    telebirr: { accountNumber: '0902882087', isActive: true },
+    cbeBirr: { accountNumber: '1000594630107', isActive: true },
+  },
 };
 
 const sampleTable = {
@@ -24,7 +27,11 @@ const stressRestaurant = {
   brandColor: '#18181B',
   description: 'AUTHENTIC HERITAGE CUISINE, ARTISAN SPECIALTY COFFEE, AND EXQUISITE HANDCRAFTED PASTRIES DAILY', // 94 characters
   logoUrl: null,
-  paymentAccounts: { telebirr: '0902882087', cbe: '1000594630107' },
+  paymentAccounts: {
+    telebirr: { accountNumber: '0902882087', isActive: true },
+    cbeBirr: { accountNumber: '1000594630107', isActive: true },
+    awashBank: { accountNumber: '01320876543200', isActive: true },
+  },
 };
 
 const stressTable = {
