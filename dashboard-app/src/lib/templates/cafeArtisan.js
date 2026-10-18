@@ -4,7 +4,6 @@ import {
   drawPillBadge,
   drawThemedCodeBadge,
   drawImageCover,
-  drawStepFlowNodes,
   drawLayoScanFooter,
   drawCardPaymentAccounts,
   formatTableCode,
@@ -21,233 +20,317 @@ import { getMenuForCard } from '../menuDataHelpers';
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
+// ── Template-scoped PNG asset URLs ───────────────────────────────────────────
+// Vite resolves these at build time — correct hashed paths in production.
+const _assetBranch  = new URL('../../assets/templates/artisan_linen/coffee_branch_top_flowers_cherries.png', import.meta.url).href;
+const _assetBowl    = new URL('../../assets/templates/artisan_linen/coffee_beans_bowl.png',                  import.meta.url).href;
+const _assetCloth   = new URL('../../assets/templates/artisan_linen/linen_cloth_folded.png',                 import.meta.url).href;
+const _assetCup     = new URL('../../assets/templates/artisan_linen/coffee_cup_latte.png',                   import.meta.url).href;
+const _assetLeaves  = new URL('../../assets/templates/artisan_linen/coffee_leaves_cluster.png',              import.meta.url).href;
+const _assetBeans   = new URL('../../assets/templates/artisan_linen/coffee_beans_scattered.png',             import.meta.url).href;
+const _assetLinenBg = new URL('../../assets/templates/artisan_linen/background_linen_portrait_1240x1748.jpg', import.meta.url).href;
+
+// Module-level image cache — avoids re-decoding on every render call
+const _imgCache = new Map();
+
+/** Loads and caches a single image; resolves null on error. */
+function _loadAsset(src) {
+  if (_imgCache.has(src)) return _imgCache.get(src);
+  const p = new Promise((res) => {
+    if (typeof Image === 'undefined') { res(null); return; }
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload  = () => res(img);
+    img.onerror = () => res(null);
+    img.src = src;
+  });
+  _imgCache.set(src, p);
+  return p;
+}
+
 /**
- * PORTRAIT RENDERER (1200 x 1800)
+ * Places a PNG asset onto the canvas at (x, y) with optional rotation around
+ * the image centre and an opacity override. Safe if img is null.
+ */
+function _placeAsset(ctx, img, x, y, w, h, rotationRad = 0, opacity = 1) {
+  if (!img) return;
+  ctx.save();
+  ctx.globalAlpha = opacity;
+  if (rotationRad !== 0) {
+    ctx.translate(x + w / 2, y + h / 2);
+    ctx.rotate(rotationRad);
+    ctx.drawImage(img, -w / 2, -h / 2, w, h);
+  } else {
+    ctx.drawImage(img, x, y, w, h);
+  }
+  ctx.restore();
+}
+
+/**
+ * PORTRAIT RENDERER (1240 x 1748) — matches Elili Cafe reference design
+ *
+ * Dynamic data kept from the server:
+ *   restaurant.name             → headline (Playfair serif, 66 px)
+ *   restaurant.description      → dash-flanked tagline with coffee icon
+ *   restaurant.logoUrl          → logoImage (drawn at natural ratio, no circle clip)
+ *   table.label                 → "TABLE N" pill badge with botanical flankers
+ *   table.qrToken               → formatted table code badge
+ *   qrImage                     → full QR code with restaurant logo in centre
+ *   restaurant.paymentAccounts  → Telebirr row (official logo + phone number)
+ *   LayoScan trademark          → footer with real logo + "Scan. Dine. Done."
+ *
+ * Visual improvements over previous version:
+ *   + Real PNG props composited at 6 corner zones (branch, bowl, cloth, cup,
+ *     leaves, beans) — matching the reference photo-realistic collage style
+ *   + Linen parchment background from template asset
+ *   + Removed: 3-step flow nodes, italic slogan, dark wave sweep, circular hero
  */
 export async function renderCafeArtisanPortrait(ctx, {
   table,
   restaurant,
   qrImage,
   logoImage,
-  heroImage,
-  width = 1200,
-  height = 1800,
+  heroImage,   // kept for API compatibility — unused in this layout
+  width  = 1240,
+  height = 1748,
 }) {
-  const brandDark = '#1B382B'; // Deep Forest Olive
-  const textMuted = '#415349';
-  const tableLabel = table?.label || 'Table 1';
+  const brandDark          = '#1B382B'; // Deep Forest Olive
+  const textMuted          = '#5C6F64';
+  const cx                 = width / 2;
+  const tableLabel         = table?.label || 'Table 1';
   const tableCodeFormatted = formatTableCode(table?.qrToken);
 
-  // 1. Warm Tactile Linen Parchment Background
-  const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
-  bgGrad.addColorStop(0, '#FAF6EF');
-  bgGrad.addColorStop(0.5, '#F4EDE1');
-  bgGrad.addColorStop(1, '#ECE2D2');
-  ctx.fillStyle = bgGrad;
+  // ── Pre-load all decorative PNG assets in parallel ────────────────────────
+  const [
+    imgBranch, imgBowl, imgCloth,
+    imgCup, imgLeaves, imgBeans, imgLinenBg,
+  ] = await Promise.all([
+    _loadAsset(_assetBranch),
+    _loadAsset(_assetBowl),
+    _loadAsset(_assetCloth),
+    _loadAsset(_assetCup),
+    _loadAsset(_assetLeaves),
+    _loadAsset(_assetBeans),
+    _loadAsset(_assetLinenBg),
+  ]);
+
+  // ── 1. Background — real linen parchment texture ──────────────────────────
+  if (imgLinenBg) {
+    // Cover semantics: fills canvas, no distortion, no letterboxing
+    drawImageCover(ctx, imgLinenBg, 0, 0, width, height);
+  } else {
+    // Graceful fallback: warm three-stop gradient
+    const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
+    bgGrad.addColorStop(0,   '#FAF8F2');
+    bgGrad.addColorStop(0.4, '#F6EFE3');
+    bgGrad.addColorStop(1,   '#E8DCCA');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, width, height);
+  }
+
+  // Warm radial centre glow — keeps the main content zone light and legible
+  const centreGlow = ctx.createRadialGradient(cx, height * 0.42, 0, cx, height * 0.42, width * 0.74);
+  centreGlow.addColorStop(0, 'rgba(255, 252, 244, 0.50)');
+  centreGlow.addColorStop(1, 'rgba(255, 252, 244, 0)');
+  ctx.fillStyle = centreGlow;
   ctx.fillRect(0, 0, width, height);
 
-  // Subtle linen micro-texture
-  ctx.save();
-  ctx.fillStyle = 'rgba(27, 56, 43, 0.025)';
-  for (let y = 12; y < height; y += 36) {
-    for (let x = 12; x < width; x += 36) {
-      ctx.fillRect(x + ((y * 7) % 11), y, 2, 2);
-    }
-  }
-  ctx.restore();
+  // ── 2. Decorative PNG corner assets ──────────────────────────────────────
+  // Each image can bleed outside the canvas edge for a natural composition.
 
-  // 2. Corner Botanical Sprigs
-  drawBotanicalSprig(ctx, 60, 60, 1.15, -0.15, 'rgba(27, 56, 43, 0.35)');
-  drawBotanicalSprig(ctx, width - 60, 60, 1.15, Math.PI / 2 + 0.15, 'rgba(27, 56, 43, 0.35)');
+  // TOP-LEFT: Coffee branch with flowers & cherries — dragged outward to top-left corner
+  _placeAsset(ctx, imgBranch, -140,         -90,           500, 320, -0.28, 1.0);
 
-  // 3. Header: Emblem or Custom Restaurant Logo
-  const headerCenterY = 148;
+  // TOP-RIGHT: Wooden bowl filled with coffee beans
+  _placeAsset(ctx, imgBowl,   width - 320,  -80,           370, 300,  0.10, 1.0);
+
+  // TOP-RIGHT: Folded linen cloth — tucked behind the bowl for depth
+  _placeAsset(ctx, imgCloth,  width - 200,   120,          250, 180, -0.08, 0.82);
+
+  // BOTTOM-LEFT: Green ceramic latte cup — dragged outward to bottom-left corner clear of payment row
+  _placeAsset(ctx, imgCup,   -210,           height - 430, 480, 410,  0.02, 1.0);
+
+  // BOTTOM-RIGHT: Leaves cluster with flowers and red cherries
+  _placeAsset(ctx, imgLeaves, width - 420,   height - 390, 480, 380,  0.28, 1.0);
+
+  // BOTTOM-RIGHT: A handful of scattered coffee beans
+  _placeAsset(ctx, imgBeans,  width - 190,   height - 160, 220, 160, -0.18, 0.88);
+
+  // Faint ghost-leaf sprig (line-art) on right-centre — subtle depth layer
+  drawBotanicalSprig(ctx, width - 88, Math.round(height * 0.46), 1.05, Math.PI * 0.55, 'rgba(27, 56, 43, 0.09)');
+
+  // ── 3. Restaurant Logo ─────────────────────────────────────────────────────
+  // Reference: logo at top-center, displayed at natural aspect ratio, no clip.
+  const logoAreaY = 72;
+
   if (logoImage) {
-    const logoSize = 105;
+    const maxLogoW  = 200;
+    const maxLogoH  = 120;
+    const natW      = logoImage.naturalWidth  || logoImage.width  || maxLogoW;
+    const natH      = logoImage.naturalHeight || logoImage.height || maxLogoH;
+    const logoScale = Math.min(maxLogoW / natW, maxLogoH / natH, 1);
+    const drawW     = Math.round(natW * logoScale);
+    const drawH     = Math.round(natH * logoScale);
     ctx.save();
-    ctx.beginPath();
-    ctx.arc(width / 2, headerCenterY, logoSize / 2 + 4, 0, Math.PI * 2);
-    ctx.fillStyle = '#FFFFFF';
-    ctx.shadowColor = 'rgba(27, 56, 43, 0.18)';
-    ctx.shadowBlur = 16;
-    ctx.fill();
-    ctx.lineWidth = 2.4;
-    ctx.strokeStyle = 'rgba(27, 56, 43, 0.4)';
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.arc(width / 2, headerCenterY, logoSize / 2, 0, Math.PI * 2);
-    ctx.clip();
-    ctx.drawImage(logoImage, width / 2 - logoSize / 2, headerCenterY - logoSize / 2, logoSize, logoSize);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(logoImage, cx - drawW / 2, logoAreaY, drawW, drawH);
     ctx.restore();
   } else {
-    drawCoffeeCupEmblem(ctx, width / 2, headerCenterY, 105, brandDark);
+    // Fallback: crisp vector coffee-cup emblem (identical colours to reference)
+    drawCoffeeCupEmblem(ctx, cx, logoAreaY + 52, 100, brandDark);
   }
 
-  // 4. Restaurant Title (generous spacing below emblem)
+  // ── 4. Restaurant Name ─────────────────────────────────────────────────────
   const restName = restaurant?.name || 'Elili Cafe';
   ctx.save();
-  ctx.textAlign = 'center';
+  ctx.textAlign    = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillStyle = brandDark;
-  ctx.font = '700 54px "Playfair Display", "Times New Roman", Georgia, serif';
-  ctx.fillText(restName, width / 2, 245, width - 200);
-
-  // Tagline: 3-dot categories (cleanly spaced)
-  const tagline = (restaurant?.description || 'GOOD FOOD • GREAT COFFEE • BETTER DAYS').toUpperCase();
-  ctx.fillStyle = textMuted;
-  ctx.font = '700 21px "Space Grotesk", Inter, sans-serif';
-  ctx.fillText(tagline, width / 2, 292, width - 220);
+  ctx.fillStyle    = brandDark;
+  ctx.font         = '700 66px "Playfair Display", "Times New Roman", Georgia, serif';
+  ctx.fillText(restName, cx, 280, width - 180);
   ctx.restore();
 
-  // 5. QR Code Card Container (reduced to 440px for better proportions)
-  const qrBoxSize = 440;
-  const qrBoxX = width / 2 - qrBoxSize / 2;
-  const qrBoxY = 345;
-  const qrBoxRadius = 32;
+  // ── 5. Dash-flanked tagline with ☕ icon ──────────────────────────────────
+  // Reference: ─── WE SERVE QUALITY, WE THRIVE FOR YOUR SATISFACTION.  ENJOY ☕ ───
+  const taglineRaw = restaurant?.description || 'WE SERVE QUALITY, WE THRIVE FOR YOUR SATISFACTION.  ENJOY';
+  const tagline    = taglineRaw.toUpperCase();
+  const tagY       = 348;
+  const ICON_STR   = '  ☕';
 
   ctx.save();
-  ctx.shadowColor = 'rgba(27, 56, 43, 0.16)';
-  ctx.shadowBlur = 28;
-  ctx.shadowOffsetY = 8;
+  ctx.font         = '600 21px "Space Grotesk", Inter, sans-serif';
+  ctx.fillStyle    = textMuted;
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'middle';
 
+  const tagTextW   = ctx.measureText(tagline).width;
+  const iconW      = ctx.measureText(ICON_STR).width;
+  const totalTagW  = tagTextW + iconW;
+  const dashGap    = 22;
+  const dashLen    = Math.max(30, (width - totalTagW - dashGap * 4 - 120) / 2);
+
+  // Left dash rule
+  ctx.strokeStyle = 'rgba(92, 111, 100, 0.55)';
+  ctx.lineWidth   = 1.6;
+  ctx.lineCap     = 'round';
   ctx.beginPath();
-  ctx.roundRect(qrBoxX, qrBoxY, qrBoxSize, qrBoxSize, qrBoxRadius);
+  ctx.moveTo(60,                   tagY);
+  ctx.lineTo(60 + dashLen,         tagY);
+  ctx.stroke();
+
+  // Right dash rule
+  ctx.beginPath();
+  ctx.moveTo(width - 60 - dashLen, tagY);
+  ctx.lineTo(width - 60,           tagY);
+  ctx.stroke();
+
+  // Tagline text
+  ctx.fillText(tagline, cx - iconW / 2, tagY, width - dashLen * 2 - 180);
+
+  // ☕ icon at end of text block
+  ctx.textAlign = 'left';
+  ctx.fillText(ICON_STR, cx + tagTextW / 2 - iconW * 0.1, tagY);
+  ctx.restore();
+
+  // ── 6. TABLE N Pill Badge with ✾ botanical flankers ──────────────────────
+  const pillW = 440, pillH = 76;
+  const pillY = 410;
+  const pillX = cx - pillW / 2;
+
+  drawPillBadge(ctx, {
+    x:         pillX,
+    y:         pillY,
+    width:     pillW,
+    height:    pillH,
+    bgColor:   brandDark,
+    text:      tableLabel,
+    textColor: '#FFFFFF',
+    font:      '700 40px "Playfair Display", Georgia, serif',
+    shadow:    true,
+  });
+
+  // Botanical ✾ flankers inside pill (matching reference leaf-sprig motif)
+  ctx.save();
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font         = '400 28px serif';
+  ctx.fillStyle    = 'rgba(255, 255, 255, 0.70)';
+  ctx.fillText('✾', pillX + 48,          pillY + pillH / 2);
+  ctx.fillText('✾', pillX + pillW - 48,   pillY + pillH / 2);
+  ctx.restore();
+
+  // ── 7. QR Code Container ──────────────────────────────────────────────────
+  // Reference: large white rounded rect with a soft green shadow
+  const qrBoxSize = 660;
+  const qrBoxX    = cx - qrBoxSize / 2;
+  const qrBoxY    = 524;
+  const qrBoxR    = 38;
+
+  ctx.save();
+  ctx.shadowColor   = 'rgba(27, 56, 43, 0.18)';
+  ctx.shadowBlur    = 36;
+  ctx.shadowOffsetY = 10;
+  ctx.beginPath();
+  ctx.roundRect(qrBoxX, qrBoxY, qrBoxSize, qrBoxSize, qrBoxR);
   ctx.fillStyle = '#FFFFFF';
   ctx.fill();
-
-  ctx.lineWidth = 2.2;
-  ctx.strokeStyle = 'rgba(27, 56, 43, 0.28)';
+  ctx.shadowColor   = 'transparent';
+  ctx.lineWidth     = 1.8;
+  ctx.strokeStyle   = 'rgba(27, 56, 43, 0.20)';
   ctx.stroke();
   ctx.restore();
 
-  // Draw QR Image inside container
+  // QR image centred inside container (qrSize 554 → ~53 px quiet-zone padding)
   if (qrImage) {
-    const qrInnerSize = 440;
-    const qrInnerX = width / 2 - qrInnerSize / 2;
-    const qrInnerY = qrBoxY + (qrBoxSize - qrInnerSize) / 2;
-    ctx.drawImage(qrImage, qrInnerX, qrInnerY, qrInnerSize, qrInnerSize);
+    const qrSize = 554;
+    const qrPad  = (qrBoxSize - qrSize) / 2;
+    ctx.drawImage(qrImage, qrBoxX + qrPad, qrBoxY + qrPad, qrSize, qrSize);
   }
 
-  // 6. Table Pill Badge (clean separation below QR box)
-  const pillW = 360;
-  const pillH = 64;
-  const pillY = qrBoxY + qrBoxSize + 60; // ~845
-  drawPillBadge(ctx, {
-    x: width / 2 - pillW / 2,
-    y: pillY,
-    width: pillW,
-    height: pillH,
-    bgColor: brandDark,
-    text: tableLabel,
-    textColor: '#FFFFFF',
-    font: '700 38px "Playfair Display", Georgia, serif',
-  });
+  // ── 8. Table Code Badge ───────────────────────────────────────────────────
+  const codeY = qrBoxY + qrBoxSize + 32;  // tight gap directly below QR box
 
-  // 7. Prominent Table CODE Capsule Badge (Directly below table badge)
-  const codeY = pillY + pillH + 34; // ~993
   drawThemedCodeBadge(ctx, {
-    cx: width / 2,
-    cy: codeY,
-    code: tableCodeFormatted,
-    bgColor: '#FFFFFF',
-    borderColor: 'rgba(27, 56, 43, 0.35)',
+    cx,
+    cy:          codeY,
+    code:        tableCodeFormatted,
+    bgColor:     '#FFFFFF',
+    borderColor: 'rgba(27, 56, 43, 0.28)',
     borderWidth: 1.8,
-    textColor: brandDark,
-    labelColor: textMuted,
-    width: 420,
-    height: 42,
-    radius: 14,
-    shadow: true,
+    textColor:   brandDark,
+    labelColor:  textMuted,
+    width:       560,
+    height:      68,
+    radius:      20,
+    shadow:      true,
   });
 
-  // 8. 3-Step Instruction Flow Node Row (generous 54px spacing below code badge)
-  const stepsY = codeY + 70; // ~1063
-  drawStepFlowNodes(ctx, {
-    cx: width / 2,
-    cy: stepsY,
-    color: brandDark,
-    textColor: textMuted,
-    circleRadius: 28,
-    spacing: 210,
-    orderIconType: 'cloche',
-    labels: ['Scan', 'View Menu', 'Order'],
-  });
+  // ── 9. Telebirr Payment Row ───────────────────────────────────────────────
+  // drawCardPaymentAccounts composites:
+  //   • official Telebirr logo (from public/banks_logo/telebirr.png in new engine,
+  //     or the legacy vector-T fallback here)
+  //   • "Telebirr" label
+  //   • phone number in bold monospace
+  const payY = codeY + 92;
 
-  // 9. Script Catchphrase: "Good Food, Good Vibes" (ample breathing space below step labels!)
-  const scriptY = stepsY + 98; // ~1161 (label ends at 1103, so 58px of clear space!)
-  ctx.save();
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = brandDark;
-  ctx.font = 'italic 700 44px "Caveat", "Brush Script MT", Georgia, cursive, serif';
-  ctx.fillText(restaurant?.slogan || 'Good Food, Good Vibes', width / 2, scriptY);
-  ctx.restore();
-
-  // 10. Bottom Hero Coffee Art Visual & Sweeping Green Wave
-  const waveTopY = height - 490; // ~1310
-
-  // Sweeping fluid organic wave in deep forest green
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(0, height);
-  ctx.lineTo(0, waveTopY + 140);
-  ctx.bezierCurveTo(
-    width * 0.25, waveTopY + 160,
-    width * 0.48, waveTopY - 10,
-    width, waveTopY + 70
-  );
-  ctx.lineTo(width, height);
-  ctx.closePath();
-  ctx.fillStyle = brandDark;
-  ctx.fill();
-  ctx.restore();
-
-  // Draw Coffee Latte Hero photo using drawImageCover (zero distortion!)
-  if (heroImage) {
-    const heroSize = 400;
-    const heroX = width - heroSize - 35;
-    const heroY = height - heroSize - 100;
-
-    ctx.save();
-    // Shadow ring
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
-    ctx.shadowBlur = 24;
-    ctx.shadowOffsetY = 8;
-    ctx.beginPath();
-    ctx.arc(heroX + heroSize / 2, heroY + heroSize / 2, heroSize / 2, 0, Math.PI * 2);
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fill();
-
-    // Photo inside circular mask
-    drawImageCover(ctx, heroImage, heroX, heroY, heroSize, heroSize, heroSize / 2);
-
-    // Decorative ring stroke
-    ctx.beginPath();
-    ctx.arc(heroX + heroSize / 2, heroY + heroSize / 2, heroSize / 2, 0, Math.PI * 2);
-    ctx.lineWidth = 6;
-    ctx.strokeStyle = '#FAF6EF';
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  // 11. Optional Payment Accounts Strip (Telebirr / CBE Birr)
   drawCardPaymentAccounts(ctx, {
-    cx: width / 2,
-    cy: height - 120,
+    cx,
+    cy:         payY,
     restaurant,
-    width: 540,
-    theme: 'light',
+    width:      760,
+    theme:      'light',
   });
 
-  // 12. "Powered by LayoScan" Footer Badge (Cleanly anchored, zero collision!)
+  // ── 10. LayoScan Footer ───────────────────────────────────────────────────
+  // Renders: LayoScan logo mark + "LayoScan" bold + italic "Scan. Dine. Done."
   await drawLayoScanFooter(ctx, {
-    cx: width / 2,
-    cy: height - 60,
-    badgeW: 390,
-    badgeH: 56,
-    templateId: 'cafe_artisan',
-    theme: 'light',
+    cx,
+    cy:          height - 68,
+    badgeW:      440,
+    badgeH:      68,
+    templateId:  'cafe_artisan',
+    theme:       'light',
     accentColor: brandDark,
   });
 }
@@ -339,66 +422,35 @@ export async function renderCafeArtisanLandscape(ctx, {
     font: '700 36px "Playfair Display", Georgia, serif',
   });
 
-
-  // 3-Step Flow Nodes (generous spacing below pill badge)
-  const stepsY = pillY + pillH + 40; // below pill badge
-  drawStepFlowNodes(ctx, {
-    cx: leftCenterX,
-    cy: stepsY,
-    color: brandDark,
-    textColor: textMuted,
-    circleRadius: 26,
-    spacing: 180,
-    orderIconType: 'cloche',
-    labels: ['Scan', 'View Menu', 'Order'],
-  });
-
-  // Script Catchphrase (ample breathing space below step labels - zero overlap!)
-  const scriptY = stepsY + 92; // ~556 (step labels end at 502, 54px clear space!)
+  // Botanical flankers
   ctx.save();
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillStyle = brandDark;
-  ctx.font = 'italic 700 42px "Caveat", "Brush Script MT", Georgia, cursive, serif';
-  ctx.fillText('Good Food, Good Vibes', leftCenterX, scriptY);
+  ctx.font = '400 22px serif';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.70)';
+  ctx.fillText('✾', leftCenterX - pillW / 2 + 38, pillY + pillH / 2);
+  ctx.fillText('✾', leftCenterX + pillW / 2 - 38, pillY + pillH / 2);
   ctx.restore();
 
-  // Bottom Wave & Hero Image on Left
-  const waveY = height - 460;
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(0, height);
-  ctx.lineTo(0, waveY + 80);
-  ctx.bezierCurveTo(200, waveY + 90, 500, waveY - 40, 960, waveY + 60);
-  ctx.lineTo(960, height);
-  ctx.closePath();
-  ctx.fillStyle = brandDark;
-  ctx.fill();
-  ctx.restore();
+  // Payment Accounts
+  drawCardPaymentAccounts(ctx, {
+    cx: leftCenterX,
+    cy: height - 120,
+    restaurant,
+    width: 540,
+    theme: 'light',
+  });
 
-  if (heroImage) {
-    const heroSize = 350;
-    const hx = 580;
-    const hy = height - heroSize - 70;
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(hx + heroSize / 2, hy + heroSize / 2, heroSize / 2, 0, Math.PI * 2);
-    ctx.fillStyle = '#FFFFFF';
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.25)';
-    ctx.shadowBlur = 20;
-    ctx.shadowOffsetY = 6;
-    ctx.fill();
-
-    // Photo clipped to circle with object-fit cover
-    drawImageCover(ctx, heroImage, hx, hy, heroSize, heroSize, heroSize / 2);
-
-    ctx.beginPath();
-    ctx.arc(hx + heroSize / 2, hy + heroSize / 2, heroSize / 2, 0, Math.PI * 2);
-    ctx.lineWidth = 5;
-    ctx.strokeStyle = '#FAF6EF';
-    ctx.stroke();
-    ctx.restore();
-  }
+  // Right Footer
+  await drawLayoScanFooter(ctx, {
+    cx: leftCenterX,
+    cy: height - 55,
+    badgeW: 360,
+    badgeH: 52,
+    templateId: 'cafe_artisan',
+    theme: 'light',
+    accentColor: brandDark,
+  });
 
   // 4. Right Section: Large QR Code Presentation (x: 980 -> 1800)
   const rightCenterX = 1390;
@@ -481,7 +533,7 @@ export async function renderCafeArtisanLandscape(ctx, {
     theme: 'light',
   });
 
-  // Right Footer (matching left side)
+  // Right Footer
   await drawLayoScanFooter(ctx, {
     cx: rightCenterX,
     cy: height - 55,
@@ -689,4 +741,3 @@ export async function renderCafeArtisanMenuBoard(ctx, {
     accentColor: brandDark,
   });
 }
-
