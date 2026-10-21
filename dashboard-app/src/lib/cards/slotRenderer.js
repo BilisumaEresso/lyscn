@@ -701,10 +701,10 @@ export function renderSlots(ctx, slots = [], data = {}, options = {}) {
           ctx.restore();
         }
 
-        const iconSize = Math.max(48, Math.min(Math.round(slotH * 0.78), 86));
+        const iconSize = slot.iconSize || Math.max(40, Math.min(Math.round(slotH * 0.75), 86));
         const iconR = iconSize / 2;
         const fontStack = ensureEthiopicFont(slot.bodyFont || 'Inter, sans-serif');
-        const fontSize = Math.max(22, Math.min(Math.round(slotH * 0.40), 40));
+        const fontSize = slot.fontSize || Math.max(18, Math.min(Math.round(slotH * 0.38), 40));
 
         // Measure text for centering
         ctx.font = `600 ${fontSize}px ${fontStack}`;
@@ -713,7 +713,7 @@ export function renderSlots(ctx, slots = [], data = {}, options = {}) {
         ctx.font = `700 ${Math.round(fontSize * 1.15)}px "Space Grotesk", monospace`;
         const numW = ctx.measureText(phoneNumber).width;
 
-        const sepW = slot.separator ? 36 : 0;
+        const sepW = slot.separator ? (slot.separatorGap || 32) : 0;
         const totalW = iconSize + 16 + labelW_tb + sepW + numW;
         let drawX = centerX - totalW / 2;
 
