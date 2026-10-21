@@ -12,14 +12,14 @@ import cafeLogoPlaceholder from '../assets/cafe_logo_placeholder.png';
 
 // Import New Declarative Background Engine & Registry
 import { renderCard } from './cards/renderEngine.js';
-import { QR_TEMPLATES, getTemplateById } from './cards/designRegistry.js';
+import { QR_TEMPLATES, getTemplateById, getCanonicalTemplateId } from './cards/designRegistry.js';
 import { contrastRatio, getRelativeLuminance } from './cards/fitText.js';
 
 const CUSTOMER_URL =
   import.meta.env.VITE_CUSTOMER_APP_URL || 'https://layoscancustomer.vercel.app';
 
 // Re-export design registry for UI components (Tables.jsx, QRTemplateSelector, etc.)
-export { QR_TEMPLATES, getTemplateById };
+export { QR_TEMPLATES, getTemplateById, getCanonicalTemplateId };
 
 /**
  * Creates and configures a QRCodeStyling instance with high-error-correction (H)

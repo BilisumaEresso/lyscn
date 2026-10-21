@@ -129,7 +129,7 @@ export function drawQRWithQuietZone(ctx, qrImage, slot, options = {}) {
       ctx.stroke();
     }
 
-    // 1b. Optional Inner White Card (for high-contrast nested QR cards, e.g. Bold Street)
+    // 1b. Optional Inner White Card (for high-contrast nested QR cards, e.g. Bold Street, Artisan Linen)
     const innerBgColor = slot.innerBgColor || options.innerBgColor;
     if (innerBgColor) {
       const pad = slot.innerPadding ?? options.innerPadding ?? 24;
@@ -141,7 +141,7 @@ export function drawQRWithQuietZone(ctx, qrImage, slot, options = {}) {
       const innerBorderColor = slot.innerBorderColor || options.innerBorderColor;
       if (innerBorderColor) {
         ctx.strokeStyle = innerBorderColor;
-        ctx.lineWidth = slot.innerBorderWidth ?? options.innerBorderWidth ?? 2;
+        ctx.lineWidth = slot.innerBorderWidth ?? options.innerBorderWidth ?? 3;
         drawRoundRect(ctx, slot.x + pad, slot.y + pad, metrics.w - pad * 2, metrics.h - pad * 2, innerRadius);
         ctx.stroke();
       }

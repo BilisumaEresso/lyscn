@@ -28,6 +28,9 @@ export const DEFAULT_DESCRIPTORS = [
 
   // Permanent Marker (Street / Fast Casual brush typography)
   '400 16px "Permanent Marker"',
+
+  // Caveat (Artisan Cafe flowing cursive typography)
+  '700 16px "Caveat"',
 ];
 
 let fontsPromise = null;

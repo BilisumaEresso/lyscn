@@ -680,6 +680,27 @@ export function renderSlots(ctx, slots = [], data = {}, options = {}) {
         const centerX = x + slotW / 2;
         const centerY = y + slotH / 2;
 
+        // Optional container pill background & border (e.g. Artisan Linen cream pill)
+        if (slot.pillBg || slot.bgColor) {
+          ctx.save();
+          if (shadowColor && shadowBlur) {
+            ctx.shadowColor = shadowColor;
+            ctx.shadowBlur = shadowBlur;
+            ctx.shadowOffsetY = shadowOffsetY;
+          }
+          ctx.fillStyle = slot.pillBg || slot.bgColor;
+          const r = slot.radius || slotH / 2;
+          drawRoundRect(ctx, x, y, slotW, slotH, r);
+          ctx.fill();
+          if (slot.borderColor) {
+            ctx.strokeStyle = slot.borderColor;
+            ctx.lineWidth = slot.borderWidth || 2;
+            drawRoundRect(ctx, x, y, slotW, slotH, r);
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+
         const iconSize = Math.max(48, Math.min(Math.round(slotH * 0.78), 86));
         const iconR = iconSize / 2;
         const fontStack = ensureEthiopicFont(slot.bodyFont || 'Inter, sans-serif');
@@ -687,7 +708,7 @@ export function renderSlots(ctx, slots = [], data = {}, options = {}) {
 
         // Measure text for centering
         ctx.font = `600 ${fontSize}px ${fontStack}`;
-        const labelText = 'Telebirr  ';
+        const labelText = slot.labelPrefix ?? 'Telebirr  ';
         const labelW_tb = ctx.measureText(labelText).width;
         ctx.font = `700 ${Math.round(fontSize * 1.15)}px "Space Grotesk", monospace`;
         const numW = ctx.measureText(phoneNumber).width;

@@ -15,6 +15,7 @@ import {
   downloadTableCard,
   downloadAllTablesZip,
   formatTableCode,
+  getCanonicalTemplateId,
 } from '../lib/qrCardComposer';
 import QRTemplateSelector from '../components/tables/QRTemplateSelector';
 import Button from '../components/ui/Button';
@@ -68,7 +69,7 @@ function QRModal({ table, open, onClose }) {
   const qc = useQueryClient();
   const { restaurant } = useAuthStore();
   const [selectedTemplate, setSelectedTemplate] = useState(
-    restaurant?.qrCardTemplate || 'cafe_artisan'
+    getCanonicalTemplateId(restaurant?.qrCardTemplate) || 'artisan_linen'
   );
   const [orientation, setOrientation] = useState('portrait');
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -98,7 +99,7 @@ function QRModal({ table, open, onClose }) {
   // Sync default template from restaurant preferences when opening modal
   useEffect(() => {
     if (open && restaurant?.qrCardTemplate) {
-      setSelectedTemplate(restaurant.qrCardTemplate);
+      setSelectedTemplate(getCanonicalTemplateId(restaurant.qrCardTemplate));
     }
   }, [open, restaurant?.qrCardTemplate]);
 
@@ -312,7 +313,7 @@ function QRModal({ table, open, onClose }) {
                 <QRTemplateSelector
                   selectedTemplateId={selectedTemplate}
                   onSelectTemplate={setSelectedTemplate}
-                  defaultTemplateId={restaurant?.qrCardTemplate || 'cafe_artisan'}
+                  defaultTemplateId={getCanonicalTemplateId(restaurant?.qrCardTemplate) || 'artisan_linen'}
                   layout="list"
                 />
               </div>
@@ -1368,7 +1369,7 @@ export default function Tables() {
       await downloadAllTablesZip({
         tables: selectedTables,
         restaurant,
-        templateId: restaurant?.qrCardTemplate || 'cafe_artisan',
+        templateId: getCanonicalTemplateId(restaurant?.qrCardTemplate) || 'artisan_linen',
         orientation: 'portrait',
         onProgress: (current, total, label) => {
           toast.loading(`Generating card ${current}/${total} (${label})…`, { id: toastId });
@@ -1393,7 +1394,7 @@ export default function Tables() {
       await downloadAllTablesZip({
         tables,
         restaurant,
-        templateId: restaurant?.qrCardTemplate || 'cafe_artisan',
+        templateId: getCanonicalTemplateId(restaurant?.qrCardTemplate) || 'artisan_linen',
         orientation: 'portrait',
         onProgress: (current, total, label) => {
           toast.loading(`Generating card ${current}/${total} (${label})…`, { id: toastId });

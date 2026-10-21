@@ -342,8 +342,20 @@ export function productMatchesCategory(product, category) {
  */
 export function getMenuForCard({ restaurant, categories = [], products = [], templateId = null }) {
   // Determine restaurant archetype preference (fixed per restaurant, NOT per preview template)
-  const restaurantArchetype = restaurant?.qrCardTemplate || 'cafe_artisan';
-  const fallback = ARCHETYPE_SAMPLE_MENUS[restaurantArchetype] || ARCHETYPE_SAMPLE_MENUS.cafe_artisan;
+  const restaurantArchetype = restaurant?.qrCardTemplate || 'artisan_linen';
+  const legacyArchetype =
+    restaurantArchetype === 'artisan_linen' || restaurantArchetype === 'cafe_tent_classic' ? 'cafe_artisan' :
+    restaurantArchetype === 'bold_street' ? 'fast_casual' :
+    restaurantArchetype === 'fresh_emerald' || restaurantArchetype === 'juice_spris' ? 'fresh_mart' :
+    restaurantArchetype === 'midnight_gold' || restaurantArchetype === 'modern_minimal' ? 'luxury_hotel' :
+    restaurantArchetype === 'habesha_heritage' ? 'cultural_heritage' :
+    restaurantArchetype === 'velvet_lounge' ? 'liquor_bar' :
+    restaurantArchetype;
+
+  const fallback =
+    ARCHETYPE_SAMPLE_MENUS[restaurantArchetype] ||
+    ARCHETYPE_SAMPLE_MENUS[legacyArchetype] ||
+    ARCHETYPE_SAMPLE_MENUS.cafe_artisan;
   const currency = restaurant?.currency || fallback.currency || 'Br';
 
   // 1. If we have live categories with active products

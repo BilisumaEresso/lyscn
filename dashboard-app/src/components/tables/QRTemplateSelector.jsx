@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Sparkles, Layers } from 'lucide-react';
-import { QR_TEMPLATES } from '../../lib/qrCardComposer';
+import { QR_TEMPLATES, getCanonicalTemplateId } from '../../lib/qrCardComposer';
 import QRTemplateCard from './QRTemplateCard';
 
 /**
@@ -16,6 +16,9 @@ export default function QRTemplateSelector({
 }) {
   const [activeCategory, setActiveCategory] = useState('all');
 
+  const canonicalSelectedId = getCanonicalTemplateId(selectedTemplateId);
+  const canonicalDefaultId = defaultTemplateId ? getCanonicalTemplateId(defaultTemplateId) : null;
+
   const categories = useMemo(() => {
     return [
       { id: 'all', label: 'All Styles' },
@@ -30,12 +33,24 @@ export default function QRTemplateSelector({
 
   const filteredTemplates = useMemo(() => {
     if (activeCategory === 'all') return QR_TEMPLATES;
-    if (activeCategory === 'cafe') return QR_TEMPLATES.filter((t) => t.id === 'cafe_artisan');
-    if (activeCategory === 'casual') return QR_TEMPLATES.filter((t) => t.id === 'fast_casual');
-    if (activeCategory === 'mart') return QR_TEMPLATES.filter((t) => t.id === 'fresh_mart');
-    if (activeCategory === 'hotel') return QR_TEMPLATES.filter((t) => t.id === 'luxury_hotel');
-    if (activeCategory === 'heritage') return QR_TEMPLATES.filter((t) => t.id === 'cultural_heritage');
-    if (activeCategory === 'bar') return QR_TEMPLATES.filter((t) => t.id === 'liquor_bar');
+    if (activeCategory === 'cafe') {
+      return QR_TEMPLATES.filter((t) => t.id === 'artisan_linen' || t.id === 'cafe_tent_classic' || t.id === 'cafe_artisan');
+    }
+    if (activeCategory === 'casual') {
+      return QR_TEMPLATES.filter((t) => t.id === 'bold_street' || t.id === 'fast_casual');
+    }
+    if (activeCategory === 'mart') {
+      return QR_TEMPLATES.filter((t) => t.id === 'fresh_emerald' || t.id === 'juice_spris' || t.id === 'fresh_mart');
+    }
+    if (activeCategory === 'hotel') {
+      return QR_TEMPLATES.filter((t) => t.id === 'midnight_gold' || t.id === 'modern_minimal' || t.id === 'luxury_hotel');
+    }
+    if (activeCategory === 'heritage') {
+      return QR_TEMPLATES.filter((t) => t.id === 'habesha_heritage' || t.id === 'cultural_heritage');
+    }
+    if (activeCategory === 'bar') {
+      return QR_TEMPLATES.filter((t) => t.id === 'velvet_lounge' || t.id === 'liquor_bar');
+    }
     return QR_TEMPLATES;
   }, [activeCategory]);
 
@@ -71,9 +86,9 @@ export default function QRTemplateSelector({
           <QRTemplateCard
             key={template.id}
             template={template}
-            isSelected={selectedTemplateId === template.id}
+            isSelected={canonicalSelectedId === template.id}
             onClick={() => onSelectTemplate(template.id)}
-            isDefault={defaultTemplateId === template.id}
+            isDefault={canonicalDefaultId === template.id}
           />
         ))}
       </div>

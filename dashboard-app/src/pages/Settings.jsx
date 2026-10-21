@@ -29,6 +29,7 @@ import { useAuthStore } from "../store/authStore";
 import { useNotificationStore } from "../store/notificationStore";
 import { playSoundByType } from "../lib/soundEffects";
 import QRTemplateSelector from "../components/tables/QRTemplateSelector";
+import { getCanonicalTemplateId } from "../lib/qrCardComposer";
 
 function SectionHeader({ title, description }) {
   return (
@@ -127,7 +128,7 @@ export default function Settings() {
       facebook: "",
       tiktok: "",
       website: "",
-      qrCardTemplate: "cafe_artisan",
+      qrCardTemplate: "artisan_linen",
       telebirrNumber: "",
       telebirrName: "",
       telebirrQrUrl: "",
@@ -159,7 +160,7 @@ export default function Settings() {
   const brandColor = watch("brandColor") || "#4F46E5";
   const logoUrl = watch("logoUrl");
   const coverUrl = watch("coverUrl");
-  const qrCardTemplate = watch("qrCardTemplate") || "cafe_artisan";
+  const qrCardTemplate = watch("qrCardTemplate") || "artisan_linen";
   const telebirrAccountType = watch("telebirrAccountType") || "phone";
   const telebirrQrUrl = watch("telebirrQrUrl");
   const cbeQrUrl = watch("cbeQrUrl");
@@ -183,7 +184,7 @@ export default function Settings() {
       facebook: restaurant.socialLinks?.facebook ?? "",
       tiktok: restaurant.socialLinks?.tiktok ?? "",
       website: restaurant.socialLinks?.website ?? "",
-      qrCardTemplate: restaurant.qrCardTemplate ?? "cafe_artisan",
+      qrCardTemplate: getCanonicalTemplateId(restaurant.qrCardTemplate) || "artisan_linen",
       telebirrAccountType: pa.telebirr?.accountType || (pa.telebirr?.qrCodeUrl ? 'merchant' : 'phone'),
       telebirrNumber: pa.telebirr?.accountNumber ?? "",
       telebirrName: pa.telebirr?.accountName ?? "",
@@ -220,7 +221,7 @@ export default function Settings() {
         facebook: d.restaurant.socialLinks?.facebook ?? "",
         tiktok: d.restaurant.socialLinks?.tiktok ?? "",
         website: d.restaurant.socialLinks?.website ?? "",
-        qrCardTemplate: d.restaurant.qrCardTemplate ?? "cafe_artisan",
+        qrCardTemplate: getCanonicalTemplateId(d.restaurant.qrCardTemplate) || "artisan_linen",
         telebirrAccountType: pa.telebirr?.accountType || (pa.telebirr?.qrCodeUrl ? 'merchant' : 'phone'),
         telebirrNumber: pa.telebirr?.accountNumber ?? "",
         telebirrName: pa.telebirr?.accountName ?? "",
@@ -510,7 +511,7 @@ export default function Settings() {
           <QRTemplateSelector
             selectedTemplateId={qrCardTemplate}
             onSelectTemplate={(id) => setValue("qrCardTemplate", id, { shouldDirty: true })}
-            defaultTemplateId={restaurant?.qrCardTemplate || "cafe_artisan"}
+            defaultTemplateId={getCanonicalTemplateId(restaurant?.qrCardTemplate) || "artisan_linen"}
             layout="grid"
           />
         </section>

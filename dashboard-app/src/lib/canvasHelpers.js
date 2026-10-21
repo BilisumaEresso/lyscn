@@ -1041,6 +1041,15 @@ export function drawCardPaymentAccounts(ctx, {
  */
 export function getThemedQRIconDataUrl(templateId = 'cafe_artisan') {
   if (typeof document === 'undefined') return null;
+  const normalizedId =
+    templateId === 'artisan_linen' || templateId === 'cafe_tent_classic' ? 'cafe_artisan' :
+    templateId === 'bold_street' ? 'fast_casual' :
+    templateId === 'fresh_emerald' || templateId === 'juice_spris' ? 'fresh_mart' :
+    templateId === 'midnight_gold' || templateId === 'modern_minimal' ? 'luxury_hotel' :
+    templateId === 'habesha_heritage' ? 'cultural_heritage' :
+    templateId === 'velvet_lounge' ? 'liquor_bar' :
+    templateId;
+
   const canvas = document.createElement('canvas');
   canvas.width = 140;
   canvas.height = 140;
@@ -1052,7 +1061,7 @@ export function getThemedQRIconDataUrl(templateId = 'cafe_artisan') {
   ctx.beginPath();
   ctx.arc(cx, cy, 64, 0, Math.PI * 2);
 
-  if (templateId === 'fast_casual') {
+  if (normalizedId === 'fast_casual') {
     ctx.fillStyle = '#1A1A1E';
     ctx.fill();
     ctx.lineWidth = 4;
@@ -1080,14 +1089,14 @@ export function getThemedQRIconDataUrl(templateId = 'cafe_artisan') {
     ctx.roundRect(cx - 22, cy + 12, 44, 12, 3);
     ctx.stroke();
     ctx.restore();
-  } else if (templateId === 'fresh_mart') {
+  } else if (normalizedId === 'fresh_mart') {
     ctx.fillStyle = '#FFFFFF';
     ctx.fill();
     ctx.lineWidth = 4;
     ctx.strokeStyle = '#0B3B24';
     ctx.stroke();
     drawCartIcon(ctx, cx, cy, 66, '#0B3B24');
-  } else if (templateId === 'luxury_hotel') {
+  } else if (normalizedId === 'luxury_hotel') {
     ctx.fillStyle = '#FFFFFF';
     ctx.fill();
     ctx.lineWidth = 4;
@@ -1114,7 +1123,7 @@ export function getThemedQRIconDataUrl(templateId = 'cafe_artisan') {
     ctx.lineTo(cx + 28, cy + 20);
     ctx.stroke();
     ctx.restore();
-  } else if (templateId === 'cultural_heritage') {
+  } else if (normalizedId === 'cultural_heritage') {
     ctx.fillStyle = '#FFFFFF';
     ctx.fill();
     ctx.lineWidth = 4;
@@ -1142,7 +1151,7 @@ export function getThemedQRIconDataUrl(templateId = 'cafe_artisan') {
     ctx.arc(cx, cy - 20, 4, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
-  } else if (templateId === 'liquor_bar') {
+  } else if (normalizedId === 'liquor_bar') {
     ctx.fillStyle = '#0D0B08';
     ctx.fill();
     ctx.lineWidth = 4;

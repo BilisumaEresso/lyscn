@@ -24,11 +24,11 @@ export const TEMPLATE_ALIASES = {
 const LEGACY_SAMPLE_METADATA = {
   artisan_linen: {
     sampleName: 'Elili Cafe',
-    sampleTagline: 'GOOD FOOD • GREAT COFFEE • BETTER DAYS',
-    dotColor: '#1B382B',
-    cornerColor: '#1B382B',
-    accentColor: '#1B382B',
-    badgeBg: '#1B382B',
+    sampleTagline: 'WE SERVE QUALITY, WE THRIVE FOR YOUR SATISFACTION.',
+    dotColor: '#0C301F',
+    cornerColor: '#0C301F',
+    accentColor: '#0C301F',
+    badgeBg: '#0C301F',
     badgeText: '#FFFFFF',
     backgroundColor: '#F8F6F0',
   },
@@ -143,6 +143,11 @@ export const DESIGNS = QR_TEMPLATES;
  * @param {string} id - Design ID or legacy template alias
  * @returns {Object} Design specification object
  */
+export function getCanonicalTemplateId(id) {
+  if (!id) return 'artisan_linen';
+  return TEMPLATE_ALIASES[id] || id;
+}
+
 export function getTemplateById(id) {
   if (!id) return QR_TEMPLATES[0];
 
