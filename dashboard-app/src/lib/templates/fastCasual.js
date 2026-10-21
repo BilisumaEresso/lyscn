@@ -337,9 +337,10 @@ export async function renderFastCasualPortrait(ctx, {
   width = 1200,
   height = 1800,
 }) {
-  const yellow = '#FFA800';
-  const darkCard = '#1A1A1E';
-  const tableLabel = table?.label || 'Table 1';
+  const orange = '#FF7300';
+  const yellow = '#FF7300';
+  const darkCard = '#101012';
+  const tableLabel = table?.label || 'Table 4';
   const tableCodeFormatted = formatTableCode(table?.qrToken);
 
   // 1. Dark Matte Charcoal Background

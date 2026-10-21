@@ -25,6 +25,9 @@ export const DEFAULT_DESCRIPTORS = [
   // Space Grotesk (Display / Modern Monospace badges)
   '600 16px "Space Grotesk"',
   '700 16px "Space Grotesk"',
+
+  // Permanent Marker (Street / Fast Casual brush typography)
+  '400 16px "Permanent Marker"',
 ];
 
 let fontsPromise = null;

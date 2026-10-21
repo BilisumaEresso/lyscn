@@ -262,6 +262,19 @@ export async function renderCard({
     preloadTelebirrLogo(),
   ]);
 
+  // 6c. Pre-load any declarative slot imageSrc or fallback image assets
+  const slotImagePromises = layout.slots
+    .filter((slot) => (slot.imageSrc || slot.fallback) && !slot.image)
+    .map(async (slot) => {
+      const src = slot.imageSrc || (typeof slot.fallback === 'string' && slot.fallback.includes('/') ? slot.fallback : null);
+      if (src && typeof src === 'string') {
+        slot.image = await loadImage(src);
+      }
+    });
+  if (slotImagePromises.length > 0) {
+    await Promise.allSettled(slotImagePromises);
+  }
+
   // 7. Composite Dynamic Slots
   // Deep clone references to guarantee input objects are never mutated (§9.8)
   const slotPayload = {

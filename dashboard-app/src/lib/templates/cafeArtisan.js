@@ -400,11 +400,45 @@ export async function renderCafeArtisanLandscape(ctx, {
   ctx.font = '700 50px "Playfair Display", Georgia, serif';
   ctx.fillText(restName, leftCenterX, 218, 860);
 
-  // Tagline (cleanly spaced)
-  const tagline = (restaurant?.description || 'GOOD FOOD • GREAT COFFEE • BETTER DAYS').toUpperCase();
+  // Tagline (cleanly spaced with dashes and coffee icon)
+  const taglineRaw = restaurant?.description || 'GOOD FOOD • GREAT COFFEE • BETTER DAYS';
+  const tagline = taglineRaw.toUpperCase();
+  const tagY = 262;
+  const ICON_STR = '  ☕';
+
+  ctx.save();
+  ctx.font = '600 18px "Space Grotesk", Inter, sans-serif';
   ctx.fillStyle = textMuted;
-  ctx.font = '700 19px "Space Grotesk", Inter, sans-serif';
-  ctx.fillText(tagline, leftCenterX, 262, 860);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  const tagTextW = ctx.measureText(tagline).width;
+  const iconW = ctx.measureText(ICON_STR).width;
+  const totalTagW = tagTextW + iconW;
+  const dashGap = 16;
+  const dashLen = Math.max(20, (860 - totalTagW - dashGap * 4) / 2);
+
+  // Left dash rule
+  ctx.strokeStyle = 'rgba(92, 111, 100, 0.55)';
+  ctx.lineWidth = 1.6;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(leftCenterX - 430, tagY);
+  ctx.lineTo(leftCenterX - 430 + dashLen, tagY);
+  ctx.stroke();
+
+  // Right dash rule
+  ctx.beginPath();
+  ctx.moveTo(leftCenterX + 430 - dashLen, tagY);
+  ctx.lineTo(leftCenterX + 430, tagY);
+  ctx.stroke();
+
+  // Tagline text
+  ctx.fillText(tagline, leftCenterX - iconW / 2, tagY, 860 - dashLen * 2 - 40);
+
+  // ☕ icon at end of text block
+  ctx.textAlign = 'left';
+  ctx.fillText(ICON_STR, leftCenterX + tagTextW / 2 - iconW * 0.1, tagY);
   ctx.restore();
 
   // Table Pill Badge

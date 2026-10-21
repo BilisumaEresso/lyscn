@@ -152,14 +152,44 @@ export function resolveSlotValue(slot, data) {
 }
 
 /**
- * Aspect-fill image drawer inside bounded slot with optional border radius.
+ * Aspect-aware image drawer inside bounded slot with optional border radius and fitMode.
+ * fitMode: 'contain' (default for logos) scales proportionally inside slot without ANY cropping.
+ * fitMode: 'cover' scales image to completely fill slot, cropping overflow.
  */
-export function drawImageFit(ctx, img, x, y, width, height, radius = 0) {
+export function drawImageFit(ctx, img, x, y, width, height, radius = 0, fitMode = 'contain') {
   if (!img) return;
   const imgW = img.naturalWidth || img.width;
   const imgH = img.naturalHeight || img.height;
   if (!imgW || !imgH) return;
 
+  if (fitMode === 'contain') {
+    const imgRatio = imgW / imgH;
+    const targetRatio = width / height;
+
+    let dWidth, dHeight, dx, dy;
+    if (imgRatio > targetRatio) {
+      dWidth = width;
+      dHeight = width / imgRatio;
+      dx = x;
+      dy = y + (height - dHeight) / 2;
+    } else {
+      dHeight = height;
+      dWidth = height * imgRatio;
+      dx = x + (width - dWidth) / 2;
+      dy = y;
+    }
+
+    ctx.save();
+    if (radius > 0) {
+      drawRoundRect(ctx, dx, dy, dWidth, dHeight, radius);
+      ctx.clip();
+    }
+    ctx.drawImage(img, 0, 0, imgW, imgH, dx, dy, dWidth, dHeight);
+    ctx.restore();
+    return;
+  }
+
+  // 'cover' mode
   const targetRatio = width / height;
   const imgRatio = imgW / imgH;
 
@@ -344,13 +374,40 @@ export function renderSlots(ctx, slots = [], data = {}, options = {}) {
           textX = x + slotW;
         }
 
-        // Render each line
-        const totalTextHeight = fitted.totalHeight || fitted.lineHeightPx;
-        const startY = y + (slotH - totalTextHeight) / 2 + fitted.lineHeightPx / 2;
+        // Render text (supports optional two-tone accent styling, e.g. "ELILI" in white, "CAFE" in orange)
+        if (slot.twoToneAccent && displayText.includes(' ') && fitted.lines.length === 1) {
+          const words = displayText.trim().split(/\s+/);
+          const lastWord = words.pop();
+          const firstPart = words.join(' ');
 
-        for (let i = 0; i < fitted.lines.length; i++) {
-          const lineY = startY + i * fitted.lineHeightPx;
-          ctx.fillText(fitted.lines[i], textX, lineY);
+          const spaceW = ctx.measureText(' ').width;
+          const firstW = ctx.measureText(firstPart).width;
+          const lastW = ctx.measureText(lastWord).width;
+          const totalW = firstW + spaceW + lastW;
+
+          let startDrawX = x;
+          if (align === 'center') {
+            startDrawX = x + (slotW - totalW) / 2;
+          } else if (align === 'right') {
+            startDrawX = x + slotW - totalW;
+          }
+          const centerY = y + slotH / 2;
+
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = color;
+          ctx.fillText(firstPart, startDrawX, centerY);
+
+          ctx.fillStyle = slot.accentColor || '#FF7300';
+          ctx.fillText(lastWord, startDrawX + firstW + spaceW, centerY);
+        } else {
+          const totalTextHeight = fitted.totalHeight || fitted.lineHeightPx;
+          const startY = y + (slotH - totalTextHeight) / 2 + fitted.lineHeightPx / 2;
+
+          for (let i = 0; i < fitted.lines.length; i++) {
+            const lineY = startY + i * fitted.lineHeightPx;
+            ctx.fillText(fitted.lines[i], textX, lineY);
+          }
         }
 
         if (slot.clip !== false && w && h) {
@@ -382,15 +439,44 @@ export function renderSlots(ctx, slots = [], data = {}, options = {}) {
     else if (type === 'image') {
       let targetImg = null;
       if (slot.source === 'logo') {
-        targetImg = logoImage;
+        targetImg = logoImage || slot.image || slot.fallback;
       } else if (slot.source === 'heroImage') {
-        targetImg = heroImage;
+        targetImg = heroImage || slot.image || slot.fallback;
       } else if (slot.image) {
         targetImg = slot.image;
+      } else if (slot.fallback) {
+        targetImg = slot.fallback;
       }
 
       if (targetImg && w && h) {
-        if (shadowColor && shadowBlur) {
+        const isLogo = slot.source === 'logo';
+        // Logos always default to 'contain' so branding is never cropped
+        const fitMode = slot.fitMode || (isLogo ? 'contain' : 'cover');
+        const shape = slot.shape || slot.logoShape || (slot.clipCircle ? 'circle' : 'auto');
+
+        // Optional background fill: only apply if explicitly defined in slot.bgColor
+        if (slot.bgColor) {
+          ctx.save();
+          if (shadowColor && shadowBlur) {
+            ctx.shadowColor = shadowColor;
+            ctx.shadowBlur = shadowBlur;
+            ctx.shadowOffsetY = shadowOffsetY;
+          }
+          ctx.fillStyle = slot.bgColor;
+          if (shape === 'circle') {
+            const size = Math.min(w, h);
+            const cx = x + w / 2;
+            const cy = y + h / 2;
+            ctx.beginPath();
+            ctx.arc(cx, cy, size / 2, 0, Math.PI * 2);
+            ctx.fill();
+          } else {
+            drawRoundRect(ctx, x, y, w, h, radius);
+            ctx.fill();
+          }
+          ctx.restore();
+        } else if (!isLogo && shadowColor && shadowBlur) {
+          // For non-logo hero images with shadow, provide solid backing card
           ctx.save();
           ctx.shadowColor = shadowColor;
           ctx.shadowBlur = shadowBlur;
@@ -401,15 +487,33 @@ export function renderSlots(ctx, slots = [], data = {}, options = {}) {
           ctx.restore();
         }
 
-        drawImageFit(ctx, targetImg, x, y, w, h, radius);
-
-        if (borderColor) {
+        // Render image honoring shape and fitMode
+        if (shape === 'circle') {
+          const size = Math.min(w, h);
+          const cx = x + w / 2;
+          const cy = y + h / 2;
           ctx.save();
-          ctx.strokeStyle = borderColor;
-          ctx.lineWidth = borderWidth;
-          drawRoundRect(ctx, x, y, w, h, radius);
-          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(cx, cy, size / 2, 0, Math.PI * 2);
+          ctx.clip();
+          drawImageFit(ctx, targetImg, cx - size / 2, cy - size / 2, size, size, 0, fitMode);
+          if (borderColor) {
+            ctx.strokeStyle = borderColor;
+            ctx.lineWidth = borderWidth || 2;
+            ctx.stroke();
+          }
           ctx.restore();
+        } else {
+          drawImageFit(ctx, targetImg, x, y, w, h, radius, fitMode);
+
+          if (borderColor) {
+            ctx.save();
+            ctx.strokeStyle = borderColor;
+            ctx.lineWidth = borderWidth || 1.5;
+            drawRoundRect(ctx, x, y, w, h, radius);
+            ctx.stroke();
+            ctx.restore();
+          }
         }
       }
     }
@@ -588,15 +692,31 @@ export function renderSlots(ctx, slots = [], data = {}, options = {}) {
         ctx.font = `700 ${Math.round(fontSize * 1.15)}px "Space Grotesk", monospace`;
         const numW = ctx.measureText(phoneNumber).width;
 
-        const totalW = iconSize + 14 + labelW_tb + numW;
+        const sepW = slot.separator ? 36 : 0;
+        const totalW = iconSize + 16 + labelW_tb + sepW + numW;
         let drawX = centerX - totalW / 2;
 
         // ── Telebirr Brand Logo / Icon ──
+        if (slot.circleBg) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(drawX + iconR, centerY, iconR, 0, Math.PI * 2);
+          ctx.fillStyle = slot.circleBg;
+          ctx.fill();
+          if (slot.circleBorderColor) {
+            ctx.strokeStyle = slot.circleBorderColor;
+            ctx.lineWidth = slot.circleBorderWidth || 3.5;
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+
         if (telebirrLogoImage) {
           ctx.save();
           ctx.shadowColor = 'rgba(0, 0, 0, 0.15)';
           ctx.shadowBlur = 8;
-          ctx.drawImage(telebirrLogoImage, drawX, centerY - iconR, iconSize, iconSize);
+          const logoPad = slot.circleBg ? Math.round(iconSize * 0.12) : 0;
+          ctx.drawImage(telebirrLogoImage, drawX + logoPad, centerY - iconR + logoPad, iconSize - logoPad * 2, iconSize - logoPad * 2);
           ctx.restore();
         } else {
           // Fallback vector icon if image not available
@@ -619,7 +739,7 @@ export function renderSlots(ctx, slots = [], data = {}, options = {}) {
           ctx.restore();
         }
 
-        drawX += iconSize + 14;
+        drawX += iconSize + 16;
 
         // ── "Telebirr" label ──
         ctx.save();
@@ -631,13 +751,31 @@ export function renderSlots(ctx, slots = [], data = {}, options = {}) {
         ctx.fillText(labelText, drawX, centerY);
         ctx.restore();
 
+        drawX += labelW_tb;
+
+        // ── Optional vertical separator line ──
+        if (slot.separator) {
+          const sepColor = slot.separatorColor || slot.circleBorderColor || '#FF7800';
+          const sepH = Math.round(slotH * 0.48);
+          ctx.save();
+          ctx.strokeStyle = sepColor;
+          ctx.lineWidth = slot.separatorWidth || 3;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(drawX + 8, centerY - sepH / 2);
+          ctx.lineTo(drawX + 8, centerY + sepH / 2);
+          ctx.stroke();
+          ctx.restore();
+          drawX += sepW;
+        }
+
         // ── Phone number ──
         ctx.save();
         ctx.fillStyle = slot.numberColor || color || '#111827';
         ctx.font = `700 ${Math.round(fontSize * 1.15)}px "Space Grotesk", monospace`;
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
-        ctx.fillText(phoneNumber, drawX + labelW_tb, centerY);
+        ctx.fillText(phoneNumber, drawX, centerY);
         ctx.restore();
       }
     }
@@ -694,7 +832,7 @@ export function renderSlots(ctx, slots = [], data = {}, options = {}) {
         ctx.save();
         const pillH = slotH - 4;
         const pillRadius = pillH / 2;
-        const pillW = Math.min(slotW, totalContentW + 56);
+        const pillW = ts.pillWidth || Math.min(slotW, totalContentW + 64);
         const pillX = centerX - pillW / 2;
         if (ts.bgColor) {
           ctx.fillStyle = ts.bgColor;
@@ -703,7 +841,7 @@ export function renderSlots(ctx, slots = [], data = {}, options = {}) {
         }
         if (ts.borderColor) {
           ctx.strokeStyle = ts.borderColor;
-          ctx.lineWidth = 1.5;
+          ctx.lineWidth = ts.borderWidth || 1.5;
           drawRoundRect(ctx, pillX, y + 2, pillW, pillH, pillRadius);
           ctx.stroke();
         }

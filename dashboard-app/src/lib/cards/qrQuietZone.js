@@ -128,6 +128,24 @@ export function drawQRWithQuietZone(ctx, qrImage, slot, options = {}) {
       drawRoundRect(ctx, slot.x, slot.y, metrics.w, metrics.h, radius);
       ctx.stroke();
     }
+
+    // 1b. Optional Inner White Card (for high-contrast nested QR cards, e.g. Bold Street)
+    const innerBgColor = slot.innerBgColor || options.innerBgColor;
+    if (innerBgColor) {
+      const pad = slot.innerPadding ?? options.innerPadding ?? 24;
+      const innerRadius = slot.innerRadius ?? options.innerRadius ?? Math.max(12, radius - 6);
+      ctx.fillStyle = innerBgColor;
+      drawRoundRect(ctx, slot.x + pad, slot.y + pad, metrics.w - pad * 2, metrics.h - pad * 2, innerRadius);
+      ctx.fill();
+
+      const innerBorderColor = slot.innerBorderColor || options.innerBorderColor;
+      if (innerBorderColor) {
+        ctx.strokeStyle = innerBorderColor;
+        ctx.lineWidth = slot.innerBorderWidth ?? options.innerBorderWidth ?? 2;
+        drawRoundRect(ctx, slot.x + pad, slot.y + pad, metrics.w - pad * 2, metrics.h - pad * 2, innerRadius);
+        ctx.stroke();
+      }
+    }
   }
 
   // 2. Draw the QR code image centered inside the quiet zone
