@@ -16,6 +16,7 @@ import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import { playSound } from '../lib/soundEffects';
 import { buildCbeDynamicQrPayload } from '../lib/cbeQrGenerator';
+import { buildTelebirrDynamicQrPayload } from '../lib/telebirrMerchantQrGenerator';
 
 function timeAgo(date, now = Date.now()) {
   const secs = Math.max(0, Math.floor((now - new Date(date).getTime()) / 1000));
@@ -35,6 +36,7 @@ export default function WaiterView() {
   const [copiedKey, setCopiedKey] = useState(null);
   const [presentQrFullScreen, setPresentQrFullScreen] = useState(false);
   const [cbeQrMode, setCbeQrMode] = useState('dynamic'); // 'dynamic' | 'static'
+  const [telebirrMerchantQrMode, setTelebirrMerchantQrMode] = useState('dynamic'); // 'dynamic' | 'static'
   const [verifiedWithEyes, setVerifiedWithEyes] = useState(false);
   const [txnRefInput, setTxnRefInput] = useState('');
   const [now, setNow] = useState(Date.now());
@@ -281,7 +283,7 @@ export default function WaiterView() {
     setTxnRefInput('');
     setPresentQrFullScreen(false);
     setCbeQrMode('dynamic');
-    setTelebirrQrMode('dynamic');
+    setTelebirrMerchantQrMode('dynamic');
     setSettleModalOpen(true);
   };
 
@@ -1387,6 +1389,23 @@ export default function WaiterView() {
               const isTelebirrMerchant = isTelebirr && bankDetails.accountType === 'merchant';
               const isTelebirrPhone = isTelebirr && !isTelebirrMerchant;
 
+              // Generate dynamic EMVCo Telebirr Merchant QR if Telebirr Merchant is selected
+              const telebirrDynamicPayload = isConfigured && isTelebirrMerchant
+                ? buildTelebirrDynamicQrPayload({
+                    merchantId: bankDetails.accountNumber,
+                    operatorId: bankDetails.operatorId,
+                    merchantName: bankDetails.accountName || restaurant?.name || 'LayoScan Merchant',
+                    amount: effectivePayAmount,
+                    reason: `Table ${selectedTableForSettle?.label}`,
+                    billId: selectedTableForSettle?._id ? String(selectedTableForSettle._id).slice(-4).toUpperCase() : '',
+                    city: 'Addis Ababa',
+                  })
+                : '';
+
+              const isDynamicTelebirr = isTelebirrMerchant && Boolean(telebirrDynamicPayload);
+              const showDynamicTelebirr = isDynamicTelebirr && (telebirrMerchantQrMode === 'dynamic');
+              const telebirrStandeePayload = bankDetails.qrCodePayload || bankDetails.accountNumber;
+
               return (
                 <div className="p-3.5 rounded-2xl bg-paper border border-ink/8 space-y-3 animate-fade-in">
                   {isConfigured ? (
@@ -1404,9 +1423,15 @@ export default function WaiterView() {
                                   <span>Dynamic</span>
                                 </span>
                               )}
-                              {isTelebirrMerchant && (
+                              {isTelebirrMerchant && showDynamicTelebirr && (
                                 <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-100 text-blue-700 border border-blue-200">
-                                  <span>Till / Merchant</span>
+                                  <Zap size={9} className="text-blue-600 fill-blue-600" />
+                                  <span>Dynamic</span>
+                                </span>
+                              )}
+                              {isTelebirrMerchant && !showDynamicTelebirr && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-100 text-blue-700 border border-blue-200">
+                                  <span>Till / Standee</span>
                                 </span>
                               )}
                               {isTelebirrPhone && (
@@ -1446,7 +1471,31 @@ export default function WaiterView() {
                             </div>
                           )}
 
-                          {(showDynamicCbe || ((bankDetails.qrCodePayload || bankDetails.qrCodeUrl) && !isTelebirrPhone)) && (
+                          {/* Toggle between Dynamic (Prefilled) and Standee/Till QR for Telebirr Merchant */}
+                          {isDynamicTelebirr && (
+                            <div className="flex items-center bg-ink/5 p-0.5 rounded-lg text-[10px] font-semibold">
+                              <button
+                                type="button"
+                                onClick={() => setTelebirrMerchantQrMode('dynamic')}
+                                className={`px-2 py-0.5 rounded transition-all ${
+                                  showDynamicTelebirr ? 'bg-white shadow-2xs text-blue-700 font-bold' : 'text-ink-muted hover:text-ink'
+                                }`}
+                              >
+                                Dynamic
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setTelebirrMerchantQrMode('static')}
+                                className={`px-2 py-0.5 rounded transition-all ${
+                                  !showDynamicTelebirr ? 'bg-white shadow-2xs text-ink font-bold' : 'text-ink-muted hover:text-ink'
+                                }`}
+                              >
+                                Standee / Till
+                              </button>
+                            </div>
+                          )}
+
+                          {(showDynamicCbe || showDynamicTelebirr || ((bankDetails.qrCodePayload || bankDetails.qrCodeUrl || isTelebirrMerchant) && !isTelebirrPhone)) && (
                             <button
                               type="button"
                               onClick={() => setPresentQrFullScreen(!presentQrFullScreen)}
@@ -1522,42 +1571,76 @@ export default function WaiterView() {
                           </div>
                         ) : isTelebirrMerchant ? (
                           <div className={`transition-all duration-200 flex flex-col items-center w-full ${presentQrFullScreen ? 'p-3 bg-white rounded-2xl shadow-lg border-2 border-primary' : ''}`}>
-                            {bankDetails.qrCodePayload ? (
-                              <div className="p-2.5 bg-white rounded-xl border border-blue-200/80 shadow-xs inline-block">
-                                <QRCodeSVG
-                                  value={bankDetails.qrCodePayload}
-                                  size={presentQrFullScreen ? 230 : 150}
-                                  level="M"
-                                  includeMargin={true}
-                                  imageSettings={{
-                                    src: '/banks_logo/telebirr.png',
-                                    height: presentQrFullScreen ? 32 : 24,
-                                    width: presentQrFullScreen ? 32 : 24,
-                                    excavate: true,
-                                  }}
-                                />
-                              </div>
+                            {showDynamicTelebirr ? (
+                              <>
+                                <div className="p-2.5 bg-white rounded-xl border border-blue-200/80 shadow-xs inline-block">
+                                  <QRCodeSVG
+                                    value={telebirrDynamicPayload}
+                                    size={presentQrFullScreen ? 230 : 150}
+                                    level="M"
+                                    includeMargin={true}
+                                    imageSettings={{
+                                      src: '/banks_logo/telebirr.png',
+                                      height: presentQrFullScreen ? 32 : 24,
+                                      width: presentQrFullScreen ? 32 : 24,
+                                      excavate: true,
+                                    }}
+                                  />
+                                </div>
+                                <div className="mt-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-semibold bg-blue-50 border-blue-200 text-blue-900">
+                                  <Sparkles size={12} className="text-blue-600 shrink-0" />
+                                  <span>
+                                    Prefilled: <b>Br {Number(effectivePayAmount || 0).toLocaleString()}</b> & <b>{tableRefRemark}</b>
+                                  </span>
+                                </div>
+                                <p className="text-[11px] font-medium text-ink-muted mt-1">
+                                  Hold phone towards guest to scan with Telebirr <b>Scan</b>
+                                </p>
+                              </>
                             ) : bankDetails.qrCodeUrl ? (
-                              <img
-                                src={bankDetails.qrCodeUrl}
-                                alt="Telebirr Merchant QR"
-                                className={`object-contain rounded-lg mx-auto ${presentQrFullScreen ? 'w-56 h-56' : 'w-32 h-32'}`}
-                              />
+                              <>
+                                <img
+                                  src={bankDetails.qrCodeUrl}
+                                  alt="Telebirr Merchant QR"
+                                  className={`object-contain rounded-lg mx-auto ${presentQrFullScreen ? 'w-56 h-56' : 'w-32 h-32'}`}
+                                />
+                                <div className="mt-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-semibold bg-blue-50 border-blue-200 text-blue-900">
+                                  <span>Official Standee QR (Scan with Telebirr <b>Scan</b>)</span>
+                                </div>
+                                <p className="text-[11px] font-medium text-ink-muted mt-1">
+                                  Ask guest to scan with Telebirr <b>Scan</b> & enter bill amount
+                                </p>
+                              </>
                             ) : (
-                              <div className="py-2 text-center text-xs text-ink-muted">
-                                No Standee QR configured. Guest can pay using Merchant ID below.
-                              </div>
+                              <>
+                                <div className="p-2.5 bg-white rounded-xl border border-blue-200/80 shadow-xs inline-block">
+                                  <QRCodeSVG
+                                    value={telebirrStandeePayload}
+                                    size={presentQrFullScreen ? 230 : 150}
+                                    level="M"
+                                    includeMargin={true}
+                                    imageSettings={{
+                                      src: '/banks_logo/telebirr.png',
+                                      height: presentQrFullScreen ? 32 : 24,
+                                      width: presentQrFullScreen ? 32 : 24,
+                                      excavate: true,
+                                    }}
+                                  />
+                                </div>
+                                <div className="mt-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-semibold bg-blue-50 border-blue-200 text-blue-900">
+                                  <span>Till Standee QR (Scan with Telebirr <b>Scan</b>)</span>
+                                </div>
+                                <p className="text-[11px] font-medium text-ink-muted mt-1">
+                                  Ask guest to scan with Telebirr <b>Scan</b> & enter bill amount
+                                </p>
+                              </>
                             )}
-
-                            <div className="mt-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-semibold bg-blue-50 border-blue-200 text-blue-900">
-                              <span>Official Standee QR (Scan with Telebirr <b>Scan</b>)</span>
-                            </div>
 
                             {/* Exact Bill Total Highlight Card */}
                             <div className="mt-2.5 w-full flex items-center justify-between bg-blue-50/90 p-2.5 rounded-xl border border-blue-200">
                               <div className="text-left min-w-0 pr-2">
                                 <span className="text-[9px] uppercase tracking-wider text-blue-800 font-bold block">
-                                  Exact Bill Total (Guest Enters)
+                                  {showDynamicTelebirr ? 'Exact Bill Total (Prefilled)' : 'Exact Bill Total (Guest Enters)'}
                                 </span>
                                 <span className="font-mono font-black text-sm sm:text-base text-blue-950 block">
                                   Br {Number(effectivePayAmount || 0).toLocaleString()}
