@@ -187,6 +187,8 @@ export default function Settings() {
       qrCardTemplate: getCanonicalTemplateId(restaurant.qrCardTemplate) || "artisan_linen",
       telebirrAccountType: pa.telebirr?.accountType || (pa.telebirr?.qrCodeUrl ? 'merchant' : 'phone'),
       telebirrNumber: pa.telebirr?.accountNumber ?? "",
+      telebirrOperatorId: pa.telebirr?.operatorId ?? "",
+      telebirrQrPayload: pa.telebirr?.qrCodePayload ?? "",
       telebirrName: pa.telebirr?.accountName ?? "",
       telebirrQrUrl: pa.telebirr?.qrCodeUrl ?? "",
       cbeNumber: pa.cbeBirr?.accountNumber ?? "",
@@ -224,6 +226,8 @@ export default function Settings() {
         qrCardTemplate: getCanonicalTemplateId(d.restaurant.qrCardTemplate) || "artisan_linen",
         telebirrAccountType: pa.telebirr?.accountType || (pa.telebirr?.qrCodeUrl ? 'merchant' : 'phone'),
         telebirrNumber: pa.telebirr?.accountNumber ?? "",
+        telebirrOperatorId: pa.telebirr?.operatorId ?? "",
+        telebirrQrPayload: pa.telebirr?.qrCodePayload ?? "",
         telebirrName: pa.telebirr?.accountName ?? "",
         telebirrQrUrl: pa.telebirr?.qrCodeUrl ?? "",
         cbeNumber: pa.cbeBirr?.accountNumber ?? "",
@@ -267,6 +271,8 @@ export default function Settings() {
           accountType: form.telebirrAccountType || "phone",
           accountNumber: form.telebirrNumber?.trim() || "",
           accountName: form.telebirrName?.trim() || "",
+          operatorId: form.telebirrOperatorId?.trim() || "",
+          qrCodePayload: form.telebirrQrPayload?.trim() || "",
           qrCodeUrl: form.telebirrAccountType === "merchant" ? (form.telebirrQrUrl?.trim() || null) : null,
           isActive: Boolean(form.telebirrNumber?.trim()),
         },
@@ -629,26 +635,39 @@ export default function Settings() {
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                     <Input
-                      label="Merchant Till Number / Shortcode"
-                      placeholder="e.g. 123456"
+                      label="Merchant ID / Till Number"
+                      placeholder="e.g. 516172"
                       {...register("telebirrNumber")}
                     />
                     <Input
+                      label="Operator ID (Optional)"
+                      placeholder="e.g. 452089"
+                      {...register("telebirrOperatorId")}
+                    />
+                    <Input
                       label="Registered Merchant Name"
-                      placeholder="e.g. Cafe Artisan"
+                      placeholder="e.g. Artisan Cafe"
                       {...register("telebirrName")}
+                    />
+                    <Input
+                      label="Standee QR Code Number (19 digits, Optional)"
+                      placeholder="e.g. 1777287076455620609"
+                      {...register("telebirrQrPayload")}
                     />
                   </div>
                   <div className="pt-2">
                     <label className="block text-xs font-semibold text-ink-muted mb-1.5">
-                      Official Telebirr Merchant QR Image (Optional)
+                      Official Telebirr Merchant Standee Image (Optional)
                     </label>
                     <ImageUploader
                       value={telebirrQrUrl}
                       onChange={(url) => setValue("telebirrQrUrl", url || "", { shouldDirty: true })}
                       aspectRatio="1:1"
-                      helperText="Upload your official green Telebirr merchant counter standee QR code for customer phone-to-phone scanning."
+                      helperText="Upload a photo of your counter standee QR code, or paste the 19 digits printed on it above."
                     />
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-blue-100/60 border border-blue-200/70 text-[11px] text-blue-900 leading-relaxed">
+                    💡 <b>Safe Standee Floor Flow:</b> LayoScan generates your official Standee QR code on the waiter terminal with assisted chips (Exact Bill Total, Merchant ID, Operator ID, and Table Remark). When diners scan with Telebirr, it opens your merchant profile instantly with 100% scan success.
                   </div>
                 </>
               )}

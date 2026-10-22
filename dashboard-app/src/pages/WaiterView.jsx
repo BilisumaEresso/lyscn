@@ -16,7 +16,6 @@ import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import { playSound } from '../lib/soundEffects';
 import { buildCbeDynamicQrPayload } from '../lib/cbeQrGenerator';
-import { buildTelebirrDynamicQrPayload } from '../lib/telebirrQrGenerator';
 
 function timeAgo(date, now = Date.now()) {
   const secs = Math.max(0, Math.floor((now - new Date(date).getTime()) / 1000));
@@ -36,7 +35,6 @@ export default function WaiterView() {
   const [copiedKey, setCopiedKey] = useState(null);
   const [presentQrFullScreen, setPresentQrFullScreen] = useState(false);
   const [cbeQrMode, setCbeQrMode] = useState('dynamic'); // 'dynamic' | 'static'
-  const [telebirrQrMode, setTelebirrQrMode] = useState('dynamic'); // 'dynamic' | 'static'
   const [verifiedWithEyes, setVerifiedWithEyes] = useState(false);
   const [txnRefInput, setTxnRefInput] = useState('');
   const [now, setNow] = useState(Date.now());
@@ -1448,7 +1446,7 @@ export default function WaiterView() {
                             </div>
                           )}
 
-                          {(showDynamicCbe || (bankDetails.qrCodeUrl && !isTelebirrPhone)) && (
+                          {(showDynamicCbe || ((bankDetails.qrCodePayload || bankDetails.qrCodeUrl) && !isTelebirrPhone)) && (
                             <button
                               type="button"
                               onClick={() => setPresentQrFullScreen(!presentQrFullScreen)}
@@ -1522,6 +1520,102 @@ export default function WaiterView() {
                               </div>
                             </div>
                           </div>
+                        ) : isTelebirrMerchant ? (
+                          <div className={`transition-all duration-200 flex flex-col items-center w-full ${presentQrFullScreen ? 'p-3 bg-white rounded-2xl shadow-lg border-2 border-primary' : ''}`}>
+                            {bankDetails.qrCodePayload ? (
+                              <div className="p-2.5 bg-white rounded-xl border border-blue-200/80 shadow-xs inline-block">
+                                <QRCodeSVG
+                                  value={bankDetails.qrCodePayload}
+                                  size={presentQrFullScreen ? 230 : 150}
+                                  level="M"
+                                  includeMargin={true}
+                                  imageSettings={{
+                                    src: '/banks_logo/telebirr.png',
+                                    height: presentQrFullScreen ? 32 : 24,
+                                    width: presentQrFullScreen ? 32 : 24,
+                                    excavate: true,
+                                  }}
+                                />
+                              </div>
+                            ) : bankDetails.qrCodeUrl ? (
+                              <img
+                                src={bankDetails.qrCodeUrl}
+                                alt="Telebirr Merchant QR"
+                                className={`object-contain rounded-lg mx-auto ${presentQrFullScreen ? 'w-56 h-56' : 'w-32 h-32'}`}
+                              />
+                            ) : (
+                              <div className="py-2 text-center text-xs text-ink-muted">
+                                No Standee QR configured. Guest can pay using Merchant ID below.
+                              </div>
+                            )}
+
+                            <div className="mt-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-semibold bg-blue-50 border-blue-200 text-blue-900">
+                              <span>Official Standee QR (Scan with Telebirr <b>Scan</b>)</span>
+                            </div>
+
+                            {/* Exact Bill Total Highlight Card */}
+                            <div className="mt-2.5 w-full flex items-center justify-between bg-blue-50/90 p-2.5 rounded-xl border border-blue-200">
+                              <div className="text-left min-w-0 pr-2">
+                                <span className="text-[9px] uppercase tracking-wider text-blue-800 font-bold block">
+                                  Exact Bill Total (Guest Enters)
+                                </span>
+                                <span className="font-mono font-black text-sm sm:text-base text-blue-950 block">
+                                  Br {Number(effectivePayAmount || 0).toLocaleString()}
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => copyToClipboard(String(effectivePayAmount), 'amount', 'bill amount')}
+                                className="px-2.5 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold flex items-center gap-1 hover:bg-blue-700 shadow-2xs shrink-0"
+                              >
+                                {copiedKey === 'amount' ? <Check size={12} /> : <Copy size={12} />}
+                                <span>{copiedKey === 'amount' ? 'Copied' : 'Copy Br'}</span>
+                              </button>
+                            </div>
+
+                            {/* Merchant ID & Operator ID Chips */}
+                            <div className="mt-2 w-full grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              <div className="flex items-center justify-between bg-paper p-2 rounded-xl border border-ink/6">
+                                <div className="text-left min-w-0 pr-1">
+                                  <span className="text-[9px] uppercase tracking-wider text-ink-muted font-bold block">
+                                    Merchant ID
+                                  </span>
+                                  <span className="font-mono font-bold text-xs text-ink truncate block">
+                                    {bankDetails.accountNumber}
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => copyToClipboard(bankDetails.accountNumber, 'account', 'merchant ID')}
+                                  className="px-2 py-0.5 rounded-md bg-white border border-ink/12 text-[11px] font-semibold text-ink flex items-center gap-1 hover:bg-ink/5 shadow-2xs shrink-0"
+                                >
+                                  {copiedKey === 'account' ? <Check size={11} className="text-emerald-600" /> : <Copy size={11} />}
+                                  <span>{copiedKey === 'account' ? 'Copied' : 'Copy'}</span>
+                                </button>
+                              </div>
+
+                              {bankDetails.operatorId ? (
+                                <div className="flex items-center justify-between bg-paper p-2 rounded-xl border border-ink/6">
+                                  <div className="text-left min-w-0 pr-1">
+                                    <span className="text-[9px] uppercase tracking-wider text-ink-muted font-bold block">
+                                      Operator ID
+                                    </span>
+                                    <span className="font-mono font-bold text-xs text-ink truncate block">
+                                      {bankDetails.operatorId}
+                                    </span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => copyToClipboard(bankDetails.operatorId, 'operator', 'operator ID')}
+                                    className="px-2 py-0.5 rounded-md bg-white border border-ink/12 text-[11px] font-semibold text-ink flex items-center gap-1 hover:bg-ink/5 shadow-2xs shrink-0"
+                                  >
+                                    {copiedKey === 'operator' ? <Check size={11} className="text-emerald-600" /> : <Copy size={11} />}
+                                    <span>{copiedKey === 'operator' ? 'Copied' : 'Copy'}</span>
+                                  </button>
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
                         ) : bankDetails.qrCodeUrl ? (
                           <div className={`transition-all duration-200 ${presentQrFullScreen ? 'p-3 bg-white rounded-2xl shadow-lg border-2 border-primary' : ''}`}>
                             <img
@@ -1536,16 +1630,16 @@ export default function WaiterView() {
                         ) : (
                           <div className="py-2 space-y-1">
                             <span className="text-xs text-ink-muted">No QR image uploaded for {bankName}</span>
-                            <p className="text-[11px] text-ink-muted">Guest can transfer directly to the account / till number below</p>
+                            <p className="text-[11px] text-ink-muted">Guest can transfer directly to the account number below</p>
                           </div>
                         )}
 
-                        {/* Account Number & 1-Tap Copy (rendered for merchant mode, CBE, Awash, etc.) */}
-                        {!isTelebirrPhone && (
+                        {/* Account Number & 1-Tap Copy for non-phone non-merchant banks */}
+                        {!isTelebirrPhone && !isTelebirrMerchant && (
                           <div className="mt-2.5 w-full flex items-center justify-between bg-paper p-2 rounded-xl border border-ink/6">
                             <div className="text-left min-w-0 pr-2">
                               <span className="text-[9px] uppercase tracking-wider text-ink-muted font-bold block">
-                                {isTelebirrMerchant ? 'Merchant Till ID' : 'Account / Phone'}
+                                Account Number
                               </span>
                               <span className="font-mono font-bold text-xs sm:text-sm text-ink truncate block">
                                 {bankDetails.accountNumber}

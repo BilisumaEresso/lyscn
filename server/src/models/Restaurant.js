@@ -61,6 +61,8 @@ const restaurantSchema = new mongoose.Schema(
         accountType:   { type: String, enum: ['merchant', 'phone'], default: 'phone' },
         accountNumber: { type: String, trim: true, default: '' },
         accountName:   { type: String, trim: true, default: '' },
+        operatorId:    { type: String, trim: true, default: '' },
+        qrCodePayload: { type: String, trim: true, default: '' },
         qrCodeUrl:     { type: String, default: null },
         isActive:      { type: Boolean, default: true },
       },
