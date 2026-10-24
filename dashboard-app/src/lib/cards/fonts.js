@@ -31,6 +31,19 @@ export const DEFAULT_DESCRIPTORS = [
 
   // Caveat (Artisan Cafe flowing cursive typography)
   '700 16px "Caveat"',
+
+  // Custom Curated Card Display Fonts
+  '400 16px "Coffe Latte"',
+  '400 16px "Coffee Town"',
+  '400 16px "Grand Hotel"',
+  '400 16px "Gunko Street"',
+  '400 16px "Runethia"',
+  '400 16px "Runiga"',
+  '400 16px "Transcity"',
+  '400 16px "Velvetta"',
+  '400 16px "Fruit Juicer"',
+  '400 16px "Freshtea Healthy"',
+  '400 16px "Dark Heritage"',
 ];
 
 let fontsPromise = null;

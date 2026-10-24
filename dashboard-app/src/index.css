@@ -7,6 +7,83 @@
   src: url('/fonts/PermanentMarker.ttf') format('truetype');
 }
 
+@font-face {
+  font-family: 'Coffe Latte';
+  font-style: normal;
+  font-weight: 400;
+  src: url('/fonts/Coffe Latte.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Coffee Town';
+  font-style: normal;
+  font-weight: 400;
+  src: url('/fonts/Coffee Town.otf') format('opentype');
+}
+
+@font-face {
+  font-family: 'Grand Hotel';
+  font-style: normal;
+  font-weight: 400;
+  src: url('/fonts/GrandHotel-Regular.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Gunko Street';
+  font-style: normal;
+  font-weight: 400;
+  src: url('/fonts/GunkoStreet-Regular.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Runethia';
+  font-style: normal;
+  font-weight: 400;
+  src: url('/fonts/Runethia.otf') format('opentype');
+}
+
+@font-face {
+  font-family: 'Runiga';
+  font-style: normal;
+  font-weight: 400;
+  src: url('/fonts/Runiga.otf') format('opentype');
+}
+
+@font-face {
+  font-family: 'Velvetta';
+  font-style: normal;
+  font-weight: 400;
+  src: url('/fonts/Velvetta - Personal Use.otf') format('opentype');
+}
+
+@font-face {
+  font-family: 'Fruit Juicer';
+  font-style: normal;
+  font-weight: 400;
+  src: url('/fonts/Fruit Juicer.otf') format('opentype');
+}
+
+@font-face {
+  font-family: 'Freshtea Healthy';
+  font-style: normal;
+  font-weight: 400;
+  src: url('/fonts/Freshtea Healthy.otf') format('opentype');
+}
+
+@font-face {
+  font-family: 'Dark Heritage';
+  font-style: normal;
+  font-weight: 400;
+  src: url('/fonts/DarkHeritage-Regular.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Transcity';
+  font-style: normal;
+  font-weight: 400;
+  src: url('/fonts/Transcity DEMO.otf') format('opentype');
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

@@ -332,11 +332,15 @@ export function renderSlots(ctx, slots = [], data = {}, options = {}) {
           }
         }
 
-        // Clip slot boundaries if w & h set (§9.4)
-        if (slot.clip !== false && w && h) {
+        // Clip slot boundaries if explicitly enabled (slot.clip === true).
+        // For text slots, avoid hard rectangular clipping by default so tall ascenders,
+        // spires, accents, and swashes are never sliced off at the bounding box edge.
+        const shouldClipText = slot.clip === true;
+        if (shouldClipText && w && h) {
           ctx.save();
           ctx.beginPath();
-          ctx.rect(x, y, w, h);
+          const bleedY = Math.max(30, Math.round(slotH * 0.3));
+          ctx.rect(x, y - bleedY, slotW, slotH + bleedY * 2);
           ctx.clip();
         }
 
@@ -410,7 +414,7 @@ export function renderSlots(ctx, slots = [], data = {}, options = {}) {
           }
         }
 
-        if (slot.clip !== false && w && h) {
+        if (shouldClipText && w && h) {
           ctx.restore();
         }
       }
