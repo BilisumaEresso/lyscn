@@ -7,7 +7,7 @@
 import { drawRoundRect } from './drawRoundRect.js';
 import { fitText, sampleBackgroundLuminance, contrastRatio, getRelativeLuminance } from './fitText.js';
 import { drawQRWithQuietZone } from './qrQuietZone.js';
-import { drawDynamicMenuGrid } from '../canvasHelpers.js';
+import { drawDynamicMenuGrid, drawFrostedPanel } from '../canvasHelpers.js';
 import { getMenuForCard } from '../menuDataHelpers.js';
 
 /**
@@ -993,6 +993,28 @@ export function renderSlots(ctx, slots = [], data = {}, options = {}) {
       const endY = slot.endY ?? (y + slotH);
 
       ctx.save();
+
+      // Render frosted glass backdrop behind menu grid to protect readability
+      // against background borders, decorative artwork, and corner graphics
+      const frostConfig = slot.menuFrost;
+      if (frostConfig !== false) {
+        const isDark = (slot.theme === 'dark' || (color && getRelativeLuminance(color) > 0.5));
+        drawFrostedPanel(ctx, {
+          x,
+          y: startY,
+          w: slotW,
+          h: endY - startY,
+          radius: frostConfig?.radius ?? 24,
+          blurRadius: frostConfig?.blurRadius ?? 24,
+          tintColor: frostConfig?.tintColor ?? (isDark ? 'rgba(15, 15, 18, 0.40)' : 'rgba(255, 255, 255, 0.38)'),
+          borderColor: frostConfig?.borderColor ?? (isDark ? 'rgba(255, 255, 255, 0.25)' : 'rgba(0, 0, 0, 0.15)'),
+          borderWidth: frostConfig?.borderWidth ?? 1.5,
+          shadowColor: frostConfig?.shadowColor ?? (isDark ? 'rgba(0, 0, 0, 0.25)' : 'rgba(0, 0, 0, 0.08)'),
+          shadowBlur: frostConfig?.shadowBlur ?? 18,
+          shadowOffsetY: frostConfig?.shadowOffsetY ?? 4,
+          specular: frostConfig?.specular ?? true,
+        });
+      }
 
       // Render 2-column menu layout
       drawDynamicMenuGrid(ctx, {

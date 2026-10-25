@@ -1382,6 +1382,150 @@ export function drawMenuBridgeBar(ctx, {
 }
 
 /**
+ * Draws a high-end transparent frosted glass panel behind content on HTML5 Canvas.
+ * Captures the clean background art underneath, blurs it, and overlays a semi-transparent
+ * glass tint with rounded corners, subtle specular highlight, and border.
+ */
+export function drawFrostedPanel(ctx, {
+  x,
+  y,
+  w,
+  h,
+  radius = 24,
+  blurRadius = 24,
+  tintColor = 'rgba(255, 255, 255, 0.35)',
+  borderColor = 'rgba(255, 255, 255, 0.30)',
+  borderWidth = 1.5,
+  shadowColor = 'rgba(0, 0, 0, 0.12)',
+  shadowBlur = 18,
+  shadowOffsetY = 4,
+  specular = true,
+} = {}) {
+  if (!ctx || w <= 0 || h <= 0) return;
+
+  const canvas = ctx.canvas;
+  const hasCanvas = canvas && typeof canvas.getContext === 'function';
+
+  // 1. Capture and Blur the clean background underneath (BEFORE any painting on ctx)
+  if (hasCanvas && blurRadius > 0 && typeof document !== 'undefined') {
+    try {
+      const margin = Math.min(80, Math.round(blurRadius * 2));
+      const srcX = Math.max(0, x - margin);
+      const srcY = Math.max(0, y - margin);
+      const srcW = Math.min(canvas.width - srcX, w + margin * 2);
+      const srcH = Math.min(canvas.height - srcY, h + margin * 2);
+
+      if (srcW > 0 && srcH > 0) {
+        // Step A: Grab the untouched background from main canvas
+        const offCanvas = document.createElement('canvas');
+        offCanvas.width = srcW;
+        offCanvas.height = srcH;
+        const offCtx = offCanvas.getContext('2d');
+
+        if (offCtx) {
+          offCtx.drawImage(canvas, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
+
+          // Step B: Create a blurred version of the background
+          const blurCanvas = document.createElement('canvas');
+          blurCanvas.width = srcW;
+          blurCanvas.height = srcH;
+          const blurCtx = blurCanvas.getContext('2d');
+
+          if (blurCtx) {
+            let blurred = false;
+            // Native Canvas 2D filter blur
+            if ('filter' in blurCtx) {
+              try {
+                blurCtx.filter = `blur(${blurRadius}px)`;
+                blurCtx.drawImage(offCanvas, 0, 0);
+                blurCtx.filter = 'none';
+                blurred = true;
+              } catch {
+                blurred = false;
+              }
+            }
+
+            // High-quality downsample-upsample blur fallback
+            if (!blurred) {
+              const scale = 0.12;
+              const sw = Math.max(8, Math.round(srcW * scale));
+              const sh = Math.max(8, Math.round(srcH * scale));
+              const sCanvas = document.createElement('canvas');
+              sCanvas.width = sw;
+              sCanvas.height = sh;
+              const sCtx = sCanvas.getContext('2d');
+              sCtx.imageSmoothingEnabled = true;
+              sCtx.imageSmoothingQuality = 'high';
+              sCtx.drawImage(offCanvas, 0, 0, sw, sh);
+
+              blurCtx.imageSmoothingEnabled = true;
+              blurCtx.imageSmoothingQuality = 'high';
+              blurCtx.drawImage(sCanvas, 0, 0, sw, sh, 0, 0, srcW, srcH);
+            }
+
+            // Step C: Draw the blurred background clipped to the rounded panel
+            ctx.save();
+            ctx.beginPath();
+            ctx.roundRect(x, y, w, h, radius);
+            ctx.clip();
+            ctx.drawImage(blurCanvas, srcX, srcY);
+            ctx.restore();
+          }
+        }
+      }
+    } catch {
+      // Gracefully fall through
+    }
+  }
+
+  // 2. Draw the semi-transparent glass tint overlay (clipped to rounded panel)
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, radius);
+  ctx.clip();
+
+  // Transparent color wash
+  ctx.fillStyle = tintColor;
+  ctx.fill();
+
+  // Subtle specular reflection gradient for authentic glass refraction
+  if (specular && typeof ctx.createLinearGradient === 'function') {
+    const isDark = tintColor.includes('rgba(0') || tintColor.includes('rgba(1') || tintColor.includes('rgba(2');
+    const grad = ctx.createLinearGradient(x, y, x, y + h);
+    if (grad) {
+      if (isDark) {
+        grad.addColorStop(0, 'rgba(255, 255, 255, 0.08)');
+        grad.addColorStop(0.3, 'rgba(255, 255, 255, 0.02)');
+        grad.addColorStop(1, 'rgba(0, 0, 0, 0.12)');
+      } else {
+        grad.addColorStop(0, 'rgba(255, 255, 255, 0.28)');
+        grad.addColorStop(0.35, 'rgba(255, 255, 255, 0.08)');
+        grad.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
+      }
+      ctx.fillStyle = grad;
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+
+  // 3. Draw frosted glass border with ambient depth shadow
+  if (borderColor && borderWidth > 0) {
+    ctx.save();
+    if (shadowColor && shadowBlur > 0) {
+      ctx.shadowColor = shadowColor;
+      ctx.shadowBlur = shadowBlur;
+      ctx.shadowOffsetY = shadowOffsetY;
+    }
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, radius);
+    ctx.strokeStyle = borderColor;
+    ctx.lineWidth = borderWidth;
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+/**
  * Dynamic 2-Column Menu Grid Engine for Full Menu Board (2400 x 3400)
  * Intelligently balances categories across two columns, dynamically computes row heights,
  * renders clean single-line items with dotted leaders, and eliminates dead voids.
